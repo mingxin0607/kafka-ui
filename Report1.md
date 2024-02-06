@@ -3,7 +3,7 @@
 > *Team Members: Mingxin Hou, Yiren Xu, Bingyao Liu*
 >
 
-# Part I: ****Introduction, Set Up and Partitioning****
+# Part I: ****Introduction & Set Up****
 
 ## 1. Intro and Overview
 
