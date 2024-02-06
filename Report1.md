@@ -100,7 +100,7 @@ Initially, we operated on a macOS platform and utilized Docker to build and exec
 - Docker (for container building and running)
 - Maven (for building the project including the Kafka UI backend).
 
-Step 1: Backend--Build Docker Image:
+#### Step 1: Backend--Build Docker Image:
 - Open terminal, navigate to the project root.
 - Build the project including kafka-ui-api backend:
 ```shell
@@ -114,7 +114,7 @@ To build only the kafka-ui-api:
 ```shell
 ./mvnw -f kafka-ui-api/pom.xml clean install -Pprod -DskipUIBuild=true
 ```
-Step 2: Frontend:
+#### Step 2: Frontend:
 - Navigate to frontend directory (e.g., kafka-ui-react-app).
 - Install Dependencies:
 ```shell
@@ -124,19 +124,19 @@ npm install
 ```shell
 npm run build
 ```
-Step 3: Running the Project:
+#### Step 3: Running the Project:
 - Run with Docker Compose:
 ```shell
 docker-compose -f ./documentation/compose/kafka-ui.yaml up -d
 ```
-Step 4: Access Kafka UI:
+#### Step 4: Access Kafka UI:
 - Once running, visit http://localhost:8080 in a browser.
 
 #### 2.2.2 Build & Run on Ubuntu (Without Docker)
 
 Then built and ran the project on Ubuntu, which is an open-source operating system based on Linux. This was done without using Docker, assuming that we had already installed the prerequisites and cloned the repository.
 
-Method1: Quick Project Execution (Without Building JAR):
+#### Method1: Quick Project Execution (Without Building JAR):
 
 - To run Kafka UI quickly without manually building a JAR file, execute a pre-built JAR file with this command:
 ```shell
@@ -144,7 +144,7 @@ java -Dspring.config.additional-location=<path-to-application-local.yml> --add-o
 ```
 Replace <path-to-application-local.yml> and <path-to-kafka-ui-jar> with actual file paths. Configure Kafka cluster details in application-local.yml.
 
-Method2: Manual Build and Execution (Without Docker):
+#### Method2: Manual Build and Execution (Without Docker):
 - Comment out the docker-maven-plugin in kafka-ui-api/pom.xml.
 - Build the JAR file with Maven:
 ```shell
