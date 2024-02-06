@@ -1,7 +1,6 @@
 # Kafka UI: An Intuitive Interface for Apache Kafka Cluster Management
 
 > *Team Members: Mingxin Hou, Yiren Xu, Bingyao Liu*
->
 
 # Part I: ****Introduction & Set Up****
 
@@ -10,6 +9,9 @@
 ### 1.1 Intro to UI for Apache Kafka
 
 `Kafka UI` is an open-source web application designed to provide a user-friendly interface for the management and monitoring of Apache Kafka clusters. It enables users to navigate through topics, view cluster status, inspect consumer groups, configure settings, and more, without the need to interact directly with the underlying details of the Kafka cluster.[[1]](https://github.com/provectus/kafka-ui)
+
+The documentation and user manual for this project can be found [here](https://docs.kafka-ui.provectus.io/overview/readme). It provides guidance on configuring and using Kafka UI.
+
 
 ### 1.2 Technical Overview
 
