@@ -153,7 +153,8 @@ mvn clean install
 - Locate the built JAR (kafka-ui-api-0.0.1-SNAPSHOT.jar) in kafka-ui-api/target.
 - Run the JAR file using the aforementioned command.
 
-### 2.3 Build Issue
+### 2.3 Build Issues
+#### macOS
 1. After installing JDK 17, remember to switch the default Java version to the current one:
     - Use the following command to list all installed Java versions and their locations:
         
