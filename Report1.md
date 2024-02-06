@@ -155,12 +155,90 @@ mvn clean install
 
 
 
+# II. Existing Test
+
+## 2.1 Existing Testing Frameworks
+
+The project primarily utilizes JUnit5, specified as **`**<junit.version>5.9.1</junit.version>**`**, as its core testing framework, complemented by additional tools to enhance testing capabilities:
+
+- **Mockito** (**`<mockito.version>5.3.1</mockito.version>`**) is employed for mocking dependencies in unit tests, thus simplifying and ensuring their reliability.
+- **Testcontainers** (**`<testcontainers.version>1.17.5</testcontainers.version>`**) provides a reusable testing environment that closely simulates production settings, enhancing the accuracy of integration tests.
+- **Maven Surefire Plugin** (**`<maven-surefire-plugin.version>3.1.2</maven-surefire-plugin.version>`**) automates the testing workflow, including test discovery and execution, and generates detailed reports.
+
+This integration of testing frameworks and tools not only boosts the efficiency and quality of Java project testing but also supports the development teams in achieving high-quality code standards through simplified unit testing, accurate integration testing, and streamlined test management.
+
+## 2.2 Existing Testing Practices
+
+The testing files are mainly restored in the path as below:
+
+`kafka-ui/kafka-ui-api/src/test`
+
+The  following description is around the main testing categories based on the project’s testing files.
+
+### **Integration Testing**
+
+- **AbstractIntegrationTest**: These tests ensure theintegration between the frontend React application and the Kafka backend. They validate that API calls for fetching Kafka topics, consumer groups, or managing message production and consumption are executed flawlessly. Additionally, they confirm the successful integration with other services like schema registries and Kafka Connect.
+
+### **Service Testing**
+
+- **BrokerServiceTest, TopicsServicePaginationTest**: These tests examine the business logic for interacting with Kafka brokers and topics. They confirm the application's capabilities to list, create, delete, and paginate through topics effectively. Furthermore, they guarantee accurate management of consumer groups and their offsets, alongside correct implementation of custom logic for Kafka's administrative functions.
+
+### **Serde Testing**
+
+- **Int32SerdeTest, AvroEmbeddedSerdeTest**: Serde tests ensure that messages are properly serialized for production into Kafka topics and deserialized upon consumption. They cover testing for various data formats, including Avro, Protobuf, integers, and strings, to ensure seamless compatibility and accuracy across Kafka clients and services.
+
+### **Controller Testing**
+
+- **ApplicationConfigControllerTest**: These tests rigorously validate the HTTP interfaces provided by the backend, ensuring that REST API endpoints respond precisely as intended. They confirm that requests to these endpoints yield the correct status codes, headers, and body content, and accurately process request parameters for operations like fetching or updating configuration details.
+
+### **Utility Class Testing**
+
+- **DynamicConfigOperationsTest**: These tests verify the functionality of utility classes that provide essential support, such as dynamic configuration management, polling mechanisms, and failover strategies. They ensure these utilities operate consistently across various scenarios, underpinning the application's operational reliability.
+
+## 2.3 Running Environment
+
+To ensure a smooth execution of the tests, please meet the following prerequisites:
+
+- **Java 17** or newer must be installed.
+- **Git** must be installed.
+- **Docker** is optional but recommended for those who prefer running tests within containers.
+
+If opting to use Docker, the backend will be containerized based on a Docker image. To set up the backend environment and run the tests, execute the following shell command:
+
+```
+./mvnw clean install -Dmaven.test.skip=true -Pprod
+```
+
+This command builds the project and skips the test phase, primarily used for production builds. For testing purposes, especially when you want to execute all the test cases, use the following Maven command:
+
+```
+mvn clean test
+```
+
+This command cleans the **`target`** directory, compiles the source code, and runs all tests in the **`src/test/java`** directory against the compiled code.
+
+## 2.4 Managing and Analyzing Test Reports
+
+When faced with numerous report files, we can employ text search tools to locate files containing specific keywords, such as "ERROR". This approach facilitates quick identification of problematic tests.
+
+For Linux and macOS, the **`grep`** command can be utilized:
+
+```
+shellCopy code
+grep -i "ERROR" /Users/yiren/Documents/GitHub/kafka-ui/kafka-ui-api/target/surefire-reports/*.txt
+
+```
+
+On Windows, the **`findstr`** command serves a similar purpose. These commands list all occurrences of the keyword "ERROR" across the test reports, aiding in the rapid identification of issues.
+
+**Viewing and Addressing Failed Tests:**
+
+- **Review Detailed Test Reports**: For each failed test, the Surefire plugin generates a detailed report file within the **`target/surefire-reports`** directory for the corresponding test class. It's important to locate the **`.txt`** report files associated with the failed tests identified, such as **`com.provectus.kafka.ui.KafkaConsumerGroupTests.txt`** and **`com.provectus.kafka.ui.emitter.MessageFiltersTest$GroovyScriptFilter.txt`**. These report files contain the names of the failed test methods, reasons for the failures, and detailed stack traces. This information is crucial for pinpointing the source of the problem and facilitating effective troubleshooting.
 
 
+# Part III. Functional testing and partition testing
 
-## Functional testing and partition testing
-
-### Functional Testing
+## 3.1Functional Testing
 
 Functional Testing is a type of software testing that validates the software system against the functional requirements/specifications. The purpose of Functional tests is to test each function of the software application, by providing appropriate input, verifying the output against the Functional requirements.
 
@@ -180,7 +258,7 @@ Systematic functional testing aims to provide comprehensive coverage of the enti
 Thorough functional testing builds confidence among users and stakeholders, assuring them that the software not only works but works reliably under various conditions.
 
 
-### Partition Testing
+## 3.2 Partition Testing
 
 Partition Testing is a software testing technique that divides the input data of a software unit into partitions of equivalent data from which test cases can be derived. In principle, test cases are designed to cover each partition at least once. This technique tries to define test cases that uncover classes of errors, thereby reducing the total number of test cases that must be developed. An advantage of this approach is reduction in the time required for testing software due to lesser number of test cases. 
 
