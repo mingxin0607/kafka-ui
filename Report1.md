@@ -155,7 +155,7 @@ mvn clean install
 
 
 
-# II. Existing Test
+# Part II. Existing Test
 
 ## 2.1 Existing Testing Frameworks
 
@@ -224,7 +224,6 @@ When faced with numerous report files, we can employ text search tools to locate
 For Linux and macOS, the **`grep`** command can be utilized:
 
 ```
-shellCopy code
 grep -i "ERROR" /Users/yiren/Documents/GitHub/kafka-ui/kafka-ui-api/target/surefire-reports/*.txt
 
 ```
