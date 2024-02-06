@@ -85,17 +85,20 @@ Fig 1-2-1 Fork button
 
 We used the button as pointed by the red arrow to fork the project, then typed the command below to clone the project by Git into the local disk.
 
-`git clone [https://github.com/mingxin0607/kafka-ui.git](https://github.com/mingxin0607/kafka-ui.git)`
+`git clone https://github.com/mingxin0607/kafka-ui.git`
 
 ### 2.2 Build & Run
 
-After the operations above, we would like to open the project in an IDE and try to build the project. Our team use `IntelliJ IDEA` provided by JetBrain as IDE.
+To build and run this project, we mainly follow the instructions from [documents](https://docs.kafka-ui.provectus.io/overview/readme) of the original project. There are many details to pay attention to in order to successfully build this project, so we recorded our own build experience below. In case of troubles while building the project, we recommend you to search the chat history of [community discord](https://discord.com/invite/4DWzD7pGE5). We are also glad to help.
+
+Please noted that there are issues with building this project on Windows system. We suggest to use wsl on Windows.
+And some unit tests would fail on mac os, which is also a problem with the original project, so we generally recommend Linux system to build this project.
 
 #### 2.2.1 Build & Run on macOS (Docker)
 
 Initially, we operated on a macOS platform and utilized Docker to build and execute the project. To prepare our development environment, we verified the inclusion of the following tools:
 
-- Java 17 package or newer(for Maven and Spring Boot backend)
+- Java 17 package for Maven and Spring Boot backend (Java 21 may fail some tests)
 - Node.js and npm (for frontend application)
 - Docker (for container building and running)
 - Maven (for building the project including the Kafka UI backend).
@@ -134,11 +137,11 @@ docker-compose -f ./documentation/compose/kafka-ui.yaml up -d
 
 #### 2.2.2 Build & Run on Ubuntu (Without Docker)
 
-Then built and ran the project on Ubuntu, which is an open-source operating system based on Linux. This was done without using Docker, assuming that we had already installed the prerequisites and cloned the repository.
+We used wsl on Windows and built the project withour docker. Please noted that Docker still needs to be up for running the tests.
 
 #### Method1: Quick Project Execution (Without Building JAR):
 
-- To run Kafka UI quickly without manually building a JAR file, execute a pre-built JAR file with this command:
+- To run Kafka UI quickly without manually building a JAR file, execute a pre-built JAR file with this command (Releases could be downloaded from the original project):
 ```shell
 java -Dspring.config.additional-location=<path-to-application-local.yml> --add-opens java.rmi/javax.rmi.ssl=ALL-UNNAMED -jar <path-to-kafka-ui-jar>
 ```
@@ -151,7 +154,14 @@ Replace <path-to-application-local.yml> and <path-to-kafka-ui-jar> with actual f
 mvn clean install
 ```
 - Locate the built JAR (kafka-ui-api-0.0.1-SNAPSHOT.jar) in kafka-ui-api/target.
-- Run the JAR file using the aforementioned command.
+- If the prod profile is not active, run the command below
+```shell
+mvn -Pprod clean install -DskipTests=true
+```
+- Run the JAR file using this command.
+```shell
+java -Dspring.config.additional-location=<path-to-application-local.yml> --add-opens java.rmi/javax.rmi.ssl=ALL-UNNAMED -jar <path-to-kafka-ui-jar>
+```
 
 ### 2.3 Build Issues
 #### macOS
@@ -298,11 +308,9 @@ When faced with numerous report files, we can employ text search tools to locate
 For Linux and macOS, the **`grep`** command can be utilized:
 
 ```
-grep -i "ERROR" /Users/yiren/Documents/GitHub/kafka-ui/kafka-ui-api/target/surefire-reports/*.txt
+grep -i "ERROR" /path/to/kafka-ui/kafka-ui-api/target/surefire-reports/*.txt
 
 ```
-
-On Windows, the **`findstr`** command serves a similar purpose. These commands list all occurrences of the keyword "ERROR" across the test reports, aiding in the rapid identification of issues.
 
 **Viewing and Addressing Failed Tests:**
 
@@ -311,7 +319,7 @@ On Windows, the **`findstr`** command serves a similar purpose. These commands l
 
 # Part III. Functional testing and partition testing
 
-## 3.1Functional Testing
+## 3.1 Functional Testing
 
 Functional Testing is a type of software testing that validates the software system against the functional requirements/specifications. The purpose of Functional tests is to test each function of the software application, by providing appropriate input, verifying the output against the Functional requirements.
 
