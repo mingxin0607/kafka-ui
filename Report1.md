@@ -3,7 +3,7 @@
 > *Team Members: Mingxin Hou, Yiren Xu, Bingyao Liu*
 >
 
-# Part I: ****Introduction, Set Up and Partitioning****
+# Part I: ****Introduction & Set Up****
 
 ## 1. Intro and Overview
 
@@ -153,9 +153,83 @@ mvn clean install
 - Locate the built JAR (kafka-ui-api-0.0.1-SNAPSHOT.jar) in kafka-ui-api/target.
 - Run the JAR file using the aforementioned command.
 
+### 2.3 Build Issues
+#### macOS
+1. After installing JDK 17, remember to switch the default Java version to the current one:
+    - Use the following command to list all installed Java versions and their locations:
+        
+        ```bash
+        /usr/libexec/java_home -V
+        
+        ```
+        
+    - Use the following command to configure the default Java version to JDK 17 (replace the path with your JDK 17 installation path):
+        
+        ```bash
+        export JAVA_HOME=$(/usr/libexec/java_home -v 17)
+        
+        ```
+        
+    - Update the `PATH` environment variable to ensure that the `bin` directory of JDK 17 comes before others:
+        
+        ```bash
+        export PATH=$JAVA_HOME/bin:$PATH
+        
+        ```
+        
+    - Verify that the Java version has been switched to JDK 17:
+        
+        ```bash
+        java -version
+        
+        ```
+        
+2. Check the versions of Node.js, npm, and Docker:
+    
+    ```bash
+    node -v
+    npm -v
+    docker --version
+    
+    ```
+    
+3. macOS system version needs to match Docker. If you have macOS Catalina (10.15.7), you can refer to the following post to download Docker:
+    
+    [Install Docker on macOS Catalina](https://stackoverflow.com/questions/68373008/install-docker-on-macos-catalina)
+    
+4. When using `npm install` to build the frontend application, you may need to:
+    - Delete the existing `node_modules` directory and `package-lock.json` file, then reinstall dependencies:
+        
+        ```bash
+        rm -rf node_modules package-lock.json
+        
+        npm install
+        
+        ```
+        
+    - Modify some dependency versions in `pom.xml`. I changed the following dependencies:
+        
+        `"vite": "^5.0.0"`
+        
+        `"@types/node": "^20.0.0"`
+        
+    - After resolving conflicts, execute:
+        
+        ```bash
+        npm install
+        
+        ```
+        
+5. Confirm if Docker is running:
+    
+    ```bash
+    docker ps
+    
+    ```
+    
+    If the 8080 port doesn't immediately redirect to the webpage, it might still be loading. Wait a bit longer, and the page should appear.
 
-
-# II. Existing Test
+# Part II. Existing Test
 
 ## 2.1 Existing Testing Frameworks
 
@@ -224,7 +298,6 @@ When faced with numerous report files, we can employ text search tools to locate
 For Linux and macOS, the **`grep`** command can be utilized:
 
 ```
-shellCopy code
 grep -i "ERROR" /Users/yiren/Documents/GitHub/kafka-ui/kafka-ui-api/target/surefire-reports/*.txt
 
 ```
