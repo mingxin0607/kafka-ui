@@ -110,9 +110,16 @@ The `Int64Serde` class is responsible for the serialization and deserialization 
 ## Test Cases
 ### test cmd
 ```
-./mvnw test -Dtest=Int64SerdeTest
+./mvnw test -pl kafka-ui-api -Dtest=Int64SerdeTest
+
 ```
 * to test it, locate the directory to the project 'Kafka-ui'.
+
+If there are some issues in running process, please enter the following cmd to see the report:
+```
+./mvnw test -pl kafka-ui-api -Dtest=Int64SerdeTest -e
+
+```
 ### `testSerializeValidLong`
 
 Verifies that a valid long value is correctly serialized into a byte array matching the expected format.
