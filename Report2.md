@@ -31,23 +31,23 @@ They provide a visual representation of system behavior, aiding in test case gen
 They are beneficial in the following ways:
 
 
-- Test Case Generation
+- **Test Case Generation**
 
     Finite models serve as a basis for generating test cases. Testers can derive test scenarios directly from the states, inputs, and transitions defined in the model, ensuring a structured and systematic approach to test case creation.
 
-- Boundary Value Testing
+- **Boundary Value Testing**
 
     FSMs help identify boundary conditions and edge cases by visualizing the transitions between states. Testers can design test cases to cover these boundaries, revealing potential issues related to extreme input values or system limits.
 
-- Error State Identification
+- **Error State Identification**
 
     Finite models explicitly define states, including error states. This aids in the identification and testing of error-handling mechanisms within the system. Testers can design test cases to force the system into error states to validate proper error handling.
 
-- Model-Based Testing
+- **Model-Based Testing**
 
     FSMs serve as a foundation for model-based testing, where test cases are generated automatically from the model. Automated tools can use the FSM to generate a set of test scenarios, reducing the manual effort required for test case design.
 
-- Documentation and Communication
+- **Documentation and Communication**
 
     FSMs offer a visual and intuitive way to document system behavior. Testers can share the model with stakeholders, including developers and product managers, to communicate complex interactions and state transitions in a more accessible manner.
 
