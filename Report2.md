@@ -98,7 +98,32 @@ This FSM is a high-level representation of the operational model of a `Serde` in
 Fig 4-4-1 FSM
 
 ## 5. Write Test Cases
+## Overview
 
+The `Int64Serde` class is responsible for the serialization and deserialization of 64-bit integers. The tests cover:
+
+- Serialization of valid long values.
+- Deserialization of valid byte arrays.
+- Exception handling for invalid serialization input.
+- Exception handling for invalid deserialization input.
+
+## Test Cases
+
+### `testSerializeValidLong`
+
+Verifies that a valid long value is correctly serialized into a byte array matching the expected format.
+
+### `testDeserializeValidBytes`
+
+Ensures that a valid byte array is correctly deserialized back into the original long value, represented as a string.
+
+### `testSerializeInvalidInputThrowsException`
+
+Confirms that attempting to serialize a non-numeric value throws a `NumberFormatException`, as expected.
+
+### `testDeserializeInvalidBytesThrowsException`
+
+Checks that deserializing a byte array that does not represent a valid long value throws an `IllegalArgumentException`.
 
 ## Reference
 
