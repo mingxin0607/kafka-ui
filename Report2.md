@@ -108,7 +108,11 @@ The `Int64Serde` class is responsible for the serialization and deserialization 
 - Exception handling for invalid deserialization input.
 
 ## Test Cases
-
+### test cmd
+```
+./mvnw test -Dtest=Int64SerdeTest
+```
+* to test it, locate the directory to the project 'Kafka-ui'.
 ### `testSerializeValidLong`
 
 Verifies that a valid long value is correctly serialized into a byte array matching the expected format.
