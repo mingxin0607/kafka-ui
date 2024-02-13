@@ -1,7 +1,7 @@
 
 ---
 
-# Part II: Functional Testing and Finite State Machines
+# Part IV: Functional Testing and Finite State Machines
 
 ## 1. Finite State Machines
 
@@ -61,6 +61,42 @@ It implemented interface `BuiltInSerde` at "kafka-ui-api/src/main/java/com/prove
 
 ## 4. Description of our functional model and diagram
 
+The FSM diagram below appears to model the lifecycle of a `Serde` instance in the Kafka UI context, as defined in the `serde.java` file. Here is a detailed description of the functional model and how it operates based on the information from the FSM and the `Serde` interface:
+
+1. **Uninitialized State**:
+    - The system starts with the `Serde` instances not yet created or initialized.
+
+2. **Create Serde Instance Transition**:
+    - The transition from "Uninitialized" to "Initialized" is triggered by the system upon application startup, where the Kafka UI scans configurations and instantiates `Serde` instances using their default, non-argument constructors.
+
+3. **Initialized State**:
+    - The `Serde` instances are now in memory but have not been configured with any properties or settings.
+
+4. **Invoke Configure Method Transition**:
+    - This transition occurs when the `configure` method is called on a `Serde` instance. The method sets up the internal state of the `Serde` using configuration properties.
+
+5. **Configured State**:
+    - The `Serde` instance is now fully set up and ready to perform serialization and deserialization operations on Kafka topic keys and values.
+
+6. **Serialize/Deserialize Transitions**:
+    - From the "Configured" state, the `Serde` can perform two main operations:
+        - Serialization: When a data transfer or persistence request occurs, the `Serde` serializes the given input into a format suitable for Kafka, typically a byte array.
+        - Deserialization: Upon receiving a data record from Kafka, the `Serde` deserializes the byte array back into the appropriate data structure for use in the application.
+
+7. **Serializing/Deserializing States**:
+    - These are transient states where the actual work of converting data formats is done. These states reflect ongoing operations. Once serialization or deserialization is complete, the Serde instance transitions back to the `Configured` state, ready for further operations. This cyclical transition allows the `Serde` instance to be used repeatedly during the application's runtime without the need for reinitialization or reconfiguration unless the underlying topic configuration or schema has changed.
+
+8. **Closing Transition**:
+    - This transition occurs when the application is shutting down or when the `Serde` instance is no longer needed. The `close()` method is called, which is supposed to clean up any resources used by the `Serde`.
+
+9. **Closed State**:
+    - The final state indicates that the `Serde` instance has been closed and is no longer available for operations.
+
+This FSM is a high-level representation of the operational model of a `Serde` instance within the Kafka UI application. It captures the lifecycle from instance creation, through configuration and operation, to eventual shutdown.
+
+![Fig 4-4-1 FSM](Fig/Untitled%202.png)
+
+Fig 4-4-1 FSM
 
 ## 5. Write Test Cases
 
