@@ -477,34 +477,34 @@
                             </execution>
                         </executions>
                     </plugin>
-                    <plugin>
-                        <groupId>io.fabric8</groupId>
-                        <artifactId>docker-maven-plugin</artifactId>
-                        <version>${fabric8-maven-plugin.version}</version>
-                        <configuration>
-                            <verbose>true</verbose>
-                            <images>
-                                <image>
-                                    <name>provectuslabs/kafka-ui:${git.revision}</name>
-                                    <build>
-                                        <contextDir>${project.basedir}</contextDir>
-                                        <args>
-                                            <JAR_FILE>${project.build.finalName}.jar</JAR_FILE>
-                                        </args>
-                                    </build>
-                                </image>
-                            </images>
-                        </configuration>
-                        <executions>
-                            <execution>
-                                <id>default</id>
-                                <phase>package</phase>
-                                <goals>
-                                    <goal>build</goal>
-                                </goals>
-                            </execution>
-                        </executions>
-                    </plugin>
+<!--                    <plugin>-->
+<!--                        <groupId>io.fabric8</groupId>-->
+<!--                        <artifactId>docker-maven-plugin</artifactId>-->
+<!--                        <version>${fabric8-maven-plugin.version}</version>-->
+<!--                        <configuration>-->
+<!--                            <verbose>true</verbose>-->
+<!--                            <images>-->
+<!--                                <image>-->
+<!--                                    <name>provectuslabs/kafka-ui:${git.revision}</name>-->
+<!--                                    <build>-->
+<!--                                        <contextDir>${project.basedir}</contextDir>-->
+<!--                                        <args>-->
+<!--                                            <JAR_FILE>${project.build.finalName}.jar</JAR_FILE>-->
+<!--                                        </args>-->
+<!--                                    </build>-->
+<!--                                </image>-->
+<!--                            </images>-->
+<!--                        </configuration>-->
+<!--                        <executions>-->
+<!--                            <execution>-->
+<!--                                <id>default</id>-->
+<!--                                <phase>package</phase>-->
+<!--                                <goals>-->
+<!--                                    <goal>build</goal>-->
+<!--                                </goals>-->
+<!--                            </execution>-->
+<!--                        </executions>-->
+<!--                    </plugin>-->
                 </plugins>
             </build>
         </profile>
