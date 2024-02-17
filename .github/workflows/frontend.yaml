@@ -18,6 +18,8 @@ jobs:
       NODE_ENV: dev
     runs-on: ubuntu-latest
     steps:
+      - name: Debug SONAR_TOKEN
+        run: echo "SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}"
       - uses: actions/checkout@v3
         with:
           # Disabling shallow clone is recommended for improving relevancy of reporting
