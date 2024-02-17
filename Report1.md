@@ -140,6 +140,7 @@ docker-compose -f ./documentation/compose/kafka-ui.yaml up -d
 #### 2.2.2 Build & Run on Ubuntu (Without Docker)
 
 We used wsl on Windows and built the project withour docker. Please noted that Docker still needs to be up for running the tests.
+And please use `sudo` before each command if the current user of wsl is not root user.
 
 #### Method1: Quick Project Execution (Without Building JAR):
 
@@ -240,6 +241,13 @@ java -Dspring.config.additional-location=<path-to-application-local.yml> --add-o
     ```
     
     If the 8080 port doesn't immediately redirect to the webpage, it might still be loading. Wait a bit longer, and the page should appear.
+
+#### Windows Subsystem for Linux
+
+1. If there is a problem with "com.provectus.kafka.ui.service.KafkaConfigSanitizerTest"
+, please check if docker engine is up.
+
+2. Please use sudo before every instruction and run it as root user.
 
 # Part II. Existing Test
 
