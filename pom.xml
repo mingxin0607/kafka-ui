@@ -16,7 +16,7 @@
 
         <frontend-generated-sources-directory>..//kafka-ui-react-app/src/generated-sources
         </frontend-generated-sources-directory>
-        <sonar.organization>provectus</sonar.organization>
+        <sonar.organization>mingxin0607</sonar.organization>
         <sonar.host.url>https://sonarcloud.io</sonar.host.url>
         <git.revision>latest</git.revision>
 
