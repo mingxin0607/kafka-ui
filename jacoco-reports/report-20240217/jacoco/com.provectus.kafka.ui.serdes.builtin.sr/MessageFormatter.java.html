@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MessageFormatter.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">kafka-ui-api</a> &gt; <a href="index.source.html" class="el_package">com.provectus.kafka.ui.serdes.builtin.sr</a> &gt; <span class="el_source">MessageFormatter.java</span></div><h1>MessageFormatter.java</h1><pre class="source lang-java linenums">package com.provectus.kafka.ui.serdes.builtin.sr;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.google.protobuf.Message;
+import com.google.protobuf.util.JsonFormat;
+import com.provectus.kafka.ui.util.jsonschema.JsonAvroConversion;
+import io.confluent.kafka.schemaregistry.avro.AvroSchemaUtils;
+import io.confluent.kafka.schemaregistry.client.SchemaRegistryClient;
+import io.confluent.kafka.serializers.AbstractKafkaSchemaSerDeConfig;
+import io.confluent.kafka.serializers.KafkaAvroDeserializer;
+import io.confluent.kafka.serializers.KafkaAvroDeserializerConfig;
+import io.confluent.kafka.serializers.json.KafkaJsonSchemaDeserializer;
+import io.confluent.kafka.serializers.protobuf.KafkaProtobufDeserializer;
+import java.util.Map;
+import lombok.SneakyThrows;
+
+interface MessageFormatter {
+
+  String format(String topic, byte[] value);
+
+  static Map&lt;SchemaType, MessageFormatter&gt; createMap(SchemaRegistryClient schemaRegistryClient) {
+<span class="fc" id="L22">    return Map.of(</span>
+        SchemaType.AVRO, new AvroMessageFormatter(schemaRegistryClient),
+        SchemaType.JSON, new JsonSchemaMessageFormatter(schemaRegistryClient),
+        SchemaType.PROTOBUF, new ProtobufMessageFormatter(schemaRegistryClient)
+    );
+  }
+
+  class AvroMessageFormatter implements MessageFormatter {
+    private final KafkaAvroDeserializer avroDeserializer;
+
+<span class="fc" id="L32">    AvroMessageFormatter(SchemaRegistryClient client) {</span>
+<span class="fc" id="L33">      this.avroDeserializer = new KafkaAvroDeserializer(client);</span>
+<span class="fc" id="L34">      this.avroDeserializer.configure(</span>
+<span class="fc" id="L35">          Map.of(</span>
+              AbstractKafkaSchemaSerDeConfig.SCHEMA_REGISTRY_URL_CONFIG, &quot;wontbeused&quot;,
+<span class="fc" id="L37">              KafkaAvroDeserializerConfig.SPECIFIC_AVRO_READER_CONFIG, false,</span>
+<span class="fc" id="L38">              KafkaAvroDeserializerConfig.SCHEMA_REFLECTION_CONFIG, false,</span>
+<span class="fc" id="L39">              KafkaAvroDeserializerConfig.AVRO_USE_LOGICAL_TYPE_CONVERTERS_CONFIG, true</span>
+          ),
+          false
+      );
+<span class="fc" id="L43">    }</span>
+
+    @Override
+    public String format(String topic, byte[] value) {
+<span class="fc" id="L47">      Object deserialized = avroDeserializer.deserialize(topic, value);</span>
+<span class="fc" id="L48">      var schema = AvroSchemaUtils.getSchema(deserialized);</span>
+<span class="fc" id="L49">      return JsonAvroConversion.convertAvroToJson(deserialized, schema).toString();</span>
+    }
+  }
+
+  class ProtobufMessageFormatter implements MessageFormatter {
+    private final KafkaProtobufDeserializer&lt;?&gt; protobufDeserializer;
+
+<span class="fc" id="L56">    ProtobufMessageFormatter(SchemaRegistryClient client) {</span>
+<span class="fc" id="L57">      this.protobufDeserializer = new KafkaProtobufDeserializer&lt;&gt;(client);</span>
+<span class="fc" id="L58">    }</span>
+
+    @Override
+<span class="nc" id="L61">    @SneakyThrows</span>
+    public String format(String topic, byte[] value) {
+<span class="fc" id="L63">      final Message message = protobufDeserializer.deserialize(topic, value);</span>
+<span class="fc" id="L64">      return JsonFormat.printer()</span>
+<span class="fc" id="L65">          .includingDefaultValueFields()</span>
+<span class="fc" id="L66">          .omittingInsignificantWhitespace()</span>
+<span class="fc" id="L67">          .preservingProtoFieldNames()</span>
+<span class="fc" id="L68">          .print(message);</span>
+    }
+  }
+
+  class JsonSchemaMessageFormatter implements MessageFormatter {
+    private final KafkaJsonSchemaDeserializer&lt;JsonNode&gt; jsonSchemaDeserializer;
+
+<span class="fc" id="L75">    JsonSchemaMessageFormatter(SchemaRegistryClient client) {</span>
+<span class="fc" id="L76">      this.jsonSchemaDeserializer = new KafkaJsonSchemaDeserializer&lt;&gt;(client);</span>
+<span class="fc" id="L77">    }</span>
+
+    @Override
+    public String format(String topic, byte[] value) {
+<span class="fc" id="L81">      JsonNode json = jsonSchemaDeserializer.deserialize(topic, value);</span>
+<span class="fc" id="L82">      return json.toString();</span>
+    }
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

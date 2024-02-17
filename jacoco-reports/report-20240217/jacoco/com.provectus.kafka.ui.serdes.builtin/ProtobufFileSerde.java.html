@@ -1,0 +1,418 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ProtobufFileSerde.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">kafka-ui-api</a> &gt; <a href="index.source.html" class="el_package">com.provectus.kafka.ui.serdes.builtin</a> &gt; <span class="el_source">ProtobufFileSerde.java</span></div><h1>ProtobufFileSerde.java</h1><pre class="source lang-java linenums">package com.provectus.kafka.ui.serdes.builtin;
+
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
+import com.google.protobuf.AnyProto;
+import com.google.protobuf.ApiProto;
+import com.google.protobuf.DescriptorProtos;
+import com.google.protobuf.Descriptors;
+import com.google.protobuf.Descriptors.Descriptor;
+import com.google.protobuf.DurationProto;
+import com.google.protobuf.DynamicMessage;
+import com.google.protobuf.EmptyProto;
+import com.google.protobuf.FieldMaskProto;
+import com.google.protobuf.SourceContextProto;
+import com.google.protobuf.StructProto;
+import com.google.protobuf.TimestampProto;
+import com.google.protobuf.TypeProto;
+import com.google.protobuf.WrappersProto;
+import com.google.protobuf.util.JsonFormat;
+import com.google.type.ColorProto;
+import com.google.type.DateProto;
+import com.google.type.DateTimeProto;
+import com.google.type.DayOfWeekProto;
+import com.google.type.ExprProto;
+import com.google.type.FractionProto;
+import com.google.type.IntervalProto;
+import com.google.type.LatLngProto;
+import com.google.type.MoneyProto;
+import com.google.type.MonthProto;
+import com.google.type.PhoneNumberProto;
+import com.google.type.PostalAddressProto;
+import com.google.type.QuaternionProto;
+import com.google.type.TimeOfDayProto;
+import com.provectus.kafka.ui.exception.ValidationException;
+import com.provectus.kafka.ui.serde.api.DeserializeResult;
+import com.provectus.kafka.ui.serde.api.PropertyResolver;
+import com.provectus.kafka.ui.serde.api.RecordHeaders;
+import com.provectus.kafka.ui.serde.api.SchemaDescription;
+import com.provectus.kafka.ui.serdes.BuiltInSerde;
+import com.provectus.kafka.ui.util.jsonschema.ProtobufSchemaConverter;
+import com.squareup.wire.schema.ErrorCollector;
+import com.squareup.wire.schema.Linker;
+import com.squareup.wire.schema.Loader;
+import com.squareup.wire.schema.Location;
+import com.squareup.wire.schema.ProtoFile;
+import com.squareup.wire.schema.internal.parser.ProtoFileElement;
+import com.squareup.wire.schema.internal.parser.ProtoParser;
+import io.confluent.kafka.schemaregistry.protobuf.ProtobufSchema;
+import io.confluent.kafka.schemaregistry.protobuf.ProtobufSchemaUtils;
+import java.io.ByteArrayInputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+import javax.annotation.Nullable;
+import lombok.SneakyThrows;
+import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.NotNull;
+
+<span class="fc" id="L66">@Slf4j</span>
+<span class="fc" id="L67">public class ProtobufFileSerde implements BuiltInSerde {</span>
+
+  public static String name() {
+<span class="fc" id="L70">    return &quot;ProtobufFile&quot;;</span>
+  }
+
+<span class="fc" id="L73">  private static final ProtobufSchemaConverter SCHEMA_CONVERTER = new ProtobufSchemaConverter();</span>
+
+<span class="fc" id="L75">  private Map&lt;String, Descriptor&gt; messageDescriptorMap = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L76">  private Map&lt;String, Descriptor&gt; keyMessageDescriptorMap = new HashMap&lt;&gt;();</span>
+
+<span class="fc" id="L78">  private Map&lt;Descriptor, Path&gt; descriptorPaths = new HashMap&lt;&gt;();</span>
+
+  @Nullable
+  private Descriptor defaultMessageDescriptor;
+
+  @Nullable
+  private Descriptor defaultKeyMessageDescriptor;
+
+  @Override
+  public boolean canBeAutoConfigured(PropertyResolver kafkaClusterProperties,
+                                     PropertyResolver globalProperties) {
+<span class="fc" id="L89">    return Configuration.canBeAutoConfigured(kafkaClusterProperties);</span>
+  }
+
+  @Override
+  public void autoConfigure(PropertyResolver kafkaClusterProperties,
+                            PropertyResolver globalProperties) {
+<span class="nc" id="L95">    configure(Configuration.create(kafkaClusterProperties));</span>
+<span class="nc" id="L96">  }</span>
+
+  @Override
+  public void configure(PropertyResolver serdeProperties,
+                        PropertyResolver kafkaClusterProperties,
+                        PropertyResolver globalProperties) {
+<span class="nc" id="L102">    configure(Configuration.create(serdeProperties));</span>
+<span class="nc" id="L103">  }</span>
+
+  @VisibleForTesting
+  void configure(Configuration configuration) {
+<span class="fc bfc" id="L107" title="All 2 branches covered.">    if (configuration.defaultMessageDescriptor() == null</span>
+<span class="pc bpc" id="L108" title="1 of 2 branches missed.">        &amp;&amp; configuration.defaultKeyMessageDescriptor() == null</span>
+<span class="pc bpc" id="L109" title="1 of 2 branches missed.">        &amp;&amp; configuration.messageDescriptorMap().isEmpty()</span>
+<span class="nc bnc" id="L110" title="All 2 branches missed.">        &amp;&amp; configuration.keyMessageDescriptorMap().isEmpty()) {</span>
+<span class="nc" id="L111">      throw new ValidationException(&quot;Neither default, not per-topic descriptors defined for &quot; + name() + &quot; serde&quot;);</span>
+    }
+<span class="fc" id="L113">    this.defaultMessageDescriptor = configuration.defaultMessageDescriptor();</span>
+<span class="fc" id="L114">    this.defaultKeyMessageDescriptor = configuration.defaultKeyMessageDescriptor();</span>
+<span class="fc" id="L115">    this.descriptorPaths = configuration.descriptorPaths();</span>
+<span class="fc" id="L116">    this.messageDescriptorMap = configuration.messageDescriptorMap();</span>
+<span class="fc" id="L117">    this.keyMessageDescriptorMap = configuration.keyMessageDescriptorMap();</span>
+<span class="fc" id="L118">  }</span>
+
+  @Override
+  public Optional&lt;String&gt; getDescription() {
+<span class="nc" id="L122">    return Optional.empty();</span>
+  }
+
+  private Optional&lt;Descriptor&gt; descriptorFor(String topic, Target type) {
+<span class="fc bfc" id="L126" title="All 2 branches covered.">    return type == Target.KEY</span>
+        ?
+<span class="fc" id="L128">        Optional.ofNullable(keyMessageDescriptorMap.get(topic))</span>
+<span class="fc" id="L129">            .or(() -&gt; Optional.ofNullable(defaultKeyMessageDescriptor))</span>
+        :
+<span class="fc" id="L131">        Optional.ofNullable(messageDescriptorMap.get(topic))</span>
+<span class="fc" id="L132">            .or(() -&gt; Optional.ofNullable(defaultMessageDescriptor));</span>
+  }
+
+  @Override
+  public boolean canDeserialize(String topic, Target type) {
+<span class="nc" id="L137">    return descriptorFor(topic, type).isPresent();</span>
+  }
+
+  @Override
+  public boolean canSerialize(String topic, Target type) {
+<span class="nc" id="L142">    return descriptorFor(topic, type).isPresent();</span>
+  }
+
+  @Override
+  public Serializer serializer(String topic, Target type) {
+<span class="fc" id="L147">    var descriptor = descriptorFor(topic, type).orElseThrow();</span>
+<span class="fc" id="L148">    return new Serializer() {</span>
+<span class="nc" id="L149">      @SneakyThrows</span>
+      @Override
+      public byte[] serialize(String input) {
+<span class="fc" id="L152">        DynamicMessage.Builder builder = DynamicMessage.newBuilder(descriptor);</span>
+<span class="fc" id="L153">        JsonFormat.parser().merge(input, builder);</span>
+<span class="fc" id="L154">        return builder.build().toByteArray();</span>
+      }
+    };
+  }
+
+  @Override
+  public Deserializer deserializer(String topic, Target type) {
+<span class="fc" id="L161">    var descriptor = descriptorFor(topic, type).orElseThrow();</span>
+<span class="fc" id="L162">    return new Deserializer() {</span>
+<span class="nc" id="L163">      @SneakyThrows</span>
+      @Override
+      public DeserializeResult deserialize(RecordHeaders headers, byte[] data) {
+<span class="fc" id="L166">        var protoMsg = DynamicMessage.parseFrom(descriptor, new ByteArrayInputStream(data));</span>
+<span class="fc" id="L167">        byte[] jsonFromProto = ProtobufSchemaUtils.toJson(protoMsg);</span>
+<span class="fc" id="L168">        var result = new String(jsonFromProto);</span>
+<span class="fc" id="L169">        return new DeserializeResult(</span>
+            result,
+            DeserializeResult.Type.JSON,
+<span class="fc" id="L172">            Map.of()</span>
+        );
+      }
+    };
+  }
+
+  @Override
+  public Optional&lt;SchemaDescription&gt; getSchema(String topic, Target type) {
+<span class="nc" id="L180">    return descriptorFor(topic, type).map(this::toSchemaDescription);</span>
+  }
+
+  private SchemaDescription toSchemaDescription(Descriptor descriptor) {
+<span class="nc" id="L184">    Path path = descriptorPaths.get(descriptor);</span>
+<span class="nc" id="L185">    return new SchemaDescription(</span>
+<span class="nc" id="L186">        SCHEMA_CONVERTER.convert(path.toUri(), descriptor).toJson(),</span>
+<span class="nc" id="L187">        Map.of(&quot;messageName&quot;, descriptor.getFullName())</span>
+    );
+  }
+
+<span class="nc" id="L191">  @SneakyThrows</span>
+  private static String readFileAsString(Path path) {
+<span class="fc" id="L193">    return Files.readString(path);</span>
+  }
+
+  //----------------------------------------------------------------------------------------------------------------
+
+  @VisibleForTesting
+<span class="fc" id="L199">  record Configuration(@Nullable Descriptor defaultMessageDescriptor,</span>
+                       @Nullable Descriptor defaultKeyMessageDescriptor,
+                       Map&lt;Descriptor, Path&gt; descriptorPaths,
+                       Map&lt;String, Descriptor&gt; messageDescriptorMap,
+                       Map&lt;String, Descriptor&gt; keyMessageDescriptorMap) {
+
+    static boolean canBeAutoConfigured(PropertyResolver kafkaClusterProperties) {
+<span class="fc" id="L206">      Optional&lt;List&lt;String&gt;&gt; protobufFiles = kafkaClusterProperties.getListProperty(&quot;protobufFiles&quot;, String.class);</span>
+<span class="fc" id="L207">      Optional&lt;String&gt; protobufFilesDir = kafkaClusterProperties.getProperty(&quot;protobufFilesDir&quot;, String.class);</span>
+<span class="pc bpc" id="L208" title="1 of 6 branches missed.">      return protobufFilesDir.isPresent() || protobufFiles.filter(files -&gt; !files.isEmpty()).isPresent();</span>
+    }
+
+    static Configuration create(PropertyResolver properties) {
+<span class="fc" id="L212">      var protobufSchemas = loadSchemas(</span>
+<span class="fc" id="L213">          properties.getListProperty(&quot;protobufFiles&quot;, String.class),</span>
+<span class="fc" id="L214">          properties.getProperty(&quot;protobufFilesDir&quot;, String.class)</span>
+      );
+
+      // Load all referenced message schemas and store their source proto file with the descriptors
+<span class="fc" id="L218">      Map&lt;Descriptor, Path&gt; descriptorPaths = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L219">      Optional&lt;String&gt; protobufMessageName = properties.getProperty(&quot;protobufMessageName&quot;, String.class);</span>
+<span class="fc" id="L220">      protobufMessageName.ifPresent(messageName -&gt; addProtobufSchema(descriptorPaths, protobufSchemas, messageName));</span>
+
+<span class="fc" id="L222">      Optional&lt;String&gt; protobufMessageNameForKey =</span>
+<span class="fc" id="L223">          properties.getProperty(&quot;protobufMessageNameForKey&quot;, String.class);</span>
+<span class="fc" id="L224">      protobufMessageNameForKey</span>
+<span class="fc" id="L225">          .ifPresent(messageName -&gt; addProtobufSchema(descriptorPaths, protobufSchemas, messageName));</span>
+
+<span class="fc" id="L227">      Optional&lt;Map&lt;String, String&gt;&gt; protobufMessageNameByTopic =</span>
+<span class="fc" id="L228">          properties.getMapProperty(&quot;protobufMessageNameByTopic&quot;, String.class, String.class);</span>
+<span class="fc" id="L229">      protobufMessageNameByTopic</span>
+<span class="fc" id="L230">          .ifPresent(messageNamesByTopic -&gt; addProtobufSchemas(descriptorPaths, protobufSchemas, messageNamesByTopic));</span>
+
+<span class="fc" id="L232">      Optional&lt;Map&lt;String, String&gt;&gt; protobufMessageNameForKeyByTopic =</span>
+<span class="fc" id="L233">          properties.getMapProperty(&quot;protobufMessageNameForKeyByTopic&quot;, String.class, String.class);</span>
+<span class="fc" id="L234">      protobufMessageNameForKeyByTopic</span>
+<span class="fc" id="L235">          .ifPresent(messageNamesByTopic -&gt; addProtobufSchemas(descriptorPaths, protobufSchemas, messageNamesByTopic));</span>
+
+      // Fill dictionary for descriptor lookup by full message name
+<span class="fc" id="L238">      Map&lt;String, Descriptor&gt; descriptorMap = descriptorPaths.keySet().stream()</span>
+<span class="fc" id="L239">          .collect(Collectors.toMap(Descriptor::getFullName, Function.identity()));</span>
+
+<span class="fc" id="L241">      return new Configuration(</span>
+<span class="fc" id="L242">          protobufMessageName.map(descriptorMap::get).orElse(null),</span>
+<span class="fc" id="L243">          protobufMessageNameForKey.map(descriptorMap::get).orElse(null),</span>
+          descriptorPaths,
+<span class="fc" id="L245">          protobufMessageNameByTopic.map(map -&gt; populateDescriptors(descriptorMap, map)).orElse(Map.of()),</span>
+<span class="fc" id="L246">          protobufMessageNameForKeyByTopic.map(map -&gt; populateDescriptors(descriptorMap, map)).orElse(Map.of())</span>
+      );
+    }
+
+    private static Map.Entry&lt;Descriptor, Path&gt; getDescriptorAndPath(Map&lt;Path, ProtobufSchema&gt; protobufSchemas,
+                                                                    String msgName) {
+<span class="fc" id="L252">      return protobufSchemas.entrySet().stream()</span>
+<span class="fc bfc" id="L253" title="All 2 branches covered.">          .filter(schema -&gt; schema.getValue().toDescriptor(msgName) != null)</span>
+<span class="fc" id="L254">          .map(schema -&gt; Map.entry(schema.getValue().toDescriptor(msgName), schema.getKey()))</span>
+<span class="fc" id="L255">          .findFirst()</span>
+<span class="fc" id="L256">          .orElseThrow(() -&gt; new NullPointerException(</span>
+              &quot;The given message type not found in protobuf definition: &quot; + msgName));
+    }
+
+    private static Map&lt;String, Descriptor&gt; populateDescriptors(Map&lt;String, Descriptor&gt; descriptorMap,
+                                                               Map&lt;String, String&gt; messageNameMap) {
+<span class="fc" id="L262">      Map&lt;String, Descriptor&gt; descriptors = new HashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L263" title="All 2 branches covered.">      for (Map.Entry&lt;String, String&gt; entry : messageNameMap.entrySet()) {</span>
+<span class="fc" id="L264">        descriptors.put(entry.getKey(), descriptorMap.get(entry.getValue()));</span>
+<span class="fc" id="L265">      }</span>
+<span class="fc" id="L266">      return descriptors;</span>
+    }
+
+    @VisibleForTesting
+    static Map&lt;Path, ProtobufSchema&gt; loadSchemas(Optional&lt;List&lt;String&gt;&gt; protobufFiles,
+                                                 Optional&lt;String&gt; protobufFilesDir) {
+<span class="fc bfc" id="L272" title="All 2 branches covered.">      if (protobufFilesDir.isPresent()) {</span>
+<span class="pc bpc" id="L273" title="1 of 2 branches missed.">        if (protobufFiles.isPresent()) {</span>
+<span class="nc" id="L274">          log.warn(&quot;protobufFiles properties will be ignored, since protobufFilesDir provided&quot;);</span>
+        }
+<span class="fc" id="L276">        List&lt;ProtoFile&gt; loadedFiles = new ProtoSchemaLoader(protobufFilesDir.get()).load();</span>
+<span class="fc" id="L277">        Map&lt;String, ProtoFileElement&gt; allPaths = loadedFiles.stream()</span>
+<span class="fc" id="L278">            .collect(Collectors.toMap(f -&gt; f.getLocation().getPath(), ProtoFile::toElement));</span>
+<span class="fc" id="L279">        return loadedFiles.stream()</span>
+<span class="fc" id="L280">            .collect(Collectors.toMap(</span>
+<span class="fc" id="L281">                f -&gt; Path.of(f.getLocation().getBase(), f.getLocation().getPath()),</span>
+<span class="fc" id="L282">                f -&gt; new ProtobufSchema(f.toElement(), List.of(), allPaths)));</span>
+      }
+      //Supporting for backward-compatibility. Normally, protobufFilesDir setting should be used
+<span class="fc" id="L285">      return protobufFiles.stream()</span>
+<span class="fc" id="L286">          .flatMap(Collection::stream)</span>
+<span class="fc" id="L287">          .distinct()</span>
+<span class="fc" id="L288">          .map(Path::of)</span>
+<span class="fc" id="L289">          .collect(Collectors.toMap(path -&gt; path, path -&gt; new ProtobufSchema(readFileAsString(path))));</span>
+    }
+
+    private static void addProtobufSchema(Map&lt;Descriptor, Path&gt; descriptorPaths,
+                                          Map&lt;Path, ProtobufSchema&gt; protobufSchemas,
+                                          String messageName) {
+<span class="fc" id="L295">      var descriptorAndPath = getDescriptorAndPath(protobufSchemas, messageName);</span>
+<span class="fc" id="L296">      descriptorPaths.put(descriptorAndPath.getKey(), descriptorAndPath.getValue());</span>
+<span class="fc" id="L297">    }</span>
+
+    private static void addProtobufSchemas(Map&lt;Descriptor, Path&gt; descriptorPaths,
+                                           Map&lt;Path, ProtobufSchema&gt; protobufSchemas,
+                                           Map&lt;String, String&gt; messageNamesByTopic) {
+<span class="fc" id="L302">      messageNamesByTopic.values().stream()</span>
+<span class="fc" id="L303">          .map(msgName -&gt; getDescriptorAndPath(protobufSchemas, msgName))</span>
+<span class="fc" id="L304">          .forEach(entry -&gt; descriptorPaths.put(entry.getKey(), entry.getValue()));</span>
+<span class="fc" id="L305">    }</span>
+  }
+
+  static class ProtoSchemaLoader {
+
+    private final Path baseLocation;
+
+<span class="fc" id="L312">    ProtoSchemaLoader(String baseLocationStr) {</span>
+<span class="fc" id="L313">      this.baseLocation = Path.of(baseLocationStr);</span>
+<span class="pc bpc" id="L314" title="1 of 2 branches missed.">      if (!Files.isReadable(baseLocation)) {</span>
+<span class="nc" id="L315">        throw new ValidationException(&quot;proto files directory not readable&quot;);</span>
+      }
+<span class="fc" id="L317">    }</span>
+
+    List&lt;ProtoFile&gt; load() {
+<span class="fc" id="L320">      Map&lt;String, ProtoFile&gt; knownTypes = knownProtoFiles();</span>
+
+<span class="fc" id="L322">      Map&lt;String, ProtoFile&gt; filesByLocations = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L323">      filesByLocations.putAll(knownTypes);</span>
+<span class="fc" id="L324">      filesByLocations.putAll(loadFilesWithLocations());</span>
+
+<span class="fc" id="L326">      Linker linker = new Linker(</span>
+<span class="fc" id="L327">          createFilesLoader(filesByLocations),</span>
+          new ErrorCollector(),
+          true,
+          true
+      );
+<span class="fc" id="L332">      var schema = linker.link(filesByLocations.values());</span>
+<span class="fc" id="L333">      linker.getErrors().throwIfNonEmpty();</span>
+<span class="fc" id="L334">      return schema.getProtoFiles()</span>
+<span class="fc" id="L335">          .stream()</span>
+<span class="fc bfc" id="L336" title="All 2 branches covered.">          .filter(p -&gt; !knownTypes.containsKey(p.getLocation().getPath())) //filtering known types</span>
+<span class="fc" id="L337">          .toList();</span>
+    }
+
+    private Map&lt;String, ProtoFile&gt; knownProtoFiles() {
+<span class="fc" id="L341">      return Stream.of(</span>
+<span class="fc" id="L342">          loadKnownProtoFile(&quot;google/type/color.proto&quot;, ColorProto.getDescriptor()),</span>
+<span class="fc" id="L343">          loadKnownProtoFile(&quot;google/type/date.proto&quot;, DateProto.getDescriptor()),</span>
+<span class="fc" id="L344">          loadKnownProtoFile(&quot;google/type/datetime.proto&quot;, DateTimeProto.getDescriptor()),</span>
+<span class="fc" id="L345">          loadKnownProtoFile(&quot;google/type/dayofweek.proto&quot;, DayOfWeekProto.getDescriptor()),</span>
+<span class="fc" id="L346">          loadKnownProtoFile(&quot;google/type/decimal.proto&quot;, com.google.type.DecimalProto.getDescriptor()),</span>
+<span class="fc" id="L347">          loadKnownProtoFile(&quot;google/type/expr.proto&quot;, ExprProto.getDescriptor()),</span>
+<span class="fc" id="L348">          loadKnownProtoFile(&quot;google/type/fraction.proto&quot;, FractionProto.getDescriptor()),</span>
+<span class="fc" id="L349">          loadKnownProtoFile(&quot;google/type/interval.proto&quot;, IntervalProto.getDescriptor()),</span>
+<span class="fc" id="L350">          loadKnownProtoFile(&quot;google/type/latlng.proto&quot;, LatLngProto.getDescriptor()),</span>
+<span class="fc" id="L351">          loadKnownProtoFile(&quot;google/type/money.proto&quot;, MoneyProto.getDescriptor()),</span>
+<span class="fc" id="L352">          loadKnownProtoFile(&quot;google/type/month.proto&quot;, MonthProto.getDescriptor()),</span>
+<span class="fc" id="L353">          loadKnownProtoFile(&quot;google/type/phone_number.proto&quot;, PhoneNumberProto.getDescriptor()),</span>
+<span class="fc" id="L354">          loadKnownProtoFile(&quot;google/type/postal_address.proto&quot;, PostalAddressProto.getDescriptor()),</span>
+<span class="fc" id="L355">          loadKnownProtoFile(&quot;google/type/quaternion.prot&quot;, QuaternionProto.getDescriptor()),</span>
+<span class="fc" id="L356">          loadKnownProtoFile(&quot;google/type/timeofday.proto&quot;, TimeOfDayProto.getDescriptor()),</span>
+<span class="fc" id="L357">          loadKnownProtoFile(&quot;google/protobuf/any.proto&quot;, AnyProto.getDescriptor()),</span>
+<span class="fc" id="L358">          loadKnownProtoFile(&quot;google/protobuf/api.proto&quot;, ApiProto.getDescriptor()),</span>
+<span class="fc" id="L359">          loadKnownProtoFile(&quot;google/protobuf/descriptor.proto&quot;, DescriptorProtos.getDescriptor()),</span>
+<span class="fc" id="L360">          loadKnownProtoFile(&quot;google/protobuf/duration.proto&quot;, DurationProto.getDescriptor()),</span>
+<span class="fc" id="L361">          loadKnownProtoFile(&quot;google/protobuf/empty.proto&quot;, EmptyProto.getDescriptor()),</span>
+<span class="fc" id="L362">          loadKnownProtoFile(&quot;google/protobuf/field_mask.proto&quot;, FieldMaskProto.getDescriptor()),</span>
+<span class="fc" id="L363">          loadKnownProtoFile(&quot;google/protobuf/source_context.proto&quot;, SourceContextProto.getDescriptor()),</span>
+<span class="fc" id="L364">          loadKnownProtoFile(&quot;google/protobuf/struct.proto&quot;, StructProto.getDescriptor()),</span>
+<span class="fc" id="L365">          loadKnownProtoFile(&quot;google/protobuf/timestamp.proto&quot;, TimestampProto.getDescriptor()),</span>
+<span class="fc" id="L366">          loadKnownProtoFile(&quot;google/protobuf/type.proto&quot;, TypeProto.getDescriptor()),</span>
+<span class="fc" id="L367">          loadKnownProtoFile(&quot;google/protobuf/wrappers.proto&quot;, WrappersProto.getDescriptor())</span>
+<span class="fc" id="L368">      ).collect(Collectors.toMap(p -&gt; p.getLocation().getPath(), p -&gt; p));</span>
+    }
+
+    private ProtoFile loadKnownProtoFile(String path, Descriptors.FileDescriptor fileDescriptor) {
+<span class="fc" id="L372">      String protoFileString = null;</span>
+      // know type file contains either message or enum
+<span class="fc bfc" id="L374" title="All 2 branches covered.">      if (!fileDescriptor.getMessageTypes().isEmpty()) {</span>
+<span class="fc" id="L375">        protoFileString = new ProtobufSchema(fileDescriptor.getMessageTypes().get(0)).canonicalString();</span>
+<span class="pc bpc" id="L376" title="1 of 2 branches missed.">      } else if (!fileDescriptor.getEnumTypes().isEmpty()) {</span>
+<span class="fc" id="L377">        protoFileString = new ProtobufSchema(fileDescriptor.getEnumTypes().get(0)).canonicalString();</span>
+      } else {
+<span class="nc" id="L379">        throw new IllegalStateException();</span>
+      }
+<span class="fc" id="L381">      return ProtoFile.Companion.get(ProtoParser.Companion.parse(Location.get(path), protoFileString));</span>
+    }
+
+    private Loader createFilesLoader(Map&lt;String, ProtoFile&gt; files) {
+<span class="fc" id="L385">      return new Loader() {</span>
+        @Override
+        public @NotNull ProtoFile load(@NotNull String path) {
+<span class="fc" id="L388">          return Preconditions.checkNotNull(files.get(path), &quot;ProtoFile not found for import '%s'&quot;, path);</span>
+        }
+
+        @Override
+        public @NotNull Loader withErrors(@NotNull ErrorCollector errorCollector) {
+<span class="fc" id="L393">          return this;</span>
+        }
+      };
+    }
+
+<span class="nc" id="L398">    @SneakyThrows</span>
+    private Map&lt;String, ProtoFile&gt; loadFilesWithLocations() {
+<span class="fc" id="L400">      Map&lt;String, ProtoFile&gt; filesByLocations = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L401">      try (var files = Files.walk(baseLocation)) {</span>
+<span class="pc bpc" id="L402" title="1 of 4 branches missed.">        files.filter(p -&gt; !Files.isDirectory(p) &amp;&amp; p.toString().endsWith(&quot;.proto&quot;))</span>
+<span class="fc" id="L403">            .forEach(path -&gt; {</span>
+              // relative path will be used as &quot;import&quot; statement
+<span class="fc" id="L405">              String relativePath = baseLocation.relativize(path).toString();</span>
+<span class="fc" id="L406">              var protoFileElement = ProtoParser.Companion.parse(</span>
+<span class="fc" id="L407">                  Location.get(baseLocation.toString(), relativePath),</span>
+<span class="fc" id="L408">                  readFileAsString(path)</span>
+              );
+<span class="fc" id="L410">              filesByLocations.put(relativePath, ProtoFile.Companion.get(protoFileElement));</span>
+<span class="fc" id="L411">            });</span>
+      }
+<span class="fc" id="L413">      return filesByLocations;</span>
+    }
+  }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

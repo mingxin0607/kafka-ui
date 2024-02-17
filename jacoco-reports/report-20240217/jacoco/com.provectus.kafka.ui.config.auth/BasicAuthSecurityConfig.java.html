@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>BasicAuthSecurityConfig.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">kafka-ui-api</a> &gt; <a href="index.source.html" class="el_package">com.provectus.kafka.ui.config.auth</a> &gt; <span class="el_source">BasicAuthSecurityConfig.java</span></div><h1>BasicAuthSecurityConfig.java</h1><pre class="source lang-java linenums">package com.provectus.kafka.ui.config.auth;
+
+import com.provectus.kafka.ui.util.EmptyRedirectStrategy;
+import java.net.URI;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
+import org.springframework.security.config.annotation.web.reactive.EnableWebFluxSecurity;
+import org.springframework.security.config.web.server.ServerHttpSecurity;
+import org.springframework.security.web.server.SecurityWebFilterChain;
+import org.springframework.security.web.server.authentication.RedirectServerAuthenticationSuccessHandler;
+import org.springframework.security.web.server.authentication.logout.RedirectServerLogoutSuccessHandler;
+import org.springframework.security.web.server.util.matcher.ServerWebExchangeMatchers;
+
+@Configuration
+@EnableWebFluxSecurity
+@ConditionalOnProperty(value = &quot;auth.type&quot;, havingValue = &quot;LOGIN_FORM&quot;)
+<span class="nc" id="L20">@Slf4j</span>
+<span class="nc" id="L21">public class BasicAuthSecurityConfig extends AbstractAuthSecurityConfig {</span>
+
+  public static final String LOGIN_URL = &quot;/auth&quot;;
+  public static final String LOGOUT_URL = &quot;/auth?logout&quot;;
+
+  @Bean
+  public SecurityWebFilterChain configure(ServerHttpSecurity http) {
+<span class="nc" id="L28">    log.info(&quot;Configuring LOGIN_FORM authentication.&quot;);</span>
+
+<span class="nc" id="L30">    final var authHandler = new RedirectServerAuthenticationSuccessHandler();</span>
+<span class="nc" id="L31">    authHandler.setRedirectStrategy(new EmptyRedirectStrategy());</span>
+
+<span class="nc" id="L33">    final var logoutSuccessHandler = new RedirectServerLogoutSuccessHandler();</span>
+<span class="nc" id="L34">    logoutSuccessHandler.setLogoutSuccessUrl(URI.create(LOGOUT_URL));</span>
+
+
+<span class="nc" id="L37">    return http.authorizeExchange(spec -&gt; spec</span>
+<span class="nc" id="L38">            .pathMatchers(AUTH_WHITELIST)</span>
+<span class="nc" id="L39">            .permitAll()</span>
+<span class="nc" id="L40">            .anyExchange()</span>
+<span class="nc" id="L41">            .authenticated()</span>
+        )
+<span class="nc" id="L43">        .formLogin(spec -&gt; spec.loginPage(LOGIN_URL).authenticationSuccessHandler(authHandler))</span>
+<span class="nc" id="L44">        .logout(spec -&gt; spec</span>
+<span class="nc" id="L45">            .logoutSuccessHandler(logoutSuccessHandler)</span>
+<span class="nc" id="L46">            .requiresLogout(ServerWebExchangeMatchers.pathMatchers(HttpMethod.GET, &quot;/logout&quot;)))</span>
+<span class="nc" id="L47">        .csrf(ServerHttpSecurity.CsrfSpec::disable)</span>
+<span class="nc" id="L48">        .build();</span>
+  }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

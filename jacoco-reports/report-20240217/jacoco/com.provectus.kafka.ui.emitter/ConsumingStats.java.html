@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ConsumingStats.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">kafka-ui-api</a> &gt; <a href="index.source.html" class="el_package">com.provectus.kafka.ui.emitter</a> &gt; <span class="el_source">ConsumingStats.java</span></div><h1>ConsumingStats.java</h1><pre class="source lang-java linenums">package com.provectus.kafka.ui.emitter;
+
+import com.provectus.kafka.ui.model.TopicMessageConsumingDTO;
+import com.provectus.kafka.ui.model.TopicMessageEventDTO;
+import reactor.core.publisher.FluxSink;
+
+<span class="fc" id="L7">class ConsumingStats {</span>
+
+<span class="fc" id="L9">  private long bytes = 0;</span>
+<span class="fc" id="L10">  private int records = 0;</span>
+<span class="fc" id="L11">  private long elapsed = 0;</span>
+<span class="fc" id="L12">  private int filterApplyErrors = 0;</span>
+
+  void sendConsumingEvt(FluxSink&lt;TopicMessageEventDTO&gt; sink, PolledRecords polledRecords) {
+<span class="fc" id="L15">    bytes += polledRecords.bytes();</span>
+<span class="fc" id="L16">    records += polledRecords.count();</span>
+<span class="fc" id="L17">    elapsed += polledRecords.elapsed().toMillis();</span>
+<span class="fc" id="L18">    sink.next(</span>
+        new TopicMessageEventDTO()
+<span class="fc" id="L20">            .type(TopicMessageEventDTO.TypeEnum.CONSUMING)</span>
+<span class="fc" id="L21">            .consuming(createConsumingStats())</span>
+    );
+<span class="fc" id="L23">  }</span>
+
+  void incFilterApplyError() {
+<span class="nc" id="L26">    filterApplyErrors++;</span>
+<span class="nc" id="L27">  }</span>
+
+  void sendFinishEvent(FluxSink&lt;TopicMessageEventDTO&gt; sink) {
+<span class="fc" id="L30">    sink.next(</span>
+        new TopicMessageEventDTO()
+<span class="fc" id="L32">            .type(TopicMessageEventDTO.TypeEnum.DONE)</span>
+<span class="fc" id="L33">            .consuming(createConsumingStats())</span>
+    );
+<span class="fc" id="L35">  }</span>
+
+  private TopicMessageConsumingDTO createConsumingStats() {
+<span class="fc" id="L38">    return new TopicMessageConsumingDTO()</span>
+<span class="fc" id="L39">        .bytesConsumed(bytes)</span>
+<span class="fc" id="L40">        .elapsedMs(elapsed)</span>
+<span class="fc" id="L41">        .isCancelled(false)</span>
+<span class="fc" id="L42">        .filterApplyErrors(filterApplyErrors)</span>
+<span class="fc" id="L43">        .messagesConsumed(records);</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

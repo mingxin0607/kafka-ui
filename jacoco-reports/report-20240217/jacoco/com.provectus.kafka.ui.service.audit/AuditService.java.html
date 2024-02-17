@@ -1,0 +1,236 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AuditService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">kafka-ui-api</a> &gt; <a href="index.source.html" class="el_package">com.provectus.kafka.ui.service.audit</a> &gt; <span class="el_source">AuditService.java</span></div><h1>AuditService.java</h1><pre class="source lang-java linenums">package com.provectus.kafka.ui.service.audit;
+
+import static com.provectus.kafka.ui.config.ClustersProperties.AuditProperties.LogLevel.ALTER_ONLY;
+import static com.provectus.kafka.ui.service.MessagesService.createProducer;
+
+import com.google.common.annotations.VisibleForTesting;
+import com.provectus.kafka.ui.config.ClustersProperties;
+import com.provectus.kafka.ui.config.auth.AuthenticatedUser;
+import com.provectus.kafka.ui.model.KafkaCluster;
+import com.provectus.kafka.ui.model.rbac.AccessContext;
+import com.provectus.kafka.ui.service.AdminClientService;
+import com.provectus.kafka.ui.service.ClustersStorage;
+import com.provectus.kafka.ui.service.ReactiveAdminClient;
+import java.io.Closeable;
+import java.io.IOException;
+import java.time.Duration;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import java.util.concurrent.TimeUnit;
+import java.util.function.Supplier;
+import java.util.stream.Collectors;
+import javax.annotation.Nullable;
+import lombok.extern.slf4j.Slf4j;
+import org.apache.kafka.clients.producer.KafkaProducer;
+import org.apache.kafka.clients.producer.ProducerConfig;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.context.SecurityContext;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.stereotype.Service;
+import reactor.core.publisher.Mono;
+import reactor.core.publisher.Signal;
+
+
+<span class="fc" id="L39">@Slf4j</span>
+@Service
+public class AuditService implements Closeable {
+
+<span class="fc" id="L43">  private static final Mono&lt;AuthenticatedUser&gt; NO_AUTH_USER = Mono.just(new AuthenticatedUser(&quot;Unknown&quot;, Set.of()));</span>
+<span class="fc" id="L44">  private static final Duration BLOCK_TIMEOUT = Duration.ofSeconds(5);</span>
+
+  private static final String DEFAULT_AUDIT_TOPIC_NAME = &quot;__kui-audit-log&quot;;
+  private static final int DEFAULT_AUDIT_TOPIC_PARTITIONS = 1;
+<span class="fc" id="L48">  private static final Map&lt;String, String&gt; DEFAULT_AUDIT_TOPIC_CONFIG = Map.of(</span>
+<span class="fc" id="L49">      &quot;retention.ms&quot;, String.valueOf(TimeUnit.DAYS.toMillis(7)),</span>
+      &quot;cleanup.policy&quot;, &quot;delete&quot;
+  );
+<span class="fc" id="L52">  private static final Map&lt;String, Object&gt; AUDIT_PRODUCER_CONFIG = Map.of(</span>
+      ProducerConfig.COMPRESSION_TYPE_CONFIG, &quot;gzip&quot;
+  );
+
+<span class="fc" id="L56">  private static final Logger AUDIT_LOGGER = LoggerFactory.getLogger(&quot;audit&quot;);</span>
+
+  private final Map&lt;String, AuditWriter&gt; auditWriters;
+
+  @Autowired
+<span class="fc" id="L61">  public AuditService(AdminClientService adminClientService, ClustersStorage clustersStorage) {</span>
+<span class="fc" id="L62">    Map&lt;String, AuditWriter&gt; auditWriters = new HashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L63" title="All 2 branches covered.">    for (var cluster : clustersStorage.getKafkaClusters()) {</span>
+<span class="fc" id="L64">      Supplier&lt;ReactiveAdminClient&gt; adminClientSupplier = () -&gt; adminClientService.get(cluster).block(BLOCK_TIMEOUT);</span>
+<span class="fc" id="L65">      createAuditWriter(cluster, adminClientSupplier, () -&gt; createProducer(cluster, AUDIT_PRODUCER_CONFIG))</span>
+<span class="fc" id="L66">          .ifPresent(writer -&gt; auditWriters.put(cluster.getName(), writer));</span>
+<span class="fc" id="L67">    }</span>
+<span class="fc" id="L68">    this.auditWriters = auditWriters;</span>
+<span class="fc" id="L69">  }</span>
+
+  @VisibleForTesting
+<span class="fc" id="L72">  AuditService(Map&lt;String, AuditWriter&gt; auditWriters) {</span>
+<span class="fc" id="L73">    this.auditWriters = auditWriters;</span>
+<span class="fc" id="L74">  }</span>
+
+  @VisibleForTesting
+  static Optional&lt;AuditWriter&gt; createAuditWriter(KafkaCluster cluster,
+                                                 Supplier&lt;ReactiveAdminClient&gt; acSupplier,
+                                                 Supplier&lt;KafkaProducer&lt;byte[], byte[]&gt;&gt; producerFactory) {
+<span class="fc" id="L80">    var auditProps = cluster.getOriginalProperties().getAudit();</span>
+<span class="fc bfc" id="L81" title="All 2 branches covered.">    if (auditProps == null) {</span>
+<span class="fc" id="L82">      return Optional.empty();</span>
+    }
+<span class="fc" id="L84">    boolean topicAudit = Optional.ofNullable(auditProps.getTopicAuditEnabled()).orElse(false);</span>
+<span class="fc" id="L85">    boolean consoleAudit = Optional.ofNullable(auditProps.getConsoleAuditEnabled()).orElse(false);</span>
+<span class="pc bnc" id="L86" title="All 2 branches missed.">    boolean alterLogOnly = Optional.ofNullable(auditProps.getLevel()).map(lvl -&gt; lvl == ALTER_ONLY).orElse(true);</span>
+<span class="pc bpc" id="L87" title="1 of 4 branches missed.">    if (!topicAudit &amp;&amp; !consoleAudit) {</span>
+<span class="nc" id="L88">      return Optional.empty();</span>
+    }
+<span class="fc bfc" id="L90" title="All 2 branches covered.">    if (!topicAudit) {</span>
+<span class="fc" id="L91">      log.info(&quot;Audit initialization finished for cluster '{}' (console only)&quot;, cluster.getName());</span>
+<span class="fc" id="L92">      return Optional.of(consoleOnlyWriter(cluster, alterLogOnly));</span>
+    }
+<span class="fc" id="L94">    String auditTopicName = Optional.ofNullable(auditProps.getTopic()).orElse(DEFAULT_AUDIT_TOPIC_NAME);</span>
+<span class="fc" id="L95">    boolean topicAuditCanBeDone = createTopicIfNeeded(cluster, acSupplier, auditTopicName, auditProps);</span>
+<span class="pc bpc" id="L96" title="1 of 2 branches missed.">    if (!topicAuditCanBeDone) {</span>
+<span class="nc bnc" id="L97" title="All 2 branches missed.">      if (consoleAudit) {</span>
+<span class="nc" id="L98">        log.info(</span>
+            &quot;Audit initialization finished for cluster '{}' (console only, topic audit init failed)&quot;,
+<span class="nc" id="L100">            cluster.getName()</span>
+        );
+<span class="nc" id="L102">        return Optional.of(consoleOnlyWriter(cluster, alterLogOnly));</span>
+      }
+<span class="nc" id="L104">      return Optional.empty();</span>
+    }
+<span class="fc" id="L106">    log.info(&quot;Audit initialization finished for cluster '{}'&quot;, cluster.getName());</span>
+<span class="fc" id="L107">    return Optional.of(</span>
+        new AuditWriter(
+<span class="fc" id="L109">            cluster.getName(),</span>
+            alterLogOnly,
+            auditTopicName,
+<span class="fc" id="L112">            producerFactory.get(),</span>
+<span class="fc bfc" id="L113" title="All 2 branches covered.">            consoleAudit ? AUDIT_LOGGER : null</span>
+        )
+    );
+  }
+
+  private static AuditWriter consoleOnlyWriter(KafkaCluster cluster, boolean alterLogOnly) {
+<span class="fc" id="L119">    return new AuditWriter(cluster.getName(), alterLogOnly, null, null, AUDIT_LOGGER);</span>
+  }
+
+  /**
+   * return true if topic created/existing and producing can be enabled.
+   */
+  private static boolean createTopicIfNeeded(KafkaCluster cluster,
+                                             Supplier&lt;ReactiveAdminClient&gt; acSupplier,
+                                             String auditTopicName,
+                                             ClustersProperties.AuditProperties auditProps) {
+    ReactiveAdminClient ac;
+    try {
+<span class="fc" id="L131">      ac = acSupplier.get();</span>
+<span class="nc" id="L132">    } catch (Exception e) {</span>
+<span class="nc" id="L133">      printAuditInitError(cluster, &quot;Error while connecting to the cluster&quot;, e);</span>
+<span class="nc" id="L134">      return false;</span>
+<span class="fc" id="L135">    }</span>
+    boolean topicExists;
+    try {
+<span class="fc" id="L138">      topicExists = ac.listTopics(true).block(BLOCK_TIMEOUT).contains(auditTopicName);</span>
+<span class="nc" id="L139">    } catch (Exception e) {</span>
+<span class="nc" id="L140">      printAuditInitError(cluster, &quot;Error checking audit topic existence&quot;, e);</span>
+<span class="nc" id="L141">      return false;</span>
+<span class="fc" id="L142">    }</span>
+<span class="fc bfc" id="L143" title="All 2 branches covered.">    if (topicExists) {</span>
+<span class="fc" id="L144">      return true;</span>
+    }
+    try {
+<span class="fc" id="L147">      int topicPartitions =</span>
+<span class="fc" id="L148">          Optional.ofNullable(auditProps.getAuditTopicsPartitions())</span>
+<span class="fc" id="L149">              .orElse(DEFAULT_AUDIT_TOPIC_PARTITIONS);</span>
+
+<span class="fc" id="L151">      Map&lt;String, String&gt; topicConfig = new HashMap&lt;&gt;(DEFAULT_AUDIT_TOPIC_CONFIG);</span>
+<span class="fc" id="L152">      Optional.ofNullable(auditProps.getAuditTopicProperties())</span>
+<span class="fc" id="L153">          .ifPresent(topicConfig::putAll);</span>
+
+<span class="fc" id="L155">      log.info(&quot;Creating audit topic '{}' for cluster '{}'&quot;, auditTopicName, cluster.getName());</span>
+<span class="fc" id="L156">      ac.createTopic(auditTopicName, topicPartitions, null, topicConfig).block(BLOCK_TIMEOUT);</span>
+<span class="fc" id="L157">      log.info(&quot;Audit topic created for cluster '{}'&quot;, cluster.getName());</span>
+<span class="fc" id="L158">      return true;</span>
+<span class="nc" id="L159">    } catch (Exception e) {</span>
+<span class="nc" id="L160">      printAuditInitError(cluster, &quot;Error creating topic '%s'&quot;.formatted(auditTopicName), e);</span>
+<span class="nc" id="L161">      return false;</span>
+    }
+  }
+
+  private static void printAuditInitError(KafkaCluster cluster, String errorMsg, Exception cause) {
+<span class="nc" id="L166">    log.error(&quot;-----------------------------------------------------------------&quot;);</span>
+<span class="nc" id="L167">    log.error(</span>
+        &quot;Error initializing Audit for cluster '{}'. Audit will be disabled. See error below: &quot;,
+<span class="nc" id="L169">        cluster.getName()</span>
+    );
+<span class="nc" id="L171">    log.error(&quot;{}&quot;, errorMsg, cause);</span>
+<span class="nc" id="L172">    log.error(&quot;-----------------------------------------------------------------&quot;);</span>
+<span class="nc" id="L173">  }</span>
+
+  public boolean isAuditTopic(KafkaCluster cluster, String topic) {
+<span class="fc" id="L176">    var writer = auditWriters.get(cluster.getName());</span>
+<span class="fc bfc" id="L177" title="All 2 branches covered.">    return writer != null</span>
+<span class="fc bfc" id="L178" title="All 2 branches covered.">        &amp;&amp; topic.equals(writer.targetTopic())</span>
+<span class="fc bfc" id="L179" title="All 2 branches covered.">        &amp;&amp; writer.isTopicWritingEnabled();</span>
+  }
+
+  public void audit(AccessContext acxt, Signal&lt;?&gt; sig) {
+<span class="fc bfc" id="L183" title="All 2 branches covered.">    if (sig.isOnComplete()) {</span>
+<span class="fc" id="L184">      extractUser(sig)</span>
+<span class="fc" id="L185">          .doOnNext(u -&gt; sendAuditRecord(acxt, u))</span>
+<span class="fc" id="L186">          .subscribe();</span>
+<span class="fc bfc" id="L187" title="All 2 branches covered.">    } else if (sig.isOnError()) {</span>
+<span class="fc" id="L188">      extractUser(sig)</span>
+<span class="fc" id="L189">          .doOnNext(u -&gt; sendAuditRecord(acxt, u, sig.getThrowable()))</span>
+<span class="fc" id="L190">          .subscribe();</span>
+    }
+<span class="fc" id="L192">  }</span>
+
+  private Mono&lt;AuthenticatedUser&gt; extractUser(Signal&lt;?&gt; sig) {
+    //see ReactiveSecurityContextHolder for impl details
+<span class="fc" id="L196">    Object key = SecurityContext.class;</span>
+<span class="fc bfc" id="L197" title="All 2 branches covered.">    if (sig.getContextView().hasKey(key)) {</span>
+<span class="fc" id="L198">      return sig.getContextView().&lt;Mono&lt;SecurityContext&gt;&gt;get(key)</span>
+<span class="pc" id="L199">          .map(context -&gt; context.getAuthentication().getPrincipal())</span>
+<span class="fc" id="L200">          .cast(UserDetails.class)</span>
+<span class="fc" id="L201">          .map(user -&gt; {</span>
+<span class="nc" id="L202">            var roles = user.getAuthorities().stream().map(GrantedAuthority::getAuthority).collect(Collectors.toSet());</span>
+<span class="nc" id="L203">            return new AuthenticatedUser(user.getUsername(), roles);</span>
+          })
+<span class="fc" id="L205">          .switchIfEmpty(NO_AUTH_USER);</span>
+    } else {
+<span class="fc" id="L207">      return NO_AUTH_USER;</span>
+    }
+  }
+
+  private void sendAuditRecord(AccessContext ctx, AuthenticatedUser user) {
+<span class="fc" id="L212">    sendAuditRecord(ctx, user, null);</span>
+<span class="fc" id="L213">  }</span>
+
+  private void sendAuditRecord(AccessContext ctx, AuthenticatedUser user, @Nullable Throwable th) {
+    try {
+<span class="fc bfc" id="L217" title="All 2 branches covered.">      if (ctx.getCluster() != null) {</span>
+<span class="fc" id="L218">        var writer = auditWriters.get(ctx.getCluster());</span>
+<span class="pc bpc" id="L219" title="1 of 2 branches missed.">        if (writer != null) {</span>
+<span class="fc" id="L220">          writer.write(ctx, user, th);</span>
+        }
+<span class="fc" id="L222">      } else {</span>
+        // cluster-independent operation
+<span class="fc" id="L224">        AuditWriter.writeAppOperation(AUDIT_LOGGER, ctx, user, th);</span>
+      }
+<span class="nc" id="L226">    } catch (Exception e) {</span>
+<span class="nc" id="L227">      log.warn(&quot;Error sending audit record&quot;, e);</span>
+<span class="fc" id="L228">    }</span>
+<span class="fc" id="L229">  }</span>
+
+  @Override
+  public void close() throws IOException {
+<span class="nc" id="L233">    auditWriters.values().forEach(AuditWriter::close);</span>
+<span class="nc" id="L234">  }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

@@ -1,0 +1,395 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>KafkaConnectMapperImpl.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">kafka-ui-api</a> &gt; <a href="index.source.html" class="el_package">com.provectus.kafka.ui.mapper</a> &gt; <span class="el_source">KafkaConnectMapperImpl.java</span></div><h1>KafkaConnectMapperImpl.java</h1><pre class="source lang-java linenums">package com.provectus.kafka.ui.mapper;
+
+import com.provectus.kafka.ui.connect.model.Connector;
+import com.provectus.kafka.ui.connect.model.ConnectorPlugin;
+import com.provectus.kafka.ui.connect.model.ConnectorPluginConfig;
+import com.provectus.kafka.ui.connect.model.ConnectorPluginConfigDefinition;
+import com.provectus.kafka.ui.connect.model.ConnectorPluginConfigValidationResponse;
+import com.provectus.kafka.ui.connect.model.ConnectorPluginConfigValue;
+import com.provectus.kafka.ui.connect.model.ConnectorStatusConnector;
+import com.provectus.kafka.ui.connect.model.ConnectorTask;
+import com.provectus.kafka.ui.connect.model.NewConnector;
+import com.provectus.kafka.ui.connect.model.Task;
+import com.provectus.kafka.ui.connect.model.TaskStatus;
+import com.provectus.kafka.ui.model.ConnectorDTO;
+import com.provectus.kafka.ui.model.ConnectorPluginConfigDTO;
+import com.provectus.kafka.ui.model.ConnectorPluginConfigDefinitionDTO;
+import com.provectus.kafka.ui.model.ConnectorPluginConfigValidationResponseDTO;
+import com.provectus.kafka.ui.model.ConnectorPluginConfigValueDTO;
+import com.provectus.kafka.ui.model.ConnectorPluginDTO;
+import com.provectus.kafka.ui.model.ConnectorStateDTO;
+import com.provectus.kafka.ui.model.ConnectorStatusDTO;
+import com.provectus.kafka.ui.model.ConnectorTaskStatusDTO;
+import com.provectus.kafka.ui.model.ConnectorTypeDTO;
+import com.provectus.kafka.ui.model.NewConnectorDTO;
+import com.provectus.kafka.ui.model.TaskDTO;
+import com.provectus.kafka.ui.model.TaskIdDTO;
+import com.provectus.kafka.ui.model.TaskStatusDTO;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import javax.annotation.processing.Generated;
+import org.springframework.stereotype.Component;
+
+@Generated(
+    value = &quot;org.mapstruct.ap.MappingProcessor&quot;,
+    date = &quot;2024-02-17T12:52:26-0800&quot;,
+    comments = &quot;version: 1.5.5.Final, compiler: javac, environment: Java 17.0.9 (Private Build)&quot;
+)
+@Component
+<span class="fc" id="L41">public class KafkaConnectMapperImpl implements KafkaConnectMapper {</span>
+
+    @Override
+    public NewConnector toClient(NewConnectorDTO newConnector) {
+<span class="pc bpc" id="L45" title="1 of 2 branches missed.">        if ( newConnector == null ) {</span>
+<span class="nc" id="L46">            return null;</span>
+        }
+
+<span class="fc" id="L49">        NewConnector newConnector1 = new NewConnector();</span>
+
+<span class="fc" id="L51">        newConnector1.setName( newConnector.getName() );</span>
+<span class="fc" id="L52">        Map&lt;String, Object&gt; map = newConnector.getConfig();</span>
+<span class="pc bpc" id="L53" title="1 of 2 branches missed.">        if ( map != null ) {</span>
+<span class="fc" id="L54">            newConnector1.setConfig( new LinkedHashMap&lt;String, Object&gt;( map ) );</span>
+        }
+
+<span class="fc" id="L57">        return newConnector1;</span>
+    }
+
+    @Override
+    public ConnectorDTO fromClient(Connector connector) {
+<span class="pc bpc" id="L62" title="1 of 2 branches missed.">        if ( connector == null ) {</span>
+<span class="nc" id="L63">            return null;</span>
+        }
+
+<span class="fc" id="L66">        ConnectorDTO connectorDTO = new ConnectorDTO();</span>
+
+<span class="fc" id="L68">        connectorDTO.setName( connector.getName() );</span>
+<span class="fc" id="L69">        Map&lt;String, Object&gt; map = connector.getConfig();</span>
+<span class="pc bpc" id="L70" title="1 of 2 branches missed.">        if ( map != null ) {</span>
+<span class="fc" id="L71">            connectorDTO.setConfig( new LinkedHashMap&lt;String, Object&gt;( map ) );</span>
+        }
+<span class="fc" id="L73">        connectorDTO.setTasks( taskListToTaskIdDTOList( connector.getTasks() ) );</span>
+<span class="fc" id="L74">        connectorDTO.setType( typeEnumToConnectorTypeDTO( connector.getType() ) );</span>
+
+<span class="fc" id="L76">        return connectorDTO;</span>
+    }
+
+    @Override
+    public ConnectorStatusDTO fromClient(ConnectorStatusConnector connectorStatus) {
+<span class="pc bpc" id="L81" title="1 of 2 branches missed.">        if ( connectorStatus == null ) {</span>
+<span class="nc" id="L82">            return null;</span>
+        }
+
+<span class="fc" id="L85">        ConnectorStatusDTO connectorStatusDTO = new ConnectorStatusDTO();</span>
+
+<span class="fc" id="L87">        connectorStatusDTO.setState( stateEnumToConnectorStateDTO( connectorStatus.getState() ) );</span>
+<span class="fc" id="L88">        connectorStatusDTO.setWorkerId( connectorStatus.getWorkerId() );</span>
+
+<span class="fc" id="L90">        return connectorStatusDTO;</span>
+    }
+
+    @Override
+    public TaskDTO fromClient(ConnectorTask connectorTask) {
+<span class="pc bpc" id="L95" title="1 of 2 branches missed.">        if ( connectorTask == null ) {</span>
+<span class="nc" id="L96">            return null;</span>
+        }
+
+<span class="fc" id="L99">        TaskDTO taskDTO = new TaskDTO();</span>
+
+<span class="fc" id="L101">        taskDTO.setId( taskToTaskIdDTO( connectorTask.getId() ) );</span>
+<span class="fc" id="L102">        Map&lt;String, Object&gt; map = connectorTask.getConfig();</span>
+<span class="pc bpc" id="L103" title="1 of 2 branches missed.">        if ( map != null ) {</span>
+<span class="fc" id="L104">            taskDTO.setConfig( new LinkedHashMap&lt;String, Object&gt;( map ) );</span>
+        }
+
+<span class="fc" id="L107">        return taskDTO;</span>
+    }
+
+    @Override
+    public TaskStatusDTO fromClient(TaskStatus taskStatus) {
+<span class="pc bpc" id="L112" title="1 of 2 branches missed.">        if ( taskStatus == null ) {</span>
+<span class="nc" id="L113">            return null;</span>
+        }
+
+<span class="fc" id="L116">        TaskStatusDTO taskStatusDTO = new TaskStatusDTO();</span>
+
+<span class="fc" id="L118">        taskStatusDTO.setId( taskStatus.getId() );</span>
+<span class="fc" id="L119">        taskStatusDTO.setState( stateEnumToConnectorTaskStatusDTO( taskStatus.getState() ) );</span>
+<span class="fc" id="L120">        taskStatusDTO.setWorkerId( taskStatus.getWorkerId() );</span>
+<span class="fc" id="L121">        taskStatusDTO.setTrace( taskStatus.getTrace() );</span>
+
+<span class="fc" id="L123">        return taskStatusDTO;</span>
+    }
+
+    @Override
+    public ConnectorPluginDTO fromClient(ConnectorPlugin connectorPlugin) {
+<span class="pc bpc" id="L128" title="1 of 2 branches missed.">        if ( connectorPlugin == null ) {</span>
+<span class="nc" id="L129">            return null;</span>
+        }
+
+<span class="fc" id="L132">        ConnectorPluginDTO connectorPluginDTO = new ConnectorPluginDTO();</span>
+
+<span class="fc" id="L134">        connectorPluginDTO.setPropertyClass( connectorPlugin.getPropertyClass() );</span>
+
+<span class="fc" id="L136">        return connectorPluginDTO;</span>
+    }
+
+    @Override
+    public ConnectorPluginConfigValidationResponseDTO fromClient(ConnectorPluginConfigValidationResponse connectorPluginConfigValidationResponse) {
+<span class="pc bpc" id="L141" title="1 of 2 branches missed.">        if ( connectorPluginConfigValidationResponse == null ) {</span>
+<span class="nc" id="L142">            return null;</span>
+        }
+
+<span class="fc" id="L145">        ConnectorPluginConfigValidationResponseDTO connectorPluginConfigValidationResponseDTO = new ConnectorPluginConfigValidationResponseDTO();</span>
+
+<span class="fc" id="L147">        connectorPluginConfigValidationResponseDTO.setName( connectorPluginConfigValidationResponse.getName() );</span>
+<span class="fc" id="L148">        connectorPluginConfigValidationResponseDTO.setErrorCount( connectorPluginConfigValidationResponse.getErrorCount() );</span>
+<span class="fc" id="L149">        List&lt;String&gt; list = connectorPluginConfigValidationResponse.getGroups();</span>
+<span class="pc bpc" id="L150" title="1 of 2 branches missed.">        if ( list != null ) {</span>
+<span class="fc" id="L151">            connectorPluginConfigValidationResponseDTO.setGroups( new ArrayList&lt;String&gt;( list ) );</span>
+        }
+<span class="fc" id="L153">        connectorPluginConfigValidationResponseDTO.setConfigs( connectorPluginConfigListToConnectorPluginConfigDTOList( connectorPluginConfigValidationResponse.getConfigs() ) );</span>
+
+<span class="fc" id="L155">        return connectorPluginConfigValidationResponseDTO;</span>
+    }
+
+    protected TaskIdDTO taskToTaskIdDTO(Task task) {
+<span class="pc bpc" id="L159" title="1 of 2 branches missed.">        if ( task == null ) {</span>
+<span class="nc" id="L160">            return null;</span>
+        }
+
+<span class="fc" id="L163">        TaskIdDTO taskIdDTO = new TaskIdDTO();</span>
+
+<span class="fc" id="L165">        taskIdDTO.setConnector( task.getConnector() );</span>
+<span class="fc" id="L166">        taskIdDTO.setTask( task.getTask() );</span>
+
+<span class="fc" id="L168">        return taskIdDTO;</span>
+    }
+
+    protected List&lt;TaskIdDTO&gt; taskListToTaskIdDTOList(List&lt;Task&gt; list) {
+<span class="pc bpc" id="L172" title="1 of 2 branches missed.">        if ( list == null ) {</span>
+<span class="nc" id="L173">            return null;</span>
+        }
+
+<span class="fc" id="L176">        List&lt;TaskIdDTO&gt; list1 = new ArrayList&lt;TaskIdDTO&gt;( list.size() );</span>
+<span class="fc bfc" id="L177" title="All 2 branches covered.">        for ( Task task : list ) {</span>
+<span class="fc" id="L178">            list1.add( taskToTaskIdDTO( task ) );</span>
+<span class="fc" id="L179">        }</span>
+
+<span class="fc" id="L181">        return list1;</span>
+    }
+
+    protected ConnectorTypeDTO typeEnumToConnectorTypeDTO(Connector.TypeEnum typeEnum) {
+<span class="pc bpc" id="L185" title="1 of 2 branches missed.">        if ( typeEnum == null ) {</span>
+<span class="nc" id="L186">            return null;</span>
+        }
+
+        ConnectorTypeDTO connectorTypeDTO;
+
+<span class="pc bpc" id="L191" title="2 of 3 branches missed.">        switch ( typeEnum ) {</span>
+<span class="nc" id="L192">            case SOURCE: connectorTypeDTO = ConnectorTypeDTO.SOURCE;</span>
+<span class="nc" id="L193">            break;</span>
+<span class="fc" id="L194">            case SINK: connectorTypeDTO = ConnectorTypeDTO.SINK;</span>
+<span class="fc" id="L195">            break;</span>
+<span class="nc" id="L196">            default: throw new IllegalArgumentException( &quot;Unexpected enum constant: &quot; + typeEnum );</span>
+        }
+
+<span class="fc" id="L199">        return connectorTypeDTO;</span>
+    }
+
+    protected ConnectorStateDTO stateEnumToConnectorStateDTO(ConnectorStatusConnector.StateEnum stateEnum) {
+<span class="pc bpc" id="L203" title="1 of 2 branches missed.">        if ( stateEnum == null ) {</span>
+<span class="nc" id="L204">            return null;</span>
+        }
+
+        ConnectorStateDTO connectorStateDTO;
+
+<span class="pc bpc" id="L209" title="4 of 5 branches missed.">        switch ( stateEnum ) {</span>
+<span class="fc" id="L210">            case RUNNING: connectorStateDTO = ConnectorStateDTO.RUNNING;</span>
+<span class="fc" id="L211">            break;</span>
+<span class="nc" id="L212">            case FAILED: connectorStateDTO = ConnectorStateDTO.FAILED;</span>
+<span class="nc" id="L213">            break;</span>
+<span class="nc" id="L214">            case PAUSED: connectorStateDTO = ConnectorStateDTO.PAUSED;</span>
+<span class="nc" id="L215">            break;</span>
+<span class="nc" id="L216">            case UNASSIGNED: connectorStateDTO = ConnectorStateDTO.UNASSIGNED;</span>
+<span class="nc" id="L217">            break;</span>
+<span class="nc" id="L218">            default: throw new IllegalArgumentException( &quot;Unexpected enum constant: &quot; + stateEnum );</span>
+        }
+
+<span class="fc" id="L221">        return connectorStateDTO;</span>
+    }
+
+    protected ConnectorTaskStatusDTO stateEnumToConnectorTaskStatusDTO(TaskStatus.StateEnum stateEnum) {
+<span class="pc bpc" id="L225" title="1 of 2 branches missed.">        if ( stateEnum == null ) {</span>
+<span class="nc" id="L226">            return null;</span>
+        }
+
+        ConnectorTaskStatusDTO connectorTaskStatusDTO;
+
+<span class="pc bpc" id="L231" title="5 of 6 branches missed.">        switch ( stateEnum ) {</span>
+<span class="fc" id="L232">            case RUNNING: connectorTaskStatusDTO = ConnectorTaskStatusDTO.RUNNING;</span>
+<span class="fc" id="L233">            break;</span>
+<span class="nc" id="L234">            case FAILED: connectorTaskStatusDTO = ConnectorTaskStatusDTO.FAILED;</span>
+<span class="nc" id="L235">            break;</span>
+<span class="nc" id="L236">            case PAUSED: connectorTaskStatusDTO = ConnectorTaskStatusDTO.PAUSED;</span>
+<span class="nc" id="L237">            break;</span>
+<span class="nc" id="L238">            case RESTARTING: connectorTaskStatusDTO = ConnectorTaskStatusDTO.RESTARTING;</span>
+<span class="nc" id="L239">            break;</span>
+<span class="nc" id="L240">            case UNASSIGNED: connectorTaskStatusDTO = ConnectorTaskStatusDTO.UNASSIGNED;</span>
+<span class="nc" id="L241">            break;</span>
+<span class="nc" id="L242">            default: throw new IllegalArgumentException( &quot;Unexpected enum constant: &quot; + stateEnum );</span>
+        }
+
+<span class="fc" id="L245">        return connectorTaskStatusDTO;</span>
+    }
+
+    protected ConnectorPluginConfigDefinitionDTO.TypeEnum typeEnumToTypeEnum(ConnectorPluginConfigDefinition.TypeEnum typeEnum) {
+<span class="pc bpc" id="L249" title="1 of 2 branches missed.">        if ( typeEnum == null ) {</span>
+<span class="nc" id="L250">            return null;</span>
+        }
+
+        ConnectorPluginConfigDefinitionDTO.TypeEnum typeEnum1;
+
+<span class="pc bpc" id="L255" title="3 of 10 branches missed.">        switch ( typeEnum ) {</span>
+<span class="fc" id="L256">            case BOOLEAN: typeEnum1 = ConnectorPluginConfigDefinitionDTO.TypeEnum.BOOLEAN;</span>
+<span class="fc" id="L257">            break;</span>
+<span class="fc" id="L258">            case CLASS: typeEnum1 = ConnectorPluginConfigDefinitionDTO.TypeEnum.CLASS;</span>
+<span class="fc" id="L259">            break;</span>
+<span class="nc" id="L260">            case DOUBLE: typeEnum1 = ConnectorPluginConfigDefinitionDTO.TypeEnum.DOUBLE;</span>
+<span class="nc" id="L261">            break;</span>
+<span class="fc" id="L262">            case INT: typeEnum1 = ConnectorPluginConfigDefinitionDTO.TypeEnum.INT;</span>
+<span class="fc" id="L263">            break;</span>
+<span class="fc" id="L264">            case LIST: typeEnum1 = ConnectorPluginConfigDefinitionDTO.TypeEnum.LIST;</span>
+<span class="fc" id="L265">            break;</span>
+<span class="fc" id="L266">            case LONG: typeEnum1 = ConnectorPluginConfigDefinitionDTO.TypeEnum.LONG;</span>
+<span class="fc" id="L267">            break;</span>
+<span class="nc" id="L268">            case PASSWORD: typeEnum1 = ConnectorPluginConfigDefinitionDTO.TypeEnum.PASSWORD;</span>
+<span class="nc" id="L269">            break;</span>
+<span class="fc" id="L270">            case SHORT: typeEnum1 = ConnectorPluginConfigDefinitionDTO.TypeEnum.SHORT;</span>
+<span class="fc" id="L271">            break;</span>
+<span class="fc" id="L272">            case STRING: typeEnum1 = ConnectorPluginConfigDefinitionDTO.TypeEnum.STRING;</span>
+<span class="fc" id="L273">            break;</span>
+<span class="nc" id="L274">            default: throw new IllegalArgumentException( &quot;Unexpected enum constant: &quot; + typeEnum );</span>
+        }
+
+<span class="fc" id="L277">        return typeEnum1;</span>
+    }
+
+    protected ConnectorPluginConfigDefinitionDTO.ImportanceEnum importanceEnumToImportanceEnum(ConnectorPluginConfigDefinition.ImportanceEnum importanceEnum) {
+<span class="pc bpc" id="L281" title="1 of 2 branches missed.">        if ( importanceEnum == null ) {</span>
+<span class="nc" id="L282">            return null;</span>
+        }
+
+        ConnectorPluginConfigDefinitionDTO.ImportanceEnum importanceEnum1;
+
+<span class="pc bpc" id="L287" title="1 of 4 branches missed.">        switch ( importanceEnum ) {</span>
+<span class="fc" id="L288">            case LOW: importanceEnum1 = ConnectorPluginConfigDefinitionDTO.ImportanceEnum.LOW;</span>
+<span class="fc" id="L289">            break;</span>
+<span class="fc" id="L290">            case MEDIUM: importanceEnum1 = ConnectorPluginConfigDefinitionDTO.ImportanceEnum.MEDIUM;</span>
+<span class="fc" id="L291">            break;</span>
+<span class="fc" id="L292">            case HIGH: importanceEnum1 = ConnectorPluginConfigDefinitionDTO.ImportanceEnum.HIGH;</span>
+<span class="fc" id="L293">            break;</span>
+<span class="nc" id="L294">            default: throw new IllegalArgumentException( &quot;Unexpected enum constant: &quot; + importanceEnum );</span>
+        }
+
+<span class="fc" id="L297">        return importanceEnum1;</span>
+    }
+
+    protected ConnectorPluginConfigDefinitionDTO.WidthEnum widthEnumToWidthEnum(ConnectorPluginConfigDefinition.WidthEnum widthEnum) {
+<span class="pc bpc" id="L301" title="1 of 2 branches missed.">        if ( widthEnum == null ) {</span>
+<span class="nc" id="L302">            return null;</span>
+        }
+
+        ConnectorPluginConfigDefinitionDTO.WidthEnum widthEnum1;
+
+<span class="pc bpc" id="L307" title="1 of 5 branches missed.">        switch ( widthEnum ) {</span>
+<span class="fc" id="L308">            case SHORT: widthEnum1 = ConnectorPluginConfigDefinitionDTO.WidthEnum.SHORT;</span>
+<span class="fc" id="L309">            break;</span>
+<span class="fc" id="L310">            case MEDIUM: widthEnum1 = ConnectorPluginConfigDefinitionDTO.WidthEnum.MEDIUM;</span>
+<span class="fc" id="L311">            break;</span>
+<span class="fc" id="L312">            case LONG: widthEnum1 = ConnectorPluginConfigDefinitionDTO.WidthEnum.LONG;</span>
+<span class="fc" id="L313">            break;</span>
+<span class="fc" id="L314">            case NONE: widthEnum1 = ConnectorPluginConfigDefinitionDTO.WidthEnum.NONE;</span>
+<span class="fc" id="L315">            break;</span>
+<span class="nc" id="L316">            default: throw new IllegalArgumentException( &quot;Unexpected enum constant: &quot; + widthEnum );</span>
+        }
+
+<span class="fc" id="L319">        return widthEnum1;</span>
+    }
+
+    protected ConnectorPluginConfigDefinitionDTO connectorPluginConfigDefinitionToConnectorPluginConfigDefinitionDTO(ConnectorPluginConfigDefinition connectorPluginConfigDefinition) {
+<span class="pc bpc" id="L323" title="1 of 2 branches missed.">        if ( connectorPluginConfigDefinition == null ) {</span>
+<span class="nc" id="L324">            return null;</span>
+        }
+
+<span class="fc" id="L327">        ConnectorPluginConfigDefinitionDTO connectorPluginConfigDefinitionDTO = new ConnectorPluginConfigDefinitionDTO();</span>
+
+<span class="fc" id="L329">        connectorPluginConfigDefinitionDTO.setName( connectorPluginConfigDefinition.getName() );</span>
+<span class="fc" id="L330">        connectorPluginConfigDefinitionDTO.setType( typeEnumToTypeEnum( connectorPluginConfigDefinition.getType() ) );</span>
+<span class="fc" id="L331">        connectorPluginConfigDefinitionDTO.setRequired( connectorPluginConfigDefinition.getRequired() );</span>
+<span class="fc" id="L332">        connectorPluginConfigDefinitionDTO.setDefaultValue( connectorPluginConfigDefinition.getDefaultValue() );</span>
+<span class="fc" id="L333">        connectorPluginConfigDefinitionDTO.setImportance( importanceEnumToImportanceEnum( connectorPluginConfigDefinition.getImportance() ) );</span>
+<span class="fc" id="L334">        connectorPluginConfigDefinitionDTO.setDocumentation( connectorPluginConfigDefinition.getDocumentation() );</span>
+<span class="fc" id="L335">        connectorPluginConfigDefinitionDTO.setGroup( connectorPluginConfigDefinition.getGroup() );</span>
+<span class="fc" id="L336">        connectorPluginConfigDefinitionDTO.setWidth( widthEnumToWidthEnum( connectorPluginConfigDefinition.getWidth() ) );</span>
+<span class="fc" id="L337">        connectorPluginConfigDefinitionDTO.setDisplayName( connectorPluginConfigDefinition.getDisplayName() );</span>
+<span class="fc" id="L338">        List&lt;String&gt; list = connectorPluginConfigDefinition.getDependents();</span>
+<span class="pc bpc" id="L339" title="1 of 2 branches missed.">        if ( list != null ) {</span>
+<span class="fc" id="L340">            connectorPluginConfigDefinitionDTO.setDependents( new ArrayList&lt;String&gt;( list ) );</span>
+        }
+<span class="fc" id="L342">        connectorPluginConfigDefinitionDTO.setOrder( connectorPluginConfigDefinition.getOrder() );</span>
+
+<span class="fc" id="L344">        return connectorPluginConfigDefinitionDTO;</span>
+    }
+
+    protected ConnectorPluginConfigValueDTO connectorPluginConfigValueToConnectorPluginConfigValueDTO(ConnectorPluginConfigValue connectorPluginConfigValue) {
+<span class="pc bpc" id="L348" title="1 of 2 branches missed.">        if ( connectorPluginConfigValue == null ) {</span>
+<span class="nc" id="L349">            return null;</span>
+        }
+
+<span class="fc" id="L352">        ConnectorPluginConfigValueDTO connectorPluginConfigValueDTO = new ConnectorPluginConfigValueDTO();</span>
+
+<span class="fc" id="L354">        connectorPluginConfigValueDTO.setName( connectorPluginConfigValue.getName() );</span>
+<span class="fc" id="L355">        connectorPluginConfigValueDTO.setValue( connectorPluginConfigValue.getValue() );</span>
+<span class="fc" id="L356">        List&lt;String&gt; list = connectorPluginConfigValue.getRecommendedValues();</span>
+<span class="pc bpc" id="L357" title="1 of 2 branches missed.">        if ( list != null ) {</span>
+<span class="fc" id="L358">            connectorPluginConfigValueDTO.setRecommendedValues( new ArrayList&lt;String&gt;( list ) );</span>
+        }
+<span class="fc" id="L360">        List&lt;String&gt; list1 = connectorPluginConfigValue.getErrors();</span>
+<span class="pc bpc" id="L361" title="1 of 2 branches missed.">        if ( list1 != null ) {</span>
+<span class="fc" id="L362">            connectorPluginConfigValueDTO.setErrors( new ArrayList&lt;String&gt;( list1 ) );</span>
+        }
+<span class="fc" id="L364">        connectorPluginConfigValueDTO.setVisible( connectorPluginConfigValue.getVisible() );</span>
+
+<span class="fc" id="L366">        return connectorPluginConfigValueDTO;</span>
+    }
+
+    protected ConnectorPluginConfigDTO connectorPluginConfigToConnectorPluginConfigDTO(ConnectorPluginConfig connectorPluginConfig) {
+<span class="pc bpc" id="L370" title="1 of 2 branches missed.">        if ( connectorPluginConfig == null ) {</span>
+<span class="nc" id="L371">            return null;</span>
+        }
+
+<span class="fc" id="L374">        ConnectorPluginConfigDTO connectorPluginConfigDTO = new ConnectorPluginConfigDTO();</span>
+
+<span class="fc" id="L376">        connectorPluginConfigDTO.setDefinition( connectorPluginConfigDefinitionToConnectorPluginConfigDefinitionDTO( connectorPluginConfig.getDefinition() ) );</span>
+<span class="fc" id="L377">        connectorPluginConfigDTO.setValue( connectorPluginConfigValueToConnectorPluginConfigValueDTO( connectorPluginConfig.getValue() ) );</span>
+
+<span class="fc" id="L379">        return connectorPluginConfigDTO;</span>
+    }
+
+    protected List&lt;ConnectorPluginConfigDTO&gt; connectorPluginConfigListToConnectorPluginConfigDTOList(List&lt;ConnectorPluginConfig&gt; list) {
+<span class="pc bpc" id="L383" title="1 of 2 branches missed.">        if ( list == null ) {</span>
+<span class="nc" id="L384">            return null;</span>
+        }
+
+<span class="fc" id="L387">        List&lt;ConnectorPluginConfigDTO&gt; list1 = new ArrayList&lt;ConnectorPluginConfigDTO&gt;( list.size() );</span>
+<span class="fc bfc" id="L388" title="All 2 branches covered.">        for ( ConnectorPluginConfig connectorPluginConfig : list ) {</span>
+<span class="fc" id="L389">            list1.add( connectorPluginConfigToConnectorPluginConfigDTO( connectorPluginConfig ) );</span>
+<span class="fc" id="L390">        }</span>
+
+<span class="fc" id="L392">        return list1;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

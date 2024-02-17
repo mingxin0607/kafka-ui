@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ForwardEmitter.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">kafka-ui-api</a> &gt; <a href="index.source.html" class="el_package">com.provectus.kafka.ui.emitter</a> &gt; <span class="el_source">ForwardEmitter.java</span></div><h1>ForwardEmitter.java</h1><pre class="source lang-java linenums">package com.provectus.kafka.ui.emitter;
+
+import com.provectus.kafka.ui.model.ConsumerPosition;
+import com.provectus.kafka.ui.model.TopicMessageDTO;
+import com.provectus.kafka.ui.serdes.ConsumerRecordDeserializer;
+import java.util.Comparator;
+import java.util.Map;
+import java.util.TreeMap;
+import java.util.function.Predicate;
+import java.util.function.Supplier;
+import java.util.stream.Collectors;
+import org.apache.kafka.common.TopicPartition;
+
+public class ForwardEmitter extends RangePollingEmitter {
+
+  public ForwardEmitter(Supplier&lt;EnhancedConsumer&gt; consumerSupplier,
+                        ConsumerPosition consumerPosition,
+                        int messagesPerPage,
+                        ConsumerRecordDeserializer deserializer,
+                        Predicate&lt;TopicMessageDTO&gt; filter,
+                        PollingSettings pollingSettings) {
+<span class="fc" id="L22">    super(</span>
+        consumerSupplier,
+        consumerPosition,
+        messagesPerPage,
+        new MessagesProcessing(
+            deserializer,
+            filter,
+            true,
+<span class="fc" id="L30">            messagesPerPage</span>
+        ),
+        pollingSettings
+    );
+<span class="fc" id="L34">  }</span>
+
+  @Override
+  protected TreeMap&lt;TopicPartition, FromToOffset&gt; nextPollingRange(TreeMap&lt;TopicPartition, FromToOffset&gt; prevRange,
+                                                                   SeekOperations seekOperations) {
+<span class="fc" id="L39">    TreeMap&lt;TopicPartition, Long&gt; readFromOffsets = new TreeMap&lt;&gt;(Comparator.comparingInt(TopicPartition::partition));</span>
+<span class="fc bfc" id="L40" title="All 2 branches covered.">    if (prevRange.isEmpty()) {</span>
+<span class="fc" id="L41">      readFromOffsets.putAll(seekOperations.getOffsetsForSeek());</span>
+    } else {
+<span class="fc" id="L43">      readFromOffsets.putAll(</span>
+<span class="fc" id="L44">          prevRange.entrySet()</span>
+<span class="fc" id="L45">              .stream()</span>
+<span class="fc" id="L46">              .collect(Collectors.toMap(Map.Entry::getKey, e -&gt; e.getValue().to()))</span>
+      );
+    }
+
+<span class="fc" id="L50">    int msgsToPollPerPartition = (int) Math.ceil((double) messagesPerPage / readFromOffsets.size());</span>
+<span class="fc" id="L51">    TreeMap&lt;TopicPartition, FromToOffset&gt; result = new TreeMap&lt;&gt;(Comparator.comparingInt(TopicPartition::partition));</span>
+<span class="fc" id="L52">    readFromOffsets.forEach((tp, fromOffset) -&gt; {</span>
+<span class="fc" id="L53">      long tpEndOffset = seekOperations.getEndOffsets().get(tp);</span>
+<span class="fc bfc" id="L54" title="All 2 branches covered.">      if (fromOffset &lt; tpEndOffset) {</span>
+<span class="fc" id="L55">        result.put(tp, new FromToOffset(fromOffset, Math.min(tpEndOffset, fromOffset + msgsToPollPerPartition)));</span>
+      }
+<span class="fc" id="L57">    });</span>
+<span class="fc" id="L58">    return result;</span>
+  }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

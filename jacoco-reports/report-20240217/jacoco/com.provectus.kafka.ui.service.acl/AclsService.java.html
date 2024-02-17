@@ -1,0 +1,273 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AclsService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">kafka-ui-api</a> &gt; <a href="index.source.html" class="el_package">com.provectus.kafka.ui.service.acl</a> &gt; <span class="el_source">AclsService.java</span></div><h1>AclsService.java</h1><pre class="source lang-java linenums">package com.provectus.kafka.ui.service.acl;
+
+import static org.apache.kafka.common.acl.AclOperation.ALL;
+import static org.apache.kafka.common.acl.AclOperation.CREATE;
+import static org.apache.kafka.common.acl.AclOperation.DESCRIBE;
+import static org.apache.kafka.common.acl.AclOperation.IDEMPOTENT_WRITE;
+import static org.apache.kafka.common.acl.AclOperation.READ;
+import static org.apache.kafka.common.acl.AclOperation.WRITE;
+import static org.apache.kafka.common.acl.AclPermissionType.ALLOW;
+import static org.apache.kafka.common.resource.PatternType.LITERAL;
+import static org.apache.kafka.common.resource.PatternType.PREFIXED;
+import static org.apache.kafka.common.resource.ResourceType.CLUSTER;
+import static org.apache.kafka.common.resource.ResourceType.GROUP;
+import static org.apache.kafka.common.resource.ResourceType.TOPIC;
+import static org.apache.kafka.common.resource.ResourceType.TRANSACTIONAL_ID;
+
+import com.google.common.collect.Sets;
+import com.provectus.kafka.ui.model.CreateConsumerAclDTO;
+import com.provectus.kafka.ui.model.CreateProducerAclDTO;
+import com.provectus.kafka.ui.model.CreateStreamAppAclDTO;
+import com.provectus.kafka.ui.model.KafkaCluster;
+import com.provectus.kafka.ui.service.AdminClientService;
+import com.provectus.kafka.ui.service.ReactiveAdminClient;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Optional;
+import java.util.Set;
+import javax.annotation.Nullable;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.apache.kafka.common.acl.AccessControlEntry;
+import org.apache.kafka.common.acl.AclBinding;
+import org.apache.kafka.common.acl.AclOperation;
+import org.apache.kafka.common.resource.Resource;
+import org.apache.kafka.common.resource.ResourcePattern;
+import org.apache.kafka.common.resource.ResourcePatternFilter;
+import org.apache.kafka.common.resource.ResourceType;
+import org.springframework.stereotype.Service;
+import org.springframework.util.CollectionUtils;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
+
+<span class="fc" id="L45">@Slf4j</span>
+@Service
+<span class="fc" id="L47">@RequiredArgsConstructor</span>
+public class AclsService {
+
+  private final AdminClientService adminClientService;
+
+  public Mono&lt;Void&gt; createAcl(KafkaCluster cluster, AclBinding aclBinding) {
+<span class="nc" id="L53">    return adminClientService.get(cluster)</span>
+<span class="nc" id="L54">        .flatMap(ac -&gt; createAclsWithLogging(ac, List.of(aclBinding)));</span>
+  }
+
+  private Mono&lt;Void&gt; createAclsWithLogging(ReactiveAdminClient ac, Collection&lt;AclBinding&gt; bindings) {
+<span class="fc" id="L58">    bindings.forEach(b -&gt; log.info(&quot;CREATING ACL: [{}]&quot;, AclCsv.createAclString(b)));</span>
+<span class="fc" id="L59">    return ac.createAcls(bindings)</span>
+<span class="fc" id="L60">        .doOnSuccess(v -&gt; bindings.forEach(b -&gt; log.info(&quot;ACL CREATED: [{}]&quot;, AclCsv.createAclString(b))));</span>
+  }
+
+  public Mono&lt;Void&gt; deleteAcl(KafkaCluster cluster, AclBinding aclBinding) {
+<span class="nc" id="L64">    var aclString = AclCsv.createAclString(aclBinding);</span>
+<span class="nc" id="L65">    log.info(&quot;DELETING ACL: [{}]&quot;, aclString);</span>
+<span class="nc" id="L66">    return adminClientService.get(cluster)</span>
+<span class="nc" id="L67">        .flatMap(ac -&gt; ac.deleteAcls(List.of(aclBinding)))</span>
+<span class="nc" id="L68">        .doOnSuccess(v -&gt; log.info(&quot;ACL DELETED: [{}]&quot;, aclString));</span>
+  }
+
+  public Flux&lt;AclBinding&gt; listAcls(KafkaCluster cluster, ResourcePatternFilter filter) {
+<span class="nc" id="L72">    return adminClientService.get(cluster)</span>
+<span class="nc" id="L73">        .flatMap(c -&gt; c.listAcls(filter))</span>
+<span class="nc" id="L74">        .flatMapIterable(acls -&gt; acls)</span>
+<span class="nc" id="L75">        .sort(Comparator.comparing(AclBinding::toString));  //sorting to keep stable order on different calls</span>
+  }
+
+  public Mono&lt;String&gt; getAclAsCsvString(KafkaCluster cluster) {
+<span class="nc" id="L79">    return adminClientService.get(cluster)</span>
+<span class="nc" id="L80">        .flatMap(c -&gt; c.listAcls(ResourcePatternFilter.ANY))</span>
+<span class="nc" id="L81">        .map(AclCsv::transformToCsvString);</span>
+  }
+
+  public Mono&lt;Void&gt; syncAclWithAclCsv(KafkaCluster cluster, String csv) {
+<span class="fc" id="L85">    return adminClientService.get(cluster)</span>
+<span class="fc" id="L86">        .flatMap(ac -&gt; ac.listAcls(ResourcePatternFilter.ANY).flatMap(existingAclList -&gt; {</span>
+<span class="fc" id="L87">          var existingSet = Set.copyOf(existingAclList);</span>
+<span class="fc" id="L88">          var newAcls = Set.copyOf(AclCsv.parseCsv(csv));</span>
+<span class="fc" id="L89">          var toDelete = Sets.difference(existingSet, newAcls);</span>
+<span class="fc" id="L90">          var toAdd = Sets.difference(newAcls, existingSet);</span>
+<span class="fc" id="L91">          logAclSyncPlan(cluster, toAdd, toDelete);</span>
+<span class="pc bpc" id="L92" title="3 of 4 branches missed.">          if (toAdd.isEmpty() &amp;&amp; toDelete.isEmpty()) {</span>
+<span class="nc" id="L93">            return Mono.empty();</span>
+          }
+<span class="fc" id="L95">          log.info(&quot;Starting new ACLs creation&quot;);</span>
+<span class="fc" id="L96">          return ac.createAcls(toAdd)</span>
+<span class="fc" id="L97">              .doOnSuccess(v -&gt; {</span>
+<span class="fc" id="L98">                log.info(&quot;{} new ACLs created&quot;, toAdd.size());</span>
+<span class="fc" id="L99">                log.info(&quot;Starting ACLs deletion&quot;);</span>
+<span class="fc" id="L100">              })</span>
+<span class="fc" id="L101">              .then(ac.deleteAcls(toDelete)</span>
+<span class="fc" id="L102">                  .doOnSuccess(v -&gt; log.info(&quot;{} ACLs deleted&quot;, toDelete.size())));</span>
+        }));
+  }
+
+  private void logAclSyncPlan(KafkaCluster cluster, Set&lt;AclBinding&gt; toBeAdded, Set&lt;AclBinding&gt; toBeDeleted) {
+<span class="fc" id="L107">    log.info(&quot;'{}' cluster ACL sync plan: &quot;, cluster.getName());</span>
+<span class="pc bpc" id="L108" title="3 of 4 branches missed.">    if (toBeAdded.isEmpty() &amp;&amp; toBeDeleted.isEmpty()) {</span>
+<span class="nc" id="L109">      log.info(&quot;Nothing to do, ACL is already in sync&quot;);</span>
+<span class="nc" id="L110">      return;</span>
+    }
+<span class="pc bpc" id="L112" title="1 of 2 branches missed.">    if (!toBeAdded.isEmpty()) {</span>
+<span class="fc" id="L113">      log.info(&quot;ACLs to be added ({}): &quot;, toBeAdded.size());</span>
+<span class="fc bfc" id="L114" title="All 2 branches covered.">      for (AclBinding aclBinding : toBeAdded) {</span>
+<span class="fc" id="L115">        log.info(&quot; &quot; + AclCsv.createAclString(aclBinding));</span>
+<span class="fc" id="L116">      }</span>
+    }
+<span class="pc bpc" id="L118" title="1 of 2 branches missed.">    if (!toBeDeleted.isEmpty()) {</span>
+<span class="fc" id="L119">      log.info(&quot;ACLs to be deleted ({}): &quot;, toBeDeleted.size());</span>
+<span class="fc bfc" id="L120" title="All 2 branches covered.">      for (AclBinding aclBinding : toBeDeleted) {</span>
+<span class="fc" id="L121">        log.info(&quot; &quot; + AclCsv.createAclString(aclBinding));</span>
+<span class="fc" id="L122">      }</span>
+    }
+<span class="fc" id="L124">  }</span>
+
+  // creates allow binding for resources by prefix or specific names list
+  private List&lt;AclBinding&gt; createAllowBindings(ResourceType resourceType,
+                                               List&lt;AclOperation&gt; opsToAllow,
+                                               String principal,
+                                               String host,
+                                               @Nullable String resourcePrefix,
+                                               @Nullable Collection&lt;String&gt; resourceNames) {
+<span class="fc" id="L133">    List&lt;AclBinding&gt; bindings = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L134" title="All 2 branches covered.">    if (resourcePrefix != null) {</span>
+<span class="fc bfc" id="L135" title="All 2 branches covered.">      for (var op : opsToAllow) {</span>
+<span class="fc" id="L136">        bindings.add(</span>
+            new AclBinding(
+                new ResourcePattern(resourceType, resourcePrefix, PREFIXED),
+                new AccessControlEntry(principal, host, op, ALLOW)));
+<span class="fc" id="L140">      }</span>
+    }
+<span class="fc bfc" id="L142" title="All 2 branches covered.">    if (!CollectionUtils.isEmpty(resourceNames)) {</span>
+<span class="fc" id="L143">      resourceNames.stream()</span>
+<span class="fc" id="L144">          .distinct()</span>
+<span class="fc" id="L145">          .forEach(resource -&gt;</span>
+<span class="fc" id="L146">              opsToAllow.forEach(op -&gt;</span>
+<span class="fc" id="L147">                  bindings.add(</span>
+                      new AclBinding(
+                          new ResourcePattern(resourceType, resource, LITERAL),
+                          new AccessControlEntry(principal, host, op, ALLOW)))));
+    }
+<span class="fc" id="L152">    return bindings;</span>
+  }
+
+  public Mono&lt;Void&gt; createConsumerAcl(KafkaCluster cluster, CreateConsumerAclDTO request) {
+<span class="fc" id="L156">    return adminClientService.get(cluster)</span>
+<span class="fc" id="L157">        .flatMap(ac -&gt; createAclsWithLogging(ac, createConsumerBindings(request)))</span>
+<span class="fc" id="L158">        .then();</span>
+  }
+
+  //Read, Describe on topics, Read on consumerGroups
+  private List&lt;AclBinding&gt; createConsumerBindings(CreateConsumerAclDTO request) {
+<span class="fc" id="L163">    List&lt;AclBinding&gt; bindings = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L164">    bindings.addAll(</span>
+<span class="fc" id="L165">        createAllowBindings(TOPIC,</span>
+<span class="fc" id="L166">            List.of(READ, DESCRIBE),</span>
+<span class="fc" id="L167">            request.getPrincipal(),</span>
+<span class="fc" id="L168">            request.getHost(),</span>
+<span class="fc" id="L169">            request.getTopicsPrefix(),</span>
+<span class="fc" id="L170">            request.getTopics()));</span>
+
+<span class="fc" id="L172">    bindings.addAll(</span>
+<span class="fc" id="L173">        createAllowBindings(</span>
+            GROUP,
+<span class="fc" id="L175">            List.of(READ),</span>
+<span class="fc" id="L176">            request.getPrincipal(),</span>
+<span class="fc" id="L177">            request.getHost(),</span>
+<span class="fc" id="L178">            request.getConsumerGroupsPrefix(),</span>
+<span class="fc" id="L179">            request.getConsumerGroups()));</span>
+<span class="fc" id="L180">    return bindings;</span>
+  }
+
+  public Mono&lt;Void&gt; createProducerAcl(KafkaCluster cluster, CreateProducerAclDTO request) {
+<span class="fc" id="L184">    return adminClientService.get(cluster)</span>
+<span class="fc" id="L185">        .flatMap(ac -&gt; createAclsWithLogging(ac, createProducerBindings(request)))</span>
+<span class="fc" id="L186">        .then();</span>
+  }
+
+  //Write, Describe, Create permission on topics, Write, Describe on transactionalIds
+  //IDEMPOTENT_WRITE on cluster if idempotent is enabled
+  private List&lt;AclBinding&gt; createProducerBindings(CreateProducerAclDTO request) {
+<span class="fc" id="L192">    List&lt;AclBinding&gt; bindings = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L193">    bindings.addAll(</span>
+<span class="fc" id="L194">        createAllowBindings(</span>
+            TOPIC,
+<span class="fc" id="L196">            List.of(WRITE, DESCRIBE, CREATE),</span>
+<span class="fc" id="L197">            request.getPrincipal(),</span>
+<span class="fc" id="L198">            request.getHost(),</span>
+<span class="fc" id="L199">            request.getTopicsPrefix(),</span>
+<span class="fc" id="L200">            request.getTopics()));</span>
+
+<span class="fc" id="L202">    bindings.addAll(</span>
+<span class="fc" id="L203">        createAllowBindings(</span>
+            TRANSACTIONAL_ID,
+<span class="fc" id="L205">            List.of(WRITE, DESCRIBE),</span>
+<span class="fc" id="L206">            request.getPrincipal(),</span>
+<span class="fc" id="L207">            request.getHost(),</span>
+<span class="fc" id="L208">            request.getTransactionsIdPrefix(),</span>
+<span class="fc" id="L209">            Optional.ofNullable(request.getTransactionalId()).map(List::of).orElse(null)));</span>
+
+<span class="fc bfc" id="L211" title="All 2 branches covered.">    if (Boolean.TRUE.equals(request.getIdempotent())) {</span>
+<span class="fc" id="L212">      bindings.addAll(</span>
+<span class="fc" id="L213">          createAllowBindings(</span>
+              CLUSTER,
+<span class="fc" id="L215">              List.of(IDEMPOTENT_WRITE),</span>
+<span class="fc" id="L216">              request.getPrincipal(),</span>
+<span class="fc" id="L217">              request.getHost(),</span>
+              null,
+<span class="fc" id="L219">              List.of(Resource.CLUSTER_NAME))); // cluster name is a const string in ACL api</span>
+    }
+<span class="fc" id="L221">    return bindings;</span>
+  }
+
+  public Mono&lt;Void&gt; createStreamAppAcl(KafkaCluster cluster, CreateStreamAppAclDTO request) {
+<span class="fc" id="L225">    return adminClientService.get(cluster)</span>
+<span class="fc" id="L226">        .flatMap(ac -&gt; createAclsWithLogging(ac, createStreamAppBindings(request)))</span>
+<span class="fc" id="L227">        .then();</span>
+  }
+
+  // Read on input topics, Write on output topics
+  // ALL on applicationId-prefixed Groups and Topics
+  private List&lt;AclBinding&gt; createStreamAppBindings(CreateStreamAppAclDTO request) {
+<span class="fc" id="L233">    List&lt;AclBinding&gt; bindings = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L234">    bindings.addAll(</span>
+<span class="fc" id="L235">        createAllowBindings(</span>
+            TOPIC,
+<span class="fc" id="L237">            List.of(READ),</span>
+<span class="fc" id="L238">            request.getPrincipal(),</span>
+<span class="fc" id="L239">            request.getHost(),</span>
+            null,
+<span class="fc" id="L241">            request.getInputTopics()));</span>
+
+<span class="fc" id="L243">    bindings.addAll(</span>
+<span class="fc" id="L244">        createAllowBindings(</span>
+            TOPIC,
+<span class="fc" id="L246">            List.of(WRITE),</span>
+<span class="fc" id="L247">            request.getPrincipal(),</span>
+<span class="fc" id="L248">            request.getHost(),</span>
+            null,
+<span class="fc" id="L250">            request.getOutputTopics()));</span>
+
+<span class="fc" id="L252">    bindings.addAll(</span>
+<span class="fc" id="L253">        createAllowBindings(</span>
+            GROUP,
+<span class="fc" id="L255">            List.of(ALL),</span>
+<span class="fc" id="L256">            request.getPrincipal(),</span>
+<span class="fc" id="L257">            request.getHost(),</span>
+<span class="fc" id="L258">            request.getApplicationId(),</span>
+            null));
+
+<span class="fc" id="L261">    bindings.addAll(</span>
+<span class="fc" id="L262">        createAllowBindings(</span>
+            TOPIC,
+<span class="fc" id="L264">            List.of(ALL),</span>
+<span class="fc" id="L265">            request.getPrincipal(),</span>
+<span class="fc" id="L266">            request.getHost(),</span>
+<span class="fc" id="L267">            request.getApplicationId(),</span>
+            null));
+<span class="fc" id="L269">    return bindings;</span>
+  }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ConnectorsExporter.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">kafka-ui-api</a> &gt; <a href="index.source.html" class="el_package">com.provectus.kafka.ui.service.integration.odd</a> &gt; <span class="el_source">ConnectorsExporter.java</span></div><h1>ConnectorsExporter.java</h1><pre class="source lang-java linenums">package com.provectus.kafka.ui.service.integration.odd;
+
+import com.provectus.kafka.ui.connect.model.ConnectorTopics;
+import com.provectus.kafka.ui.model.ConnectDTO;
+import com.provectus.kafka.ui.model.ConnectorDTO;
+import com.provectus.kafka.ui.model.KafkaCluster;
+import com.provectus.kafka.ui.service.KafkaConnectService;
+import java.net.URI;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import lombok.RequiredArgsConstructor;
+import org.opendatadiscovery.client.model.DataEntity;
+import org.opendatadiscovery.client.model.DataEntityList;
+import org.opendatadiscovery.client.model.DataEntityType;
+import org.opendatadiscovery.client.model.DataSource;
+import org.opendatadiscovery.client.model.DataTransformer;
+import org.opendatadiscovery.client.model.MetadataExtension;
+import reactor.core.publisher.Flux;
+
+<span class="fc" id="L21">@RequiredArgsConstructor</span>
+class ConnectorsExporter {
+
+  private final KafkaConnectService kafkaConnectService;
+
+  Flux&lt;DataEntityList&gt; export(KafkaCluster cluster) {
+<span class="fc" id="L27">    return kafkaConnectService.getConnects(cluster)</span>
+<span class="fc" id="L28">        .flatMap(connect -&gt; kafkaConnectService.getConnectorNamesWithErrorsSuppress(cluster, connect.getName())</span>
+<span class="fc" id="L29">            .flatMap(connectorName -&gt; kafkaConnectService.getConnector(cluster, connect.getName(), connectorName))</span>
+<span class="fc" id="L30">            .flatMap(connectorDTO -&gt;</span>
+<span class="fc" id="L31">                kafkaConnectService.getConnectorTopics(cluster, connect.getName(), connectorDTO.getName())</span>
+<span class="fc" id="L32">                    .map(topics -&gt; createConnectorDataEntity(cluster, connect, connectorDTO, topics)))</span>
+<span class="fc" id="L33">            .buffer(100)</span>
+<span class="fc" id="L34">            .map(connectDataEntities -&gt; {</span>
+<span class="fc" id="L35">              String dsOddrn = Oddrn.connectDataSourceOddrn(connect.getAddress());</span>
+<span class="fc" id="L36">              return new DataEntityList()</span>
+<span class="fc" id="L37">                  .dataSourceOddrn(dsOddrn)</span>
+<span class="fc" id="L38">                  .items(connectDataEntities);</span>
+            })
+        );
+  }
+
+  Flux&lt;DataSource&gt; getConnectDataSources(KafkaCluster cluster) {
+<span class="nc" id="L44">    return kafkaConnectService.getConnects(cluster)</span>
+<span class="nc" id="L45">        .map(ConnectorsExporter::toDataSource);</span>
+  }
+
+  private static DataSource toDataSource(ConnectDTO connect) {
+<span class="nc" id="L49">    return new DataSource()</span>
+<span class="nc" id="L50">        .oddrn(Oddrn.connectDataSourceOddrn(connect.getAddress()))</span>
+<span class="nc" id="L51">        .name(connect.getName())</span>
+<span class="nc" id="L52">        .description(&quot;Kafka Connect&quot;);</span>
+  }
+
+  private static DataEntity createConnectorDataEntity(KafkaCluster cluster,
+                                                      ConnectDTO connect,
+                                                      ConnectorDTO connector,
+                                                      ConnectorTopics connectorTopics) {
+<span class="fc" id="L59">    var metadata = new HashMap&lt;&gt;(extractMetadata(connector));</span>
+<span class="fc" id="L60">    metadata.put(&quot;type&quot;, connector.getType().name());</span>
+
+<span class="fc" id="L62">    var info = extractConnectorInfo(cluster, connector, connectorTopics);</span>
+<span class="fc" id="L63">    DataTransformer transformer = new DataTransformer();</span>
+<span class="fc" id="L64">    transformer.setInputs(info.inputs());</span>
+<span class="fc" id="L65">    transformer.setOutputs(info.outputs());</span>
+
+<span class="fc" id="L67">    return new DataEntity()</span>
+<span class="fc" id="L68">        .oddrn(Oddrn.connectorOddrn(connect.getAddress(), connector.getName()))</span>
+<span class="fc" id="L69">        .name(connector.getName())</span>
+<span class="fc" id="L70">        .description(&quot;Kafka Connector \&quot;%s\&quot; (%s)&quot;.formatted(connector.getName(), connector.getType()))</span>
+<span class="fc" id="L71">        .type(DataEntityType.JOB)</span>
+<span class="fc" id="L72">        .dataTransformer(transformer)</span>
+<span class="fc" id="L73">        .metadata(List.of(</span>
+            new MetadataExtension()
+<span class="fc" id="L75">                .schemaUrl(URI.create(&quot;wontbeused.oops&quot;))</span>
+<span class="fc" id="L76">                .metadata(metadata)));</span>
+  }
+
+  private static Map&lt;String, Object&gt; extractMetadata(ConnectorDTO connector) {
+    // will be sanitized by KafkaConfigSanitizer (if it's enabled)
+<span class="fc" id="L81">    return connector.getConfig();</span>
+  }
+
+  private static ConnectorInfo extractConnectorInfo(KafkaCluster cluster,
+                                                    ConnectorDTO connector,
+                                                    ConnectorTopics topics) {
+<span class="fc" id="L87">    return ConnectorInfo.extract(</span>
+<span class="fc" id="L88">        (String) connector.getConfig().get(&quot;connector.class&quot;),</span>
+<span class="fc" id="L89">        connector.getType(),</span>
+<span class="fc" id="L90">        connector.getConfig(),</span>
+<span class="fc" id="L91">        topics.getTopics(),</span>
+<span class="fc" id="L92">        topic -&gt; Oddrn.topicOddrn(cluster, topic)</span>
+    );
+  }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

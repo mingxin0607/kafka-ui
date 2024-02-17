@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Permission.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">kafka-ui-api</a> &gt; <a href="index.source.html" class="el_package">com.provectus.kafka.ui.model.rbac</a> &gt; <span class="el_source">Permission.java</span></div><h1>Permission.java</h1><pre class="source lang-java linenums">package com.provectus.kafka.ui.model.rbac;
+
+import static com.provectus.kafka.ui.model.rbac.Resource.ACL;
+import static com.provectus.kafka.ui.model.rbac.Resource.APPLICATIONCONFIG;
+import static com.provectus.kafka.ui.model.rbac.Resource.AUDIT;
+import static com.provectus.kafka.ui.model.rbac.Resource.CLUSTERCONFIG;
+import static com.provectus.kafka.ui.model.rbac.Resource.KSQL;
+
+import com.provectus.kafka.ui.model.rbac.permission.AclAction;
+import com.provectus.kafka.ui.model.rbac.permission.ApplicationConfigAction;
+import com.provectus.kafka.ui.model.rbac.permission.AuditAction;
+import com.provectus.kafka.ui.model.rbac.permission.ClusterConfigAction;
+import com.provectus.kafka.ui.model.rbac.permission.ConnectAction;
+import com.provectus.kafka.ui.model.rbac.permission.ConsumerGroupAction;
+import com.provectus.kafka.ui.model.rbac.permission.KsqlAction;
+import com.provectus.kafka.ui.model.rbac.permission.SchemaAction;
+import com.provectus.kafka.ui.model.rbac.permission.TopicAction;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+import java.util.regex.Pattern;
+import javax.annotation.Nullable;
+import lombok.EqualsAndHashCode;
+import lombok.Getter;
+import lombok.ToString;
+import org.apache.commons.collections.CollectionUtils;
+import org.springframework.util.Assert;
+
+@Getter
+<span class="nc" id="L30">@ToString</span>
+<span class="nc bnc" id="L31" title="All 30 branches missed.">@EqualsAndHashCode</span>
+<span class="nc" id="L32">public class Permission {</span>
+
+<span class="nc" id="L34">  private static final List&lt;Resource&gt; RBAC_ACTION_EXEMPT_LIST =</span>
+<span class="nc" id="L35">      List.of(KSQL, CLUSTERCONFIG, APPLICATIONCONFIG, ACL, AUDIT);</span>
+
+<span class="nc" id="L37">  Resource resource;</span>
+<span class="nc" id="L38">  List&lt;String&gt; actions;</span>
+
+  @Nullable
+<span class="nc" id="L41">  String value;</span>
+  @Nullable
+<span class="nc" id="L43">  transient Pattern compiledValuePattern;</span>
+
+  @SuppressWarnings(&quot;unused&quot;)
+  public void setResource(String resource) {
+<span class="nc" id="L47">    this.resource = Resource.fromString(resource.toUpperCase());</span>
+<span class="nc" id="L48">  }</span>
+
+  @SuppressWarnings(&quot;unused&quot;)
+  public void setValue(@Nullable String value) {
+<span class="nc" id="L52">    this.value = value;</span>
+<span class="nc" id="L53">  }</span>
+
+  @SuppressWarnings(&quot;unused&quot;)
+  public void setActions(List&lt;String&gt; actions) {
+<span class="nc" id="L57">    this.actions = actions;</span>
+<span class="nc" id="L58">  }</span>
+
+  public void validate() {
+<span class="nc" id="L61">    Assert.notNull(resource, &quot;resource cannot be null&quot;);</span>
+<span class="nc bnc" id="L62" title="All 2 branches missed.">    if (!RBAC_ACTION_EXEMPT_LIST.contains(this.resource)) {</span>
+<span class="nc" id="L63">      Assert.notNull(value, &quot;permission value can't be empty for resource &quot; + resource);</span>
+    }
+<span class="nc" id="L65">  }</span>
+
+  public void transform() {
+<span class="nc bnc" id="L68" title="All 2 branches missed.">    if (value != null) {</span>
+<span class="nc" id="L69">      this.compiledValuePattern = Pattern.compile(value);</span>
+    }
+<span class="nc bnc" id="L71" title="All 4 branches missed.">    if (CollectionUtils.isNotEmpty(actions) &amp;&amp; actions.stream().anyMatch(&quot;ALL&quot;::equalsIgnoreCase)) {</span>
+<span class="nc" id="L72">      this.actions = getAllActionValues();</span>
+    }
+<span class="nc" id="L74">  }</span>
+
+  private List&lt;String&gt; getAllActionValues() {
+<span class="nc bnc" id="L77" title="All 2 branches missed.">    if (resource == null) {</span>
+<span class="nc" id="L78">      return Collections.emptyList();</span>
+    }
+
+<span class="nc bnc" id="L81" title="All 10 branches missed.">    return switch (this.resource) {</span>
+<span class="nc" id="L82">      case APPLICATIONCONFIG -&gt; Arrays.stream(ApplicationConfigAction.values()).map(Enum::toString).toList();</span>
+<span class="nc" id="L83">      case CLUSTERCONFIG -&gt; Arrays.stream(ClusterConfigAction.values()).map(Enum::toString).toList();</span>
+<span class="nc" id="L84">      case TOPIC -&gt; Arrays.stream(TopicAction.values()).map(Enum::toString).toList();</span>
+<span class="nc" id="L85">      case CONSUMER -&gt; Arrays.stream(ConsumerGroupAction.values()).map(Enum::toString).toList();</span>
+<span class="nc" id="L86">      case SCHEMA -&gt; Arrays.stream(SchemaAction.values()).map(Enum::toString).toList();</span>
+<span class="nc" id="L87">      case CONNECT -&gt; Arrays.stream(ConnectAction.values()).map(Enum::toString).toList();</span>
+<span class="nc" id="L88">      case KSQL -&gt; Arrays.stream(KsqlAction.values()).map(Enum::toString).toList();</span>
+<span class="nc" id="L89">      case ACL -&gt; Arrays.stream(AclAction.values()).map(Enum::toString).toList();</span>
+<span class="nc" id="L90">      case AUDIT -&gt; Arrays.stream(AuditAction.values()).map(Enum::toString).toList();</span>
+    };
+  }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

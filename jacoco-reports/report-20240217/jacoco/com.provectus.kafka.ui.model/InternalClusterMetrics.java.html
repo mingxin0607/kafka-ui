@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>InternalClusterMetrics.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">kafka-ui-api</a> &gt; <a href="index.source.html" class="el_package">com.provectus.kafka.ui.model</a> &gt; <span class="el_source">InternalClusterMetrics.java</span></div><h1>InternalClusterMetrics.java</h1><pre class="source lang-java linenums">package com.provectus.kafka.ui.model;
+
+import java.math.BigDecimal;
+import java.util.List;
+import java.util.Map;
+import javax.annotation.Nullable;
+import lombok.Builder;
+import lombok.Data;
+
+
+<span class="nc bnc" id="L11" title="All 102 branches missed.">@Data</span>
+<span class="nc" id="L12">@Builder(toBuilder = true)</span>
+public class InternalClusterMetrics {
+
+  public static InternalClusterMetrics empty() {
+<span class="nc" id="L16">    return InternalClusterMetrics.builder()</span>
+<span class="nc" id="L17">        .brokers(List.of())</span>
+<span class="nc" id="L18">        .topics(Map.of())</span>
+<span class="nc" id="L19">        .status(ServerStatusDTO.OFFLINE)</span>
+<span class="nc" id="L20">        .internalBrokerMetrics(Map.of())</span>
+<span class="nc" id="L21">        .metrics(List.of())</span>
+<span class="nc" id="L22">        .version(&quot;unknown&quot;)</span>
+<span class="nc" id="L23">        .build();</span>
+  }
+
+<span class="nc" id="L26">  private final String version;</span>
+
+<span class="nc" id="L28">  private final ServerStatusDTO status;</span>
+<span class="nc" id="L29">  private final Throwable lastKafkaException;</span>
+
+<span class="nc" id="L31">  private final int brokerCount;</span>
+<span class="nc" id="L32">  private final int activeControllers;</span>
+<span class="nc" id="L33">  private final List&lt;Integer&gt; brokers;</span>
+
+<span class="nc" id="L35">  private final int topicCount;</span>
+<span class="nc" id="L36">  private final Map&lt;String, InternalTopic&gt; topics;</span>
+
+  // partitions stats
+<span class="nc" id="L39">  private final int underReplicatedPartitionCount;</span>
+<span class="nc" id="L40">  private final int onlinePartitionCount;</span>
+<span class="nc" id="L41">  private final int offlinePartitionCount;</span>
+<span class="nc" id="L42">  private final int inSyncReplicasCount;</span>
+<span class="nc" id="L43">  private final int outOfSyncReplicasCount;</span>
+
+  // log dir stats
+  @Nullable // will be null if log dir collection disabled
+<span class="nc" id="L47">  private final Map&lt;Integer, InternalBrokerDiskUsage&gt; internalBrokerDiskUsage;</span>
+
+  // metrics from metrics collector
+<span class="nc" id="L50">  private final BigDecimal bytesInPerSec;</span>
+<span class="nc" id="L51">  private final BigDecimal bytesOutPerSec;</span>
+<span class="nc" id="L52">  private final Map&lt;Integer, BrokerMetrics&gt; internalBrokerMetrics;</span>
+<span class="nc" id="L53">  private final List&lt;MetricDTO&gt; metrics;</span>
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

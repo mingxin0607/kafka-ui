@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MessagesProcessing.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">kafka-ui-api</a> &gt; <a href="index.source.html" class="el_package">com.provectus.kafka.ui.emitter</a> &gt; <span class="el_source">MessagesProcessing.java</span></div><h1>MessagesProcessing.java</h1><pre class="source lang-java linenums">package com.provectus.kafka.ui.emitter;
+
+import static java.util.stream.Collectors.collectingAndThen;
+import static java.util.stream.Collectors.groupingBy;
+import static java.util.stream.Collectors.toList;
+
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.Iterables;
+import com.google.common.collect.Streams;
+import com.provectus.kafka.ui.model.TopicMessageDTO;
+import com.provectus.kafka.ui.model.TopicMessageEventDTO;
+import com.provectus.kafka.ui.model.TopicMessagePhaseDTO;
+import com.provectus.kafka.ui.serdes.ConsumerRecordDeserializer;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
+import java.util.function.Predicate;
+import javax.annotation.Nullable;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.apache.kafka.clients.consumer.ConsumerRecord;
+import org.apache.kafka.common.utils.Bytes;
+import reactor.core.publisher.FluxSink;
+
+<span class="fc" id="L26">@Slf4j</span>
+<span class="fc" id="L27">@RequiredArgsConstructor</span>
+class MessagesProcessing {
+
+<span class="fc" id="L30">  private final ConsumingStats consumingStats = new ConsumingStats();</span>
+<span class="fc" id="L31">  private long sentMessages = 0;</span>
+
+  private final ConsumerRecordDeserializer deserializer;
+  private final Predicate&lt;TopicMessageDTO&gt; filter;
+  private final boolean ascendingSortBeforeSend;
+  private final @Nullable Integer limit;
+
+  boolean limitReached() {
+<span class="pc bpc" id="L39" title="1 of 4 branches missed.">    return limit != null &amp;&amp; sentMessages &gt;= limit;</span>
+  }
+
+  void send(FluxSink&lt;TopicMessageEventDTO&gt; sink, Iterable&lt;ConsumerRecord&lt;Bytes, Bytes&gt;&gt; polled) {
+<span class="fc" id="L43">    sortForSending(polled, ascendingSortBeforeSend)</span>
+<span class="fc" id="L44">        .forEach(rec -&gt; {</span>
+<span class="pc bpc" id="L45" title="2 of 4 branches missed.">          if (!limitReached() &amp;&amp; !sink.isCancelled()) {</span>
+<span class="fc" id="L46">            TopicMessageDTO topicMessage = deserializer.deserialize(rec);</span>
+            try {
+<span class="fc bfc" id="L48" title="All 2 branches covered.">              if (filter.test(topicMessage)) {</span>
+<span class="fc" id="L49">                sink.next(</span>
+                    new TopicMessageEventDTO()
+<span class="fc" id="L51">                        .type(TopicMessageEventDTO.TypeEnum.MESSAGE)</span>
+<span class="fc" id="L52">                        .message(topicMessage)</span>
+                );
+<span class="fc" id="L54">                sentMessages++;</span>
+              }
+<span class="nc" id="L56">            } catch (Exception e) {</span>
+<span class="nc" id="L57">              consumingStats.incFilterApplyError();</span>
+<span class="nc" id="L58">              log.trace(&quot;Error applying filter for message {}&quot;, topicMessage);</span>
+<span class="fc" id="L59">            }</span>
+          }
+<span class="fc" id="L61">        });</span>
+<span class="fc" id="L62">  }</span>
+
+  void sentConsumingInfo(FluxSink&lt;TopicMessageEventDTO&gt; sink, PolledRecords polledRecords) {
+<span class="pc bpc" id="L65" title="1 of 2 branches missed.">    if (!sink.isCancelled()) {</span>
+<span class="fc" id="L66">      consumingStats.sendConsumingEvt(sink, polledRecords);</span>
+    }
+<span class="fc" id="L68">  }</span>
+
+  void sendFinishEvent(FluxSink&lt;TopicMessageEventDTO&gt; sink) {
+<span class="fc bfc" id="L71" title="All 2 branches covered.">    if (!sink.isCancelled()) {</span>
+<span class="fc" id="L72">      consumingStats.sendFinishEvent(sink);</span>
+    }
+<span class="fc" id="L74">  }</span>
+
+  void sendPhase(FluxSink&lt;TopicMessageEventDTO&gt; sink, String name) {
+<span class="pc bpc" id="L77" title="1 of 2 branches missed.">    if (!sink.isCancelled()) {</span>
+<span class="fc" id="L78">      sink.next(</span>
+          new TopicMessageEventDTO()
+<span class="fc" id="L80">              .type(TopicMessageEventDTO.TypeEnum.PHASE)</span>
+<span class="fc" id="L81">              .phase(new TopicMessagePhaseDTO().name(name))</span>
+      );
+    }
+<span class="fc" id="L84">  }</span>
+
+  /*
+   * Sorting by timestamps, BUT requesting that records within same partitions should be ordered by offsets.
+   */
+  @VisibleForTesting
+  static Iterable&lt;ConsumerRecord&lt;Bytes, Bytes&gt;&gt; sortForSending(Iterable&lt;ConsumerRecord&lt;Bytes, Bytes&gt;&gt; records,
+                                                               boolean asc) {
+<span class="fc bfc" id="L92" title="All 2 branches covered.">    Comparator&lt;ConsumerRecord&gt; offsetComparator = asc</span>
+<span class="fc" id="L93">        ? Comparator.comparingLong(ConsumerRecord::offset)</span>
+<span class="fc" id="L94">        : Comparator.&lt;ConsumerRecord&gt;comparingLong(ConsumerRecord::offset).reversed();</span>
+
+    // partition -&gt; sorted by offsets records
+<span class="fc" id="L97">    Map&lt;Integer, List&lt;ConsumerRecord&lt;Bytes, Bytes&gt;&gt;&gt; perPartition = Streams.stream(records)</span>
+<span class="fc" id="L98">        .collect(</span>
+<span class="fc" id="L99">            groupingBy(</span>
+                ConsumerRecord::partition,
+                TreeMap::new,
+<span class="fc" id="L102">                collectingAndThen(toList(), lst -&gt; lst.stream().sorted(offsetComparator).toList())));</span>
+
+<span class="fc bfc" id="L104" title="All 2 branches covered.">    Comparator&lt;ConsumerRecord&gt; tsComparator = asc</span>
+<span class="fc" id="L105">        ? Comparator.comparing(ConsumerRecord::timestamp)</span>
+<span class="fc" id="L106">        : Comparator.&lt;ConsumerRecord&gt;comparingLong(ConsumerRecord::timestamp).reversed();</span>
+
+    // merge-sorting records from partitions one by one using timestamp comparator
+<span class="fc" id="L109">    return Iterables.mergeSorted(perPartition.values(), tsComparator);</span>
+  }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

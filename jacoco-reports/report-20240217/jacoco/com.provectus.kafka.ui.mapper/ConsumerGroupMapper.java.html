@@ -1,0 +1,120 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ConsumerGroupMapper.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">kafka-ui-api</a> &gt; <a href="index.source.html" class="el_package">com.provectus.kafka.ui.mapper</a> &gt; <span class="el_source">ConsumerGroupMapper.java</span></div><h1>ConsumerGroupMapper.java</h1><pre class="source lang-java linenums">package com.provectus.kafka.ui.mapper;
+
+import com.provectus.kafka.ui.model.BrokerDTO;
+import com.provectus.kafka.ui.model.ConsumerGroupDTO;
+import com.provectus.kafka.ui.model.ConsumerGroupDetailsDTO;
+import com.provectus.kafka.ui.model.ConsumerGroupStateDTO;
+import com.provectus.kafka.ui.model.ConsumerGroupTopicPartitionDTO;
+import com.provectus.kafka.ui.model.InternalConsumerGroup;
+import com.provectus.kafka.ui.model.InternalTopicConsumerGroup;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Optional;
+import org.apache.kafka.common.Node;
+import org.apache.kafka.common.TopicPartition;
+
+public class ConsumerGroupMapper {
+
+  private ConsumerGroupMapper() {
+  }
+
+  public static ConsumerGroupDTO toDto(InternalConsumerGroup c) {
+<span class="fc" id="L23">    return convertToConsumerGroup(c, new ConsumerGroupDTO());</span>
+  }
+
+  public static ConsumerGroupDTO toDto(InternalTopicConsumerGroup c) {
+<span class="nc" id="L27">    ConsumerGroupDTO consumerGroup = new ConsumerGroupDetailsDTO();</span>
+<span class="nc" id="L28">    consumerGroup.setTopics(1); //for ui backward-compatibility, need to rm usage from ui</span>
+<span class="nc" id="L29">    consumerGroup.setGroupId(c.getGroupId());</span>
+<span class="nc" id="L30">    consumerGroup.setMembers(c.getMembers());</span>
+<span class="nc" id="L31">    consumerGroup.setConsumerLag(c.getConsumerLag());</span>
+<span class="nc" id="L32">    consumerGroup.setSimple(c.isSimple());</span>
+<span class="nc" id="L33">    consumerGroup.setPartitionAssignor(c.getPartitionAssignor());</span>
+<span class="nc" id="L34">    consumerGroup.setState(mapConsumerGroupState(c.getState()));</span>
+<span class="nc" id="L35">    Optional.ofNullable(c.getCoordinator())</span>
+<span class="nc" id="L36">        .ifPresent(cd -&gt; consumerGroup.setCoordinator(mapCoordinator(cd)));</span>
+<span class="nc" id="L37">    return consumerGroup;</span>
+  }
+
+  public static ConsumerGroupDetailsDTO toDetailsDto(InternalConsumerGroup g) {
+<span class="nc" id="L41">    ConsumerGroupDetailsDTO details = convertToConsumerGroup(g, new ConsumerGroupDetailsDTO());</span>
+<span class="nc" id="L42">    Map&lt;TopicPartition, ConsumerGroupTopicPartitionDTO&gt; partitionMap = new HashMap&lt;&gt;();</span>
+
+<span class="nc bnc" id="L44" title="All 2 branches missed.">    for (Map.Entry&lt;TopicPartition, Long&gt; entry : g.getOffsets().entrySet()) {</span>
+<span class="nc" id="L45">      ConsumerGroupTopicPartitionDTO partition = new ConsumerGroupTopicPartitionDTO();</span>
+<span class="nc" id="L46">      partition.setTopic(entry.getKey().topic());</span>
+<span class="nc" id="L47">      partition.setPartition(entry.getKey().partition());</span>
+<span class="nc" id="L48">      partition.setCurrentOffset(entry.getValue());</span>
+
+<span class="nc" id="L50">      final Optional&lt;Long&gt; endOffset = Optional.ofNullable(g.getEndOffsets())</span>
+<span class="nc" id="L51">          .map(o -&gt; o.get(entry.getKey()));</span>
+
+<span class="nc" id="L53">      final Long behind = endOffset.map(o -&gt; o - entry.getValue())</span>
+<span class="nc" id="L54">          .orElse(0L);</span>
+
+<span class="nc" id="L56">      partition.setEndOffset(endOffset.orElse(0L));</span>
+<span class="nc" id="L57">      partition.setConsumerLag(behind);</span>
+
+<span class="nc" id="L59">      partitionMap.put(entry.getKey(), partition);</span>
+<span class="nc" id="L60">    }</span>
+
+<span class="nc bnc" id="L62" title="All 2 branches missed.">    for (InternalConsumerGroup.InternalMember member : g.getMembers()) {</span>
+<span class="nc bnc" id="L63" title="All 2 branches missed.">      for (TopicPartition topicPartition : member.getAssignment()) {</span>
+<span class="nc" id="L64">        final ConsumerGroupTopicPartitionDTO partition = partitionMap.computeIfAbsent(</span>
+            topicPartition,
+<span class="nc" id="L66">            tp -&gt; new ConsumerGroupTopicPartitionDTO()</span>
+<span class="nc" id="L67">                .topic(tp.topic())</span>
+<span class="nc" id="L68">                .partition(tp.partition())</span>
+        );
+<span class="nc" id="L70">        partition.setHost(member.getHost());</span>
+<span class="nc" id="L71">        partition.setConsumerId(member.getConsumerId());</span>
+<span class="nc" id="L72">        partitionMap.put(topicPartition, partition);</span>
+<span class="nc" id="L73">      }</span>
+<span class="nc" id="L74">    }</span>
+<span class="nc" id="L75">    details.setPartitions(new ArrayList&lt;&gt;(partitionMap.values()));</span>
+<span class="nc" id="L76">    return details;</span>
+  }
+
+  private static &lt;T extends ConsumerGroupDTO&gt; T convertToConsumerGroup(
+      InternalConsumerGroup c, T consumerGroup) {
+<span class="fc" id="L81">    consumerGroup.setGroupId(c.getGroupId());</span>
+<span class="fc" id="L82">    consumerGroup.setMembers(c.getMembers().size());</span>
+<span class="fc" id="L83">    consumerGroup.setConsumerLag(c.getConsumerLag());</span>
+<span class="fc" id="L84">    consumerGroup.setTopics(c.getTopicNum());</span>
+<span class="fc" id="L85">    consumerGroup.setSimple(c.isSimple());</span>
+
+<span class="fc" id="L87">    Optional.ofNullable(c.getState())</span>
+<span class="fc" id="L88">        .ifPresent(s -&gt; consumerGroup.setState(mapConsumerGroupState(s)));</span>
+<span class="fc" id="L89">    Optional.ofNullable(c.getCoordinator())</span>
+<span class="fc" id="L90">        .ifPresent(cd -&gt; consumerGroup.setCoordinator(mapCoordinator(cd)));</span>
+
+<span class="fc" id="L92">    consumerGroup.setPartitionAssignor(c.getPartitionAssignor());</span>
+<span class="fc" id="L93">    return consumerGroup;</span>
+  }
+
+  private static BrokerDTO mapCoordinator(Node node) {
+<span class="fc" id="L97">    return new BrokerDTO().host(node.host()).id(node.id()).port(node.port());</span>
+  }
+
+  private static ConsumerGroupStateDTO mapConsumerGroupState(
+      org.apache.kafka.common.ConsumerGroupState state) {
+<span class="pc bpc" id="L102" title="5 of 6 branches missed.">    switch (state) {</span>
+      case DEAD:
+<span class="nc" id="L104">        return ConsumerGroupStateDTO.DEAD;</span>
+      case EMPTY:
+<span class="nc" id="L106">        return ConsumerGroupStateDTO.EMPTY;</span>
+      case STABLE:
+<span class="fc" id="L108">        return ConsumerGroupStateDTO.STABLE;</span>
+      case PREPARING_REBALANCE:
+<span class="nc" id="L110">        return ConsumerGroupStateDTO.PREPARING_REBALANCE;</span>
+      case COMPLETING_REBALANCE:
+<span class="nc" id="L112">        return ConsumerGroupStateDTO.COMPLETING_REBALANCE;</span>
+      default:
+<span class="nc" id="L114">        return ConsumerGroupStateDTO.UNKNOWN;</span>
+    }
+  }
+
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

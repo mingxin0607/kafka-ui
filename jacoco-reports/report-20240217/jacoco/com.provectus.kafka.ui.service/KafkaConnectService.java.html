@@ -1,0 +1,296 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>KafkaConnectService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">kafka-ui-api</a> &gt; <a href="index.source.html" class="el_package">com.provectus.kafka.ui.service</a> &gt; <span class="el_source">KafkaConnectService.java</span></div><h1>KafkaConnectService.java</h1><pre class="source lang-java linenums">package com.provectus.kafka.ui.service;
+
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.provectus.kafka.ui.connect.api.KafkaConnectClientApi;
+import com.provectus.kafka.ui.connect.model.ConnectorStatus;
+import com.provectus.kafka.ui.connect.model.ConnectorStatusConnector;
+import com.provectus.kafka.ui.connect.model.ConnectorTopics;
+import com.provectus.kafka.ui.connect.model.TaskStatus;
+import com.provectus.kafka.ui.exception.NotFoundException;
+import com.provectus.kafka.ui.exception.ValidationException;
+import com.provectus.kafka.ui.mapper.ClusterMapper;
+import com.provectus.kafka.ui.mapper.KafkaConnectMapper;
+import com.provectus.kafka.ui.model.ConnectDTO;
+import com.provectus.kafka.ui.model.ConnectorActionDTO;
+import com.provectus.kafka.ui.model.ConnectorDTO;
+import com.provectus.kafka.ui.model.ConnectorPluginConfigValidationResponseDTO;
+import com.provectus.kafka.ui.model.ConnectorPluginDTO;
+import com.provectus.kafka.ui.model.ConnectorStateDTO;
+import com.provectus.kafka.ui.model.ConnectorTaskStatusDTO;
+import com.provectus.kafka.ui.model.FullConnectorInfoDTO;
+import com.provectus.kafka.ui.model.KafkaCluster;
+import com.provectus.kafka.ui.model.NewConnectorDTO;
+import com.provectus.kafka.ui.model.TaskDTO;
+import com.provectus.kafka.ui.model.connect.InternalConnectInfo;
+import com.provectus.kafka.ui.util.ReactiveFailover;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.function.Predicate;
+import java.util.stream.Stream;
+import javax.annotation.Nullable;
+import lombok.RequiredArgsConstructor;
+import lombok.SneakyThrows;
+import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
+import org.springframework.stereotype.Service;
+import org.springframework.web.reactive.function.client.WebClientResponseException;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
+
+@Service
+<span class="fc" id="L43">@Slf4j</span>
+<span class="fc" id="L44">@RequiredArgsConstructor</span>
+public class KafkaConnectService {
+  private final ClusterMapper clusterMapper;
+  private final KafkaConnectMapper kafkaConnectMapper;
+  private final ObjectMapper objectMapper;
+  private final KafkaConfigSanitizer kafkaConfigSanitizer;
+
+  public Flux&lt;ConnectDTO&gt; getConnects(KafkaCluster cluster) {
+<span class="fc" id="L52">    return Flux.fromIterable(</span>
+<span class="fc" id="L53">        Optional.ofNullable(cluster.getOriginalProperties().getKafkaConnect())</span>
+<span class="fc" id="L54">            .map(lst -&gt; lst.stream().map(clusterMapper::toKafkaConnect).toList())</span>
+<span class="fc" id="L55">            .orElse(List.of())</span>
+    );
+  }
+
+  public Flux&lt;FullConnectorInfoDTO&gt; getAllConnectors(final KafkaCluster cluster,
+                                                     @Nullable final String search) {
+<span class="fc" id="L61">    return getConnects(cluster)</span>
+<span class="fc" id="L62">        .flatMap(connect -&gt;</span>
+<span class="fc" id="L63">            getConnectorNamesWithErrorsSuppress(cluster, connect.getName())</span>
+<span class="fc" id="L64">                .flatMap(connectorName -&gt;</span>
+<span class="fc" id="L65">                    Mono.zip(</span>
+<span class="fc" id="L66">                        getConnector(cluster, connect.getName(), connectorName),</span>
+<span class="fc" id="L67">                        getConnectorConfig(cluster, connect.getName(), connectorName),</span>
+<span class="fc" id="L68">                        getConnectorTasks(cluster, connect.getName(), connectorName).collectList(),</span>
+<span class="fc" id="L69">                        getConnectorTopics(cluster, connect.getName(), connectorName)</span>
+<span class="fc" id="L70">                    ).map(tuple -&gt;</span>
+<span class="fc" id="L71">                        InternalConnectInfo.builder()</span>
+<span class="fc" id="L72">                            .connector(tuple.getT1())</span>
+<span class="fc" id="L73">                            .config(tuple.getT2())</span>
+<span class="fc" id="L74">                            .tasks(tuple.getT3())</span>
+<span class="fc" id="L75">                            .topics(tuple.getT4().getTopics())</span>
+<span class="fc" id="L76">                            .build())))</span>
+<span class="fc" id="L77">        .map(kafkaConnectMapper::fullConnectorInfo)</span>
+<span class="fc" id="L78">        .filter(matchesSearchTerm(search));</span>
+  }
+
+  private Predicate&lt;FullConnectorInfoDTO&gt; matchesSearchTerm(@Nullable final String search) {
+<span class="fc bfc" id="L82" title="All 2 branches covered.">    if (search == null) {</span>
+<span class="fc" id="L83">      return c -&gt; true;</span>
+    }
+<span class="fc" id="L85">    return connector -&gt; getStringsForSearch(connector)</span>
+<span class="fc" id="L86">        .anyMatch(string -&gt; StringUtils.containsIgnoreCase(string, search));</span>
+  }
+
+  private Stream&lt;String&gt; getStringsForSearch(FullConnectorInfoDTO fullConnectorInfo) {
+<span class="fc" id="L90">    return Stream.of(</span>
+<span class="fc" id="L91">        fullConnectorInfo.getName(),</span>
+<span class="fc" id="L92">        fullConnectorInfo.getConnect(),</span>
+<span class="fc" id="L93">        fullConnectorInfo.getStatus().getState().getValue(),</span>
+<span class="fc" id="L94">        fullConnectorInfo.getType().getValue());</span>
+  }
+
+  public Mono&lt;ConnectorTopics&gt; getConnectorTopics(KafkaCluster cluster, String connectClusterName,
+                                                  String connectorName) {
+<span class="fc" id="L99">    return api(cluster, connectClusterName)</span>
+<span class="fc" id="L100">        .mono(c -&gt; c.getConnectorTopics(connectorName))</span>
+<span class="fc" id="L101">        .map(result -&gt; result.get(connectorName))</span>
+        // old Connect API versions don't have this endpoint, setting empty list for
+        // backward-compatibility
+<span class="pc" id="L104">        .onErrorResume(Exception.class, e -&gt; Mono.just(new ConnectorTopics().topics(List.of())));</span>
+  }
+
+  public Flux&lt;String&gt; getConnectorNames(KafkaCluster cluster, String connectName) {
+<span class="fc" id="L108">    return api(cluster, connectName)</span>
+<span class="fc" id="L109">        .flux(client -&gt; client.getConnectors(null))</span>
+        // for some reason `getConnectors` method returns the response as a single string
+<span class="fc" id="L111">        .collectList().map(e -&gt; e.get(0))</span>
+<span class="fc" id="L112">        .map(this::parseConnectorsNamesStringToList)</span>
+<span class="fc" id="L113">        .flatMapMany(Flux::fromIterable);</span>
+  }
+
+  // returns empty flux if there was an error communicating with Connect
+  public Flux&lt;String&gt; getConnectorNamesWithErrorsSuppress(KafkaCluster cluster, String connectName) {
+<span class="fc" id="L118">    return getConnectorNames(cluster, connectName).onErrorComplete();</span>
+  }
+
+<span class="nc" id="L121">  @SneakyThrows</span>
+  private List&lt;String&gt; parseConnectorsNamesStringToList(String json) {
+<span class="fc" id="L123">    return objectMapper.readValue(json, new TypeReference&lt;&gt;() {</span>
+    });
+  }
+
+  public Mono&lt;ConnectorDTO&gt; createConnector(KafkaCluster cluster, String connectName,
+                                            Mono&lt;NewConnectorDTO&gt; connector) {
+<span class="fc" id="L129">    return api(cluster, connectName)</span>
+<span class="fc" id="L130">        .mono(client -&gt;</span>
+<span class="fc" id="L131">            connector</span>
+<span class="fc" id="L132">                .flatMap(c -&gt; connectorExists(cluster, connectName, c.getName())</span>
+<span class="fc" id="L133">                    .map(exists -&gt; {</span>
+<span class="fc bfc" id="L134" title="All 2 branches covered.">                      if (Boolean.TRUE.equals(exists)) {</span>
+<span class="fc" id="L135">                        throw new ValidationException(</span>
+<span class="fc" id="L136">                            String.format(&quot;Connector with name %s already exists&quot;, c.getName()));</span>
+                      }
+<span class="fc" id="L138">                      return c;</span>
+                    }))
+<span class="fc" id="L140">                .map(kafkaConnectMapper::toClient)</span>
+<span class="fc" id="L141">                .flatMap(client::createConnector)</span>
+<span class="fc" id="L142">                .flatMap(c -&gt; getConnector(cluster, connectName, c.getName()))</span>
+        );
+  }
+
+  private Mono&lt;Boolean&gt; connectorExists(KafkaCluster cluster, String connectName,
+                                        String connectorName) {
+<span class="fc" id="L148">    return getConnectorNames(cluster, connectName)</span>
+<span class="fc" id="L149">        .any(name -&gt; name.equals(connectorName));</span>
+  }
+
+  public Mono&lt;ConnectorDTO&gt; getConnector(KafkaCluster cluster, String connectName,
+                                         String connectorName) {
+<span class="fc" id="L154">    return api(cluster, connectName)</span>
+<span class="fc" id="L155">        .mono(client -&gt; client.getConnector(connectorName)</span>
+<span class="fc" id="L156">            .map(kafkaConnectMapper::fromClient)</span>
+<span class="fc" id="L157">            .flatMap(connector -&gt;</span>
+<span class="fc" id="L158">                client.getConnectorStatus(connector.getName())</span>
+                    // status request can return 404 if tasks not assigned yet
+<span class="fc" id="L160">                    .onErrorResume(WebClientResponseException.NotFound.class,</span>
+<span class="nc" id="L161">                        e -&gt; emptyStatus(connectorName))</span>
+<span class="fc" id="L162">                    .map(connectorStatus -&gt; {</span>
+<span class="fc" id="L163">                      var status = connectorStatus.getConnector();</span>
+<span class="fc" id="L164">                      var sanitizedConfig = kafkaConfigSanitizer.sanitizeConnectorConfig(connector.getConfig());</span>
+<span class="fc" id="L165">                      ConnectorDTO result = new ConnectorDTO()</span>
+<span class="fc" id="L166">                          .connect(connectName)</span>
+<span class="fc" id="L167">                          .status(kafkaConnectMapper.fromClient(status))</span>
+<span class="fc" id="L168">                          .type(connector.getType())</span>
+<span class="fc" id="L169">                          .tasks(connector.getTasks())</span>
+<span class="fc" id="L170">                          .name(connector.getName())</span>
+<span class="fc" id="L171">                          .config(sanitizedConfig);</span>
+
+<span class="pc bpc" id="L173" title="1 of 2 branches missed.">                      if (connectorStatus.getTasks() != null) {</span>
+<span class="fc" id="L174">                        boolean isAnyTaskFailed = connectorStatus.getTasks().stream()</span>
+<span class="fc" id="L175">                            .map(TaskStatus::getState)</span>
+<span class="fc" id="L176">                            .anyMatch(TaskStatus.StateEnum.FAILED::equals);</span>
+
+<span class="pc bpc" id="L178" title="1 of 2 branches missed.">                        if (isAnyTaskFailed) {</span>
+<span class="nc" id="L179">                          result.getStatus().state(ConnectorStateDTO.TASK_FAILED);</span>
+                        }
+                      }
+<span class="fc" id="L182">                      return result;</span>
+                    })
+            )
+        );
+  }
+
+  private Mono&lt;ConnectorStatus&gt; emptyStatus(String connectorName) {
+<span class="nc" id="L189">    return Mono.just(new ConnectorStatus()</span>
+<span class="nc" id="L190">        .name(connectorName)</span>
+<span class="nc" id="L191">        .tasks(List.of())</span>
+<span class="nc" id="L192">        .connector(new ConnectorStatusConnector()</span>
+<span class="nc" id="L193">            .state(ConnectorStatusConnector.StateEnum.UNASSIGNED)));</span>
+  }
+
+  public Mono&lt;Map&lt;String, Object&gt;&gt; getConnectorConfig(KafkaCluster cluster, String connectName,
+                                                      String connectorName) {
+<span class="fc" id="L198">    return api(cluster, connectName)</span>
+<span class="fc" id="L199">        .mono(c -&gt; c.getConnectorConfig(connectorName))</span>
+<span class="fc" id="L200">        .map(kafkaConfigSanitizer::sanitizeConnectorConfig);</span>
+  }
+
+  public Mono&lt;ConnectorDTO&gt; setConnectorConfig(KafkaCluster cluster, String connectName,
+                                               String connectorName, Mono&lt;Map&lt;String, Object&gt;&gt; requestBody) {
+<span class="fc" id="L205">    return api(cluster, connectName)</span>
+<span class="fc" id="L206">        .mono(c -&gt;</span>
+<span class="fc" id="L207">            requestBody</span>
+<span class="fc" id="L208">                .flatMap(body -&gt; c.setConnectorConfig(connectorName, body))</span>
+<span class="fc" id="L209">                .map(kafkaConnectMapper::fromClient));</span>
+  }
+
+  public Mono&lt;Void&gt; deleteConnector(
+      KafkaCluster cluster, String connectName, String connectorName) {
+<span class="fc" id="L214">    return api(cluster, connectName)</span>
+<span class="fc" id="L215">        .mono(c -&gt; c.deleteConnector(connectorName));</span>
+  }
+
+  public Mono&lt;Void&gt; updateConnectorState(KafkaCluster cluster, String connectName,
+                                         String connectorName, ConnectorActionDTO action) {
+<span class="nc" id="L220">    return api(cluster, connectName)</span>
+<span class="nc" id="L221">        .mono(client -&gt; {</span>
+<span class="nc bnc" id="L222" title="All 6 branches missed.">          switch (action) {</span>
+            case RESTART:
+<span class="nc" id="L224">              return client.restartConnector(connectorName, false, false);</span>
+            case RESTART_ALL_TASKS:
+<span class="nc" id="L226">              return restartTasks(cluster, connectName, connectorName, task -&gt; true);</span>
+            case RESTART_FAILED_TASKS:
+<span class="nc" id="L228">              return restartTasks(cluster, connectName, connectorName,</span>
+<span class="nc bnc" id="L229" title="All 2 branches missed.">                  t -&gt; t.getStatus().getState() == ConnectorTaskStatusDTO.FAILED);</span>
+            case PAUSE:
+<span class="nc" id="L231">              return client.pauseConnector(connectorName);</span>
+            case RESUME:
+<span class="nc" id="L233">              return client.resumeConnector(connectorName);</span>
+            default:
+<span class="nc" id="L235">              throw new IllegalStateException(&quot;Unexpected value: &quot; + action);</span>
+          }
+        });
+  }
+
+  private Mono&lt;Void&gt; restartTasks(KafkaCluster cluster, String connectName,
+                                  String connectorName, Predicate&lt;TaskDTO&gt; taskFilter) {
+<span class="nc" id="L242">    return getConnectorTasks(cluster, connectName, connectorName)</span>
+<span class="nc" id="L243">        .filter(taskFilter)</span>
+<span class="nc" id="L244">        .flatMap(t -&gt;</span>
+<span class="nc" id="L245">            restartConnectorTask(cluster, connectName, connectorName, t.getId().getTask()))</span>
+<span class="nc" id="L246">        .then();</span>
+  }
+
+  public Flux&lt;TaskDTO&gt; getConnectorTasks(KafkaCluster cluster, String connectName, String connectorName) {
+<span class="fc" id="L250">    return api(cluster, connectName)</span>
+<span class="fc" id="L251">        .flux(client -&gt;</span>
+<span class="fc" id="L252">            client.getConnectorTasks(connectorName)</span>
+<span class="pc" id="L253">                .onErrorResume(WebClientResponseException.NotFound.class, e -&gt; Flux.empty())</span>
+<span class="fc" id="L254">                .map(kafkaConnectMapper::fromClient)</span>
+<span class="fc" id="L255">                .flatMap(task -&gt;</span>
+<span class="fc" id="L256">                    client</span>
+<span class="fc" id="L257">                        .getConnectorTaskStatus(connectorName, task.getId().getTask())</span>
+<span class="pc" id="L258">                        .onErrorResume(WebClientResponseException.NotFound.class, e -&gt; Mono.empty())</span>
+<span class="fc" id="L259">                        .map(kafkaConnectMapper::fromClient)</span>
+<span class="fc" id="L260">                        .map(task::status)</span>
+                ));
+  }
+
+  public Mono&lt;Void&gt; restartConnectorTask(KafkaCluster cluster, String connectName,
+                                         String connectorName, Integer taskId) {
+<span class="nc" id="L266">    return api(cluster, connectName)</span>
+<span class="nc" id="L267">        .mono(client -&gt; client.restartConnectorTask(connectorName, taskId));</span>
+  }
+
+  public Flux&lt;ConnectorPluginDTO&gt; getConnectorPlugins(KafkaCluster cluster,
+                                                      String connectName) {
+<span class="fc" id="L272">    return api(cluster, connectName)</span>
+<span class="fc" id="L273">        .flux(client -&gt; client.getConnectorPlugins().map(kafkaConnectMapper::fromClient));</span>
+  }
+
+  public Mono&lt;ConnectorPluginConfigValidationResponseDTO&gt; validateConnectorPluginConfig(
+      KafkaCluster cluster, String connectName, String pluginName, Mono&lt;Map&lt;String, Object&gt;&gt; requestBody) {
+<span class="fc" id="L278">    return api(cluster, connectName)</span>
+<span class="fc" id="L279">        .mono(client -&gt;</span>
+<span class="fc" id="L280">            requestBody</span>
+<span class="fc" id="L281">                .flatMap(body -&gt;</span>
+<span class="fc" id="L282">                    client.validateConnectorPluginConfig(pluginName, body))</span>
+<span class="fc" id="L283">                .map(kafkaConnectMapper::fromClient)</span>
+        );
+  }
+
+  private ReactiveFailover&lt;KafkaConnectClientApi&gt; api(KafkaCluster cluster, String connectName) {
+<span class="fc" id="L288">    var client = cluster.getConnectsClients().get(connectName);</span>
+<span class="fc bfc" id="L289" title="All 2 branches covered.">    if (client == null) {</span>
+<span class="fc" id="L290">      throw new NotFoundException(</span>
+<span class="fc" id="L291">          &quot;Connect %s not found for cluster %s&quot;.formatted(connectName, cluster.getName()));</span>
+    }
+<span class="fc" id="L293">    return client;</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

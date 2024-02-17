@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ClusterService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">kafka-ui-api</a> &gt; <a href="index.source.html" class="el_package">com.provectus.kafka.ui.service</a> &gt; <span class="el_source">ClusterService.java</span></div><h1>ClusterService.java</h1><pre class="source lang-java linenums">package com.provectus.kafka.ui.service;
+
+import com.provectus.kafka.ui.mapper.ClusterMapper;
+import com.provectus.kafka.ui.model.ClusterDTO;
+import com.provectus.kafka.ui.model.ClusterMetricsDTO;
+import com.provectus.kafka.ui.model.ClusterStatsDTO;
+import com.provectus.kafka.ui.model.InternalClusterState;
+import com.provectus.kafka.ui.model.KafkaCluster;
+import java.util.List;
+import java.util.stream.Collectors;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+import reactor.core.publisher.Mono;
+
+@Service
+<span class="fc" id="L17">@RequiredArgsConstructor</span>
+<span class="fc" id="L18">@Slf4j</span>
+public class ClusterService {
+
+  private final StatisticsCache statisticsCache;
+  private final ClustersStorage clustersStorage;
+  private final ClusterMapper clusterMapper;
+  private final StatisticsService statisticsService;
+
+  public List&lt;ClusterDTO&gt; getClusters() {
+<span class="nc" id="L27">    return clustersStorage.getKafkaClusters()</span>
+<span class="nc" id="L28">        .stream()</span>
+<span class="nc" id="L29">        .map(c -&gt; clusterMapper.toCluster(new InternalClusterState(c, statisticsCache.get(c))))</span>
+<span class="nc" id="L30">        .collect(Collectors.toList());</span>
+  }
+
+  public Mono&lt;ClusterStatsDTO&gt; getClusterStats(KafkaCluster cluster) {
+<span class="nc" id="L34">    return Mono.justOrEmpty(</span>
+<span class="nc" id="L35">        clusterMapper.toClusterStats(</span>
+<span class="nc" id="L36">            new InternalClusterState(cluster, statisticsCache.get(cluster)))</span>
+    );
+  }
+
+  public Mono&lt;ClusterMetricsDTO&gt; getClusterMetrics(KafkaCluster cluster) {
+
+<span class="nc" id="L42">    return Mono.just(</span>
+<span class="nc" id="L43">        clusterMapper.toClusterMetrics(</span>
+<span class="nc" id="L44">            statisticsCache.get(cluster).getMetrics()));</span>
+  }
+
+  public Mono&lt;ClusterDTO&gt; updateCluster(KafkaCluster cluster) {
+<span class="nc" id="L48">    return statisticsService.updateCache(cluster)</span>
+<span class="nc" id="L49">        .map(metrics -&gt; clusterMapper.toCluster(new InternalClusterState(cluster, metrics)));</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

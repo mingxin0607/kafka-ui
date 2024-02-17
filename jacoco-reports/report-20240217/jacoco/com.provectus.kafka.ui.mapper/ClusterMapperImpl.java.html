@@ -1,0 +1,360 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ClusterMapperImpl.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">kafka-ui-api</a> &gt; <a href="index.source.html" class="el_package">com.provectus.kafka.ui.mapper</a> &gt; <span class="el_source">ClusterMapperImpl.java</span></div><h1>ClusterMapperImpl.java</h1><pre class="source lang-java linenums">package com.provectus.kafka.ui.mapper;
+
+import com.provectus.kafka.ui.config.ClustersProperties;
+import com.provectus.kafka.ui.model.BrokerConfigDTO;
+import com.provectus.kafka.ui.model.BrokerDTO;
+import com.provectus.kafka.ui.model.BrokerDiskUsageDTO;
+import com.provectus.kafka.ui.model.CleanUpPolicyDTO;
+import com.provectus.kafka.ui.model.CleanupPolicy;
+import com.provectus.kafka.ui.model.ClusterDTO;
+import com.provectus.kafka.ui.model.ClusterFeature;
+import com.provectus.kafka.ui.model.ClusterStatsDTO;
+import com.provectus.kafka.ui.model.ConfigSourceDTO;
+import com.provectus.kafka.ui.model.ConfigSynonymDTO;
+import com.provectus.kafka.ui.model.ConnectDTO;
+import com.provectus.kafka.ui.model.InternalBroker;
+import com.provectus.kafka.ui.model.InternalBrokerConfig;
+import com.provectus.kafka.ui.model.InternalClusterState;
+import com.provectus.kafka.ui.model.InternalPartition;
+import com.provectus.kafka.ui.model.InternalReplica;
+import com.provectus.kafka.ui.model.InternalTopic;
+import com.provectus.kafka.ui.model.InternalTopicConfig;
+import com.provectus.kafka.ui.model.PartitionDTO;
+import com.provectus.kafka.ui.model.ReplicaDTO;
+import com.provectus.kafka.ui.model.TopicConfigDTO;
+import com.provectus.kafka.ui.model.TopicDTO;
+import com.provectus.kafka.ui.model.TopicDetailsDTO;
+import java.util.ArrayList;
+import java.util.List;
+import javax.annotation.processing.Generated;
+import org.apache.kafka.clients.admin.ConfigEntry;
+import org.springframework.stereotype.Component;
+
+@Generated(
+    value = &quot;org.mapstruct.ap.MappingProcessor&quot;,
+    date = &quot;2024-02-17T12:52:26-0800&quot;,
+    comments = &quot;version: 1.5.5.Final, compiler: javac, environment: Java 17.0.9 (Private Build)&quot;
+)
+@Component
+<span class="fc" id="L39">public class ClusterMapperImpl implements ClusterMapper {</span>
+
+    @Override
+    public ClusterDTO toCluster(InternalClusterState clusterState) {
+<span class="nc bnc" id="L43" title="All 2 branches missed.">        if ( clusterState == null ) {</span>
+<span class="nc" id="L44">            return null;</span>
+        }
+
+<span class="nc" id="L47">        ClusterDTO clusterDTO = new ClusterDTO();</span>
+
+<span class="nc" id="L49">        clusterDTO.setName( clusterState.getName() );</span>
+<span class="nc" id="L50">        clusterDTO.setStatus( clusterState.getStatus() );</span>
+<span class="nc" id="L51">        clusterDTO.setLastError( clusterState.getLastError() );</span>
+<span class="nc" id="L52">        clusterDTO.setBrokerCount( clusterState.getBrokerCount() );</span>
+<span class="nc" id="L53">        clusterDTO.setOnlinePartitionCount( clusterState.getOnlinePartitionCount() );</span>
+<span class="nc" id="L54">        clusterDTO.setTopicCount( clusterState.getTopicCount() );</span>
+<span class="nc" id="L55">        clusterDTO.setBytesInPerSec( clusterState.getBytesInPerSec() );</span>
+<span class="nc" id="L56">        clusterDTO.setBytesOutPerSec( clusterState.getBytesOutPerSec() );</span>
+<span class="nc" id="L57">        clusterDTO.setReadOnly( clusterState.getReadOnly() );</span>
+<span class="nc" id="L58">        clusterDTO.setVersion( clusterState.getVersion() );</span>
+<span class="nc" id="L59">        clusterDTO.setFeatures( toFeaturesEnum( clusterState.getFeatures() ) );</span>
+
+<span class="nc" id="L61">        return clusterDTO;</span>
+    }
+
+    @Override
+    public ClusterStatsDTO toClusterStats(InternalClusterState clusterState) {
+<span class="nc bnc" id="L66" title="All 2 branches missed.">        if ( clusterState == null ) {</span>
+<span class="nc" id="L67">            return null;</span>
+        }
+
+<span class="nc" id="L70">        ClusterStatsDTO clusterStatsDTO = new ClusterStatsDTO();</span>
+
+<span class="nc" id="L72">        clusterStatsDTO.setBrokerCount( clusterState.getBrokerCount() );</span>
+<span class="nc" id="L73">        clusterStatsDTO.setActiveControllers( clusterState.getActiveControllers() );</span>
+<span class="nc" id="L74">        clusterStatsDTO.setOnlinePartitionCount( clusterState.getOnlinePartitionCount() );</span>
+<span class="nc" id="L75">        clusterStatsDTO.setOfflinePartitionCount( clusterState.getOfflinePartitionCount() );</span>
+<span class="nc" id="L76">        clusterStatsDTO.setInSyncReplicasCount( clusterState.getInSyncReplicasCount() );</span>
+<span class="nc" id="L77">        clusterStatsDTO.setOutOfSyncReplicasCount( clusterState.getOutOfSyncReplicasCount() );</span>
+<span class="nc" id="L78">        clusterStatsDTO.setUnderReplicatedPartitionCount( clusterState.getUnderReplicatedPartitionCount() );</span>
+<span class="nc" id="L79">        List&lt;BrokerDiskUsageDTO&gt; list = clusterState.getDiskUsage();</span>
+<span class="nc bnc" id="L80" title="All 2 branches missed.">        if ( list != null ) {</span>
+<span class="nc" id="L81">            clusterStatsDTO.setDiskUsage( new ArrayList&lt;BrokerDiskUsageDTO&gt;( list ) );</span>
+        }
+<span class="nc" id="L83">        clusterStatsDTO.setVersion( clusterState.getVersion() );</span>
+
+<span class="nc" id="L85">        return clusterStatsDTO;</span>
+    }
+
+    @Override
+    public BrokerConfigDTO toBrokerConfig(InternalBrokerConfig config) {
+<span class="pc bpc" id="L90" title="1 of 2 branches missed.">        if ( config == null ) {</span>
+<span class="nc" id="L91">            return null;</span>
+        }
+
+<span class="fc" id="L94">        BrokerConfigDTO brokerConfigDTO = new BrokerConfigDTO();</span>
+
+<span class="fc" id="L96">        brokerConfigDTO.setIsSensitive( config.isSensitive() );</span>
+<span class="fc" id="L97">        brokerConfigDTO.setIsReadOnly( config.isReadOnly() );</span>
+<span class="fc" id="L98">        brokerConfigDTO.setName( config.getName() );</span>
+<span class="fc" id="L99">        brokerConfigDTO.setValue( config.getValue() );</span>
+<span class="fc" id="L100">        brokerConfigDTO.setSource( configSourceToConfigSourceDTO( config.getSource() ) );</span>
+<span class="fc" id="L101">        brokerConfigDTO.setSynonyms( configSynonymListToConfigSynonymDTOList( config.getSynonyms() ) );</span>
+
+<span class="fc" id="L103">        return brokerConfigDTO;</span>
+    }
+
+    @Override
+    public TopicDTO toTopic(InternalTopic topic) {
+<span class="pc bpc" id="L108" title="1 of 2 branches missed.">        if ( topic == null ) {</span>
+<span class="nc" id="L109">            return null;</span>
+        }
+
+<span class="fc" id="L112">        TopicDTO topicDTO = new TopicDTO();</span>
+
+<span class="fc" id="L114">        topicDTO.setName( topic.getName() );</span>
+<span class="fc" id="L115">        topicDTO.setInternal( topic.isInternal() );</span>
+<span class="fc" id="L116">        topicDTO.setPartitionCount( topic.getPartitionCount() );</span>
+<span class="fc" id="L117">        topicDTO.setReplicationFactor( topic.getReplicationFactor() );</span>
+<span class="fc" id="L118">        topicDTO.setReplicas( topic.getReplicas() );</span>
+<span class="fc" id="L119">        topicDTO.setInSyncReplicas( topic.getInSyncReplicas() );</span>
+<span class="fc" id="L120">        topicDTO.setSegmentSize( topic.getSegmentSize() );</span>
+<span class="fc" id="L121">        topicDTO.setSegmentCount( (int) topic.getSegmentCount() );</span>
+<span class="fc" id="L122">        topicDTO.setBytesInPerSec( topic.getBytesInPerSec() );</span>
+<span class="fc" id="L123">        topicDTO.setBytesOutPerSec( topic.getBytesOutPerSec() );</span>
+<span class="fc" id="L124">        topicDTO.setUnderReplicatedPartitions( topic.getUnderReplicatedPartitions() );</span>
+<span class="fc" id="L125">        topicDTO.setCleanUpPolicy( cleanupPolicyToCleanUpPolicyDTO( topic.getCleanUpPolicy() ) );</span>
+<span class="fc" id="L126">        topicDTO.setPartitions( map( topic.getPartitions() ) );</span>
+
+<span class="fc" id="L128">        return topicDTO;</span>
+    }
+
+    @Override
+    public PartitionDTO toPartition(InternalPartition topic) {
+<span class="pc bpc" id="L133" title="1 of 2 branches missed.">        if ( topic == null ) {</span>
+<span class="nc" id="L134">            return null;</span>
+        }
+
+<span class="fc" id="L137">        PartitionDTO partitionDTO = new PartitionDTO();</span>
+
+<span class="fc" id="L139">        partitionDTO.setPartition( topic.getPartition() );</span>
+<span class="fc" id="L140">        partitionDTO.setLeader( topic.getLeader() );</span>
+<span class="fc" id="L141">        partitionDTO.setReplicas( internalReplicaListToReplicaDTOList( topic.getReplicas() ) );</span>
+<span class="fc" id="L142">        partitionDTO.setOffsetMax( topic.getOffsetMax() );</span>
+<span class="fc" id="L143">        partitionDTO.setOffsetMin( topic.getOffsetMin() );</span>
+
+<span class="fc" id="L145">        return partitionDTO;</span>
+    }
+
+    @Override
+    public BrokerDTO toBrokerDto(InternalBroker broker) {
+<span class="nc bnc" id="L150" title="All 2 branches missed.">        if ( broker == null ) {</span>
+<span class="nc" id="L151">            return null;</span>
+        }
+
+<span class="nc" id="L154">        BrokerDTO brokerDTO = new BrokerDTO();</span>
+
+<span class="nc" id="L156">        brokerDTO.setId( broker.getId() );</span>
+<span class="nc" id="L157">        brokerDTO.setHost( broker.getHost() );</span>
+<span class="nc" id="L158">        brokerDTO.setPort( broker.getPort() );</span>
+<span class="nc" id="L159">        brokerDTO.setBytesInPerSec( broker.getBytesInPerSec() );</span>
+<span class="nc" id="L160">        brokerDTO.setBytesOutPerSec( broker.getBytesOutPerSec() );</span>
+<span class="nc" id="L161">        brokerDTO.setPartitionsLeader( broker.getPartitionsLeader() );</span>
+<span class="nc" id="L162">        brokerDTO.setPartitions( broker.getPartitions() );</span>
+<span class="nc" id="L163">        brokerDTO.setInSyncPartitions( broker.getInSyncPartitions() );</span>
+<span class="nc" id="L164">        brokerDTO.setPartitionsSkew( broker.getPartitionsSkew() );</span>
+<span class="nc" id="L165">        brokerDTO.setLeadersSkew( broker.getLeadersSkew() );</span>
+
+<span class="nc" id="L167">        return brokerDTO;</span>
+    }
+
+    @Override
+    public TopicDetailsDTO toTopicDetails(InternalTopic topic) {
+<span class="pc bpc" id="L172" title="1 of 2 branches missed.">        if ( topic == null ) {</span>
+<span class="nc" id="L173">            return null;</span>
+        }
+
+<span class="fc" id="L176">        TopicDetailsDTO topicDetailsDTO = new TopicDetailsDTO();</span>
+
+<span class="fc" id="L178">        topicDetailsDTO.setName( topic.getName() );</span>
+<span class="fc" id="L179">        topicDetailsDTO.setInternal( topic.isInternal() );</span>
+<span class="fc" id="L180">        topicDetailsDTO.setPartitions( map( topic.getPartitions() ) );</span>
+<span class="fc" id="L181">        topicDetailsDTO.setPartitionCount( topic.getPartitionCount() );</span>
+<span class="fc" id="L182">        topicDetailsDTO.setReplicationFactor( topic.getReplicationFactor() );</span>
+<span class="fc" id="L183">        topicDetailsDTO.setReplicas( topic.getReplicas() );</span>
+<span class="fc" id="L184">        topicDetailsDTO.setInSyncReplicas( topic.getInSyncReplicas() );</span>
+<span class="fc" id="L185">        topicDetailsDTO.setBytesInPerSec( topic.getBytesInPerSec() );</span>
+<span class="fc" id="L186">        topicDetailsDTO.setBytesOutPerSec( topic.getBytesOutPerSec() );</span>
+<span class="fc" id="L187">        topicDetailsDTO.setSegmentSize( topic.getSegmentSize() );</span>
+<span class="fc" id="L188">        topicDetailsDTO.setSegmentCount( (int) topic.getSegmentCount() );</span>
+<span class="fc" id="L189">        topicDetailsDTO.setUnderReplicatedPartitions( topic.getUnderReplicatedPartitions() );</span>
+<span class="fc" id="L190">        topicDetailsDTO.setCleanUpPolicy( cleanupPolicyToCleanUpPolicyDTO( topic.getCleanUpPolicy() ) );</span>
+
+<span class="fc" id="L192">        return topicDetailsDTO;</span>
+    }
+
+    @Override
+    public TopicConfigDTO toTopicConfig(InternalTopicConfig topic) {
+<span class="pc bpc" id="L197" title="1 of 2 branches missed.">        if ( topic == null ) {</span>
+<span class="nc" id="L198">            return null;</span>
+        }
+
+<span class="fc" id="L201">        TopicConfigDTO topicConfigDTO = new TopicConfigDTO();</span>
+
+<span class="fc" id="L203">        topicConfigDTO.setIsReadOnly( topic.isReadOnly() );</span>
+<span class="fc" id="L204">        topicConfigDTO.setIsSensitive( topic.isSensitive() );</span>
+<span class="fc" id="L205">        topicConfigDTO.setName( topic.getName() );</span>
+<span class="fc" id="L206">        topicConfigDTO.setValue( topic.getValue() );</span>
+<span class="fc" id="L207">        topicConfigDTO.setDefaultValue( topic.getDefaultValue() );</span>
+<span class="fc" id="L208">        topicConfigDTO.setSource( configSourceToConfigSourceDTO( topic.getSource() ) );</span>
+<span class="fc" id="L209">        topicConfigDTO.setSynonyms( configSynonymListToConfigSynonymDTOList( topic.getSynonyms() ) );</span>
+<span class="fc" id="L210">        topicConfigDTO.setDoc( topic.getDoc() );</span>
+
+<span class="fc" id="L212">        return topicConfigDTO;</span>
+    }
+
+    @Override
+    public ReplicaDTO toReplica(InternalReplica replica) {
+<span class="pc bpc" id="L217" title="1 of 2 branches missed.">        if ( replica == null ) {</span>
+<span class="nc" id="L218">            return null;</span>
+        }
+
+<span class="fc" id="L221">        ReplicaDTO replicaDTO = new ReplicaDTO();</span>
+
+<span class="fc" id="L223">        replicaDTO.setBroker( replica.getBroker() );</span>
+<span class="fc" id="L224">        replicaDTO.setLeader( replica.isLeader() );</span>
+<span class="fc" id="L225">        replicaDTO.setInSync( replica.isInSync() );</span>
+
+<span class="fc" id="L227">        return replicaDTO;</span>
+    }
+
+    @Override
+    public ConnectDTO toKafkaConnect(ClustersProperties.ConnectCluster connect) {
+<span class="pc bpc" id="L232" title="1 of 2 branches missed.">        if ( connect == null ) {</span>
+<span class="nc" id="L233">            return null;</span>
+        }
+
+<span class="fc" id="L236">        ConnectDTO connectDTO = new ConnectDTO();</span>
+
+<span class="fc" id="L238">        connectDTO.setName( connect.getName() );</span>
+<span class="fc" id="L239">        connectDTO.setAddress( connect.getAddress() );</span>
+
+<span class="fc" id="L241">        return connectDTO;</span>
+    }
+
+    @Override
+    public List&lt;ClusterDTO.FeaturesEnum&gt; toFeaturesEnum(List&lt;ClusterFeature&gt; features) {
+<span class="nc bnc" id="L246" title="All 2 branches missed.">        if ( features == null ) {</span>
+<span class="nc" id="L247">            return null;</span>
+        }
+
+<span class="nc" id="L250">        List&lt;ClusterDTO.FeaturesEnum&gt; list = new ArrayList&lt;ClusterDTO.FeaturesEnum&gt;( features.size() );</span>
+<span class="nc bnc" id="L251" title="All 2 branches missed.">        for ( ClusterFeature clusterFeature : features ) {</span>
+<span class="nc" id="L252">            list.add( clusterFeatureToFeaturesEnum( clusterFeature ) );</span>
+<span class="nc" id="L253">        }</span>
+
+<span class="nc" id="L255">        return list;</span>
+    }
+
+    protected ConfigSourceDTO configSourceToConfigSourceDTO(ConfigEntry.ConfigSource configSource) {
+<span class="pc bpc" id="L259" title="1 of 2 branches missed.">        if ( configSource == null ) {</span>
+<span class="nc" id="L260">            return null;</span>
+        }
+
+        ConfigSourceDTO configSourceDTO;
+
+<span class="pc bpc" id="L265" title="5 of 8 branches missed.">        switch ( configSource ) {</span>
+<span class="nc" id="L266">            case DYNAMIC_TOPIC_CONFIG: configSourceDTO = ConfigSourceDTO.DYNAMIC_TOPIC_CONFIG;</span>
+<span class="nc" id="L267">            break;</span>
+<span class="nc" id="L268">            case DYNAMIC_BROKER_LOGGER_CONFIG: configSourceDTO = ConfigSourceDTO.DYNAMIC_BROKER_LOGGER_CONFIG;</span>
+<span class="nc" id="L269">            break;</span>
+<span class="fc" id="L270">            case DYNAMIC_BROKER_CONFIG: configSourceDTO = ConfigSourceDTO.DYNAMIC_BROKER_CONFIG;</span>
+<span class="fc" id="L271">            break;</span>
+<span class="nc" id="L272">            case DYNAMIC_DEFAULT_BROKER_CONFIG: configSourceDTO = ConfigSourceDTO.DYNAMIC_DEFAULT_BROKER_CONFIG;</span>
+<span class="nc" id="L273">            break;</span>
+<span class="fc" id="L274">            case STATIC_BROKER_CONFIG: configSourceDTO = ConfigSourceDTO.STATIC_BROKER_CONFIG;</span>
+<span class="fc" id="L275">            break;</span>
+<span class="fc" id="L276">            case DEFAULT_CONFIG: configSourceDTO = ConfigSourceDTO.DEFAULT_CONFIG;</span>
+<span class="fc" id="L277">            break;</span>
+<span class="nc" id="L278">            case UNKNOWN: configSourceDTO = ConfigSourceDTO.UNKNOWN;</span>
+<span class="nc" id="L279">            break;</span>
+<span class="nc" id="L280">            default: throw new IllegalArgumentException( &quot;Unexpected enum constant: &quot; + configSource );</span>
+        }
+
+<span class="fc" id="L283">        return configSourceDTO;</span>
+    }
+
+    protected List&lt;ConfigSynonymDTO&gt; configSynonymListToConfigSynonymDTOList(List&lt;ConfigEntry.ConfigSynonym&gt; list) {
+<span class="pc bpc" id="L287" title="1 of 2 branches missed.">        if ( list == null ) {</span>
+<span class="nc" id="L288">            return null;</span>
+        }
+
+<span class="fc" id="L291">        List&lt;ConfigSynonymDTO&gt; list1 = new ArrayList&lt;ConfigSynonymDTO&gt;( list.size() );</span>
+<span class="fc bfc" id="L292" title="All 2 branches covered.">        for ( ConfigEntry.ConfigSynonym configSynonym : list ) {</span>
+<span class="fc" id="L293">            list1.add( toConfigSynonym( configSynonym ) );</span>
+<span class="fc" id="L294">        }</span>
+
+<span class="fc" id="L296">        return list1;</span>
+    }
+
+    protected CleanUpPolicyDTO cleanupPolicyToCleanUpPolicyDTO(CleanupPolicy cleanupPolicy) {
+<span class="pc bpc" id="L300" title="1 of 2 branches missed.">        if ( cleanupPolicy == null ) {</span>
+<span class="nc" id="L301">            return null;</span>
+        }
+
+        CleanUpPolicyDTO cleanUpPolicyDTO;
+
+<span class="pc bpc" id="L306" title="2 of 5 branches missed.">        switch ( cleanupPolicy ) {</span>
+<span class="fc" id="L307">            case DELETE: cleanUpPolicyDTO = CleanUpPolicyDTO.DELETE;</span>
+<span class="fc" id="L308">            break;</span>
+<span class="fc" id="L309">            case COMPACT: cleanUpPolicyDTO = CleanUpPolicyDTO.COMPACT;</span>
+<span class="fc" id="L310">            break;</span>
+<span class="nc" id="L311">            case COMPACT_DELETE: cleanUpPolicyDTO = CleanUpPolicyDTO.COMPACT_DELETE;</span>
+<span class="nc" id="L312">            break;</span>
+<span class="fc" id="L313">            case UNKNOWN: cleanUpPolicyDTO = CleanUpPolicyDTO.UNKNOWN;</span>
+<span class="fc" id="L314">            break;</span>
+<span class="nc" id="L315">            default: throw new IllegalArgumentException( &quot;Unexpected enum constant: &quot; + cleanupPolicy );</span>
+        }
+
+<span class="fc" id="L318">        return cleanUpPolicyDTO;</span>
+    }
+
+    protected List&lt;ReplicaDTO&gt; internalReplicaListToReplicaDTOList(List&lt;InternalReplica&gt; list) {
+<span class="pc bpc" id="L322" title="1 of 2 branches missed.">        if ( list == null ) {</span>
+<span class="nc" id="L323">            return null;</span>
+        }
+
+<span class="fc" id="L326">        List&lt;ReplicaDTO&gt; list1 = new ArrayList&lt;ReplicaDTO&gt;( list.size() );</span>
+<span class="fc bfc" id="L327" title="All 2 branches covered.">        for ( InternalReplica internalReplica : list ) {</span>
+<span class="fc" id="L328">            list1.add( toReplica( internalReplica ) );</span>
+<span class="fc" id="L329">        }</span>
+
+<span class="fc" id="L331">        return list1;</span>
+    }
+
+    protected ClusterDTO.FeaturesEnum clusterFeatureToFeaturesEnum(ClusterFeature clusterFeature) {
+<span class="nc bnc" id="L335" title="All 2 branches missed.">        if ( clusterFeature == null ) {</span>
+<span class="nc" id="L336">            return null;</span>
+        }
+
+        ClusterDTO.FeaturesEnum featuresEnum;
+
+<span class="nc bnc" id="L341" title="All 7 branches missed.">        switch ( clusterFeature ) {</span>
+<span class="nc" id="L342">            case KAFKA_CONNECT: featuresEnum = ClusterDTO.FeaturesEnum.KAFKA_CONNECT;</span>
+<span class="nc" id="L343">            break;</span>
+<span class="nc" id="L344">            case KSQL_DB: featuresEnum = ClusterDTO.FeaturesEnum.KSQL_DB;</span>
+<span class="nc" id="L345">            break;</span>
+<span class="nc" id="L346">            case SCHEMA_REGISTRY: featuresEnum = ClusterDTO.FeaturesEnum.SCHEMA_REGISTRY;</span>
+<span class="nc" id="L347">            break;</span>
+<span class="nc" id="L348">            case TOPIC_DELETION: featuresEnum = ClusterDTO.FeaturesEnum.TOPIC_DELETION;</span>
+<span class="nc" id="L349">            break;</span>
+<span class="nc" id="L350">            case KAFKA_ACL_VIEW: featuresEnum = ClusterDTO.FeaturesEnum.KAFKA_ACL_VIEW;</span>
+<span class="nc" id="L351">            break;</span>
+<span class="nc" id="L352">            case KAFKA_ACL_EDIT: featuresEnum = ClusterDTO.FeaturesEnum.KAFKA_ACL_EDIT;</span>
+<span class="nc" id="L353">            break;</span>
+<span class="nc" id="L354">            default: throw new IllegalArgumentException( &quot;Unexpected enum constant: &quot; + clusterFeature );</span>
+        }
+
+<span class="nc" id="L357">        return featuresEnum;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

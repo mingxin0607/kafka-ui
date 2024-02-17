@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>StatisticsCache.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">kafka-ui-api</a> &gt; <a href="index.source.html" class="el_package">com.provectus.kafka.ui.service</a> &gt; <span class="el_source">StatisticsCache.java</span></div><h1>StatisticsCache.java</h1><pre class="source lang-java linenums">package com.provectus.kafka.ui.service;
+
+import com.provectus.kafka.ui.model.KafkaCluster;
+import com.provectus.kafka.ui.model.ServerStatusDTO;
+import com.provectus.kafka.ui.model.Statistics;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.concurrent.ConcurrentHashMap;
+import org.apache.kafka.clients.admin.ConfigEntry;
+import org.apache.kafka.clients.admin.TopicDescription;
+import org.springframework.stereotype.Component;
+
+@Component
+public class StatisticsCache {
+
+<span class="fc" id="L18">  private final Map&lt;String, Statistics&gt; cache = new ConcurrentHashMap&lt;&gt;();</span>
+
+<span class="fc" id="L20">  public StatisticsCache(ClustersStorage clustersStorage) {</span>
+<span class="fc" id="L21">    var initializing = Statistics.empty().toBuilder().status(ServerStatusDTO.INITIALIZING).build();</span>
+<span class="fc" id="L22">    clustersStorage.getKafkaClusters().forEach(c -&gt; cache.put(c.getName(), initializing));</span>
+<span class="fc" id="L23">  }</span>
+
+  public synchronized void replace(KafkaCluster c, Statistics stats) {
+<span class="fc" id="L26">    cache.put(c.getName(), stats);</span>
+<span class="fc" id="L27">  }</span>
+
+  public synchronized void update(KafkaCluster c,
+                                  Map&lt;String, TopicDescription&gt; descriptions,
+                                  Map&lt;String, List&lt;ConfigEntry&gt;&gt; configs) {
+<span class="fc" id="L32">    var metrics = get(c);</span>
+<span class="fc" id="L33">    var updatedDescriptions = new HashMap&lt;&gt;(metrics.getTopicDescriptions());</span>
+<span class="fc" id="L34">    updatedDescriptions.putAll(descriptions);</span>
+<span class="fc" id="L35">    var updatedConfigs = new HashMap&lt;&gt;(metrics.getTopicConfigs());</span>
+<span class="fc" id="L36">    updatedConfigs.putAll(configs);</span>
+<span class="fc" id="L37">    replace(</span>
+        c,
+<span class="fc" id="L39">        metrics.toBuilder()</span>
+<span class="fc" id="L40">            .topicDescriptions(updatedDescriptions)</span>
+<span class="fc" id="L41">            .topicConfigs(updatedConfigs)</span>
+<span class="fc" id="L42">            .build()</span>
+    );
+<span class="fc" id="L44">  }</span>
+
+  public synchronized void onTopicDelete(KafkaCluster c, String topic) {
+<span class="fc" id="L47">    var metrics = get(c);</span>
+<span class="fc" id="L48">    var updatedDescriptions = new HashMap&lt;&gt;(metrics.getTopicDescriptions());</span>
+<span class="fc" id="L49">    updatedDescriptions.remove(topic);</span>
+<span class="fc" id="L50">    var updatedConfigs = new HashMap&lt;&gt;(metrics.getTopicConfigs());</span>
+<span class="fc" id="L51">    updatedConfigs.remove(topic);</span>
+<span class="fc" id="L52">    replace(</span>
+        c,
+<span class="fc" id="L54">        metrics.toBuilder()</span>
+<span class="fc" id="L55">            .topicDescriptions(updatedDescriptions)</span>
+<span class="fc" id="L56">            .topicConfigs(updatedConfigs)</span>
+<span class="fc" id="L57">            .build()</span>
+    );
+<span class="fc" id="L59">  }</span>
+
+  public Statistics get(KafkaCluster c) {
+<span class="fc" id="L62">    return Objects.requireNonNull(cache.get(c.getName()), &quot;Unknown cluster metrics requested&quot;);</span>
+  }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

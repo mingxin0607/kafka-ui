@@ -1,0 +1,755 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ReactiveAdminClient.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">kafka-ui-api</a> &gt; <a href="index.source.html" class="el_package">com.provectus.kafka.ui.service</a> &gt; <span class="el_source">ReactiveAdminClient.java</span></div><h1>ReactiveAdminClient.java</h1><pre class="source lang-java linenums">package com.provectus.kafka.ui.service;
+
+import static java.util.stream.Collectors.toList;
+import static java.util.stream.Collectors.toMap;
+import static org.apache.kafka.clients.admin.ListOffsetsResult.ListOffsetsResultInfo;
+
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableTable;
+import com.google.common.collect.Iterables;
+import com.google.common.collect.Table;
+import com.provectus.kafka.ui.exception.IllegalEntityStateException;
+import com.provectus.kafka.ui.exception.NotFoundException;
+import com.provectus.kafka.ui.exception.ValidationException;
+import com.provectus.kafka.ui.util.KafkaVersion;
+import com.provectus.kafka.ui.util.annotation.KafkaClientInternalsDependant;
+import java.io.Closeable;
+import java.time.Duration;
+import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.ExecutionException;
+import java.util.function.BiFunction;
+import java.util.function.Function;
+import java.util.function.Predicate;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
+import java.util.stream.Stream;
+import javax.annotation.Nullable;
+import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.Value;
+import lombok.extern.slf4j.Slf4j;
+import org.apache.kafka.clients.admin.AdminClient;
+import org.apache.kafka.clients.admin.AlterConfigOp;
+import org.apache.kafka.clients.admin.Config;
+import org.apache.kafka.clients.admin.ConfigEntry;
+import org.apache.kafka.clients.admin.ConsumerGroupDescription;
+import org.apache.kafka.clients.admin.ConsumerGroupListing;
+import org.apache.kafka.clients.admin.DescribeClusterOptions;
+import org.apache.kafka.clients.admin.DescribeClusterResult;
+import org.apache.kafka.clients.admin.DescribeConfigsOptions;
+import org.apache.kafka.clients.admin.ListConsumerGroupOffsetsSpec;
+import org.apache.kafka.clients.admin.ListOffsetsResult;
+import org.apache.kafka.clients.admin.ListTopicsOptions;
+import org.apache.kafka.clients.admin.NewPartitionReassignment;
+import org.apache.kafka.clients.admin.NewPartitions;
+import org.apache.kafka.clients.admin.NewTopic;
+import org.apache.kafka.clients.admin.OffsetSpec;
+import org.apache.kafka.clients.admin.ProducerState;
+import org.apache.kafka.clients.admin.RecordsToDelete;
+import org.apache.kafka.clients.admin.TopicDescription;
+import org.apache.kafka.clients.consumer.OffsetAndMetadata;
+import org.apache.kafka.common.KafkaException;
+import org.apache.kafka.common.KafkaFuture;
+import org.apache.kafka.common.Node;
+import org.apache.kafka.common.TopicPartition;
+import org.apache.kafka.common.TopicPartitionInfo;
+import org.apache.kafka.common.TopicPartitionReplica;
+import org.apache.kafka.common.acl.AccessControlEntryFilter;
+import org.apache.kafka.common.acl.AclBinding;
+import org.apache.kafka.common.acl.AclBindingFilter;
+import org.apache.kafka.common.acl.AclOperation;
+import org.apache.kafka.common.config.ConfigResource;
+import org.apache.kafka.common.errors.ClusterAuthorizationException;
+import org.apache.kafka.common.errors.GroupIdNotFoundException;
+import org.apache.kafka.common.errors.GroupNotEmptyException;
+import org.apache.kafka.common.errors.InvalidRequestException;
+import org.apache.kafka.common.errors.SecurityDisabledException;
+import org.apache.kafka.common.errors.TopicAuthorizationException;
+import org.apache.kafka.common.errors.UnknownTopicOrPartitionException;
+import org.apache.kafka.common.errors.UnsupportedVersionException;
+import org.apache.kafka.common.requests.DescribeLogDirsResponse;
+import org.apache.kafka.common.resource.ResourcePatternFilter;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
+import reactor.util.function.Tuple2;
+import reactor.util.function.Tuples;
+
+
+<span class="fc" id="L91">@Slf4j</span>
+<span class="fc" id="L92">@AllArgsConstructor</span>
+public class ReactiveAdminClient implements Closeable {
+
+<span class="fc" id="L95">  public enum SupportedFeature {</span>
+<span class="fc" id="L96">    INCREMENTAL_ALTER_CONFIGS(2.3f),</span>
+<span class="fc" id="L97">    CONFIG_DOCUMENTATION_RETRIEVAL(2.6f),</span>
+<span class="fc" id="L98">    DESCRIBE_CLUSTER_INCLUDE_AUTHORIZED_OPERATIONS(2.3f),</span>
+<span class="fc" id="L99">    AUTHORIZED_SECURITY_ENABLED(ReactiveAdminClient::isAuthorizedSecurityEnabled);</span>
+
+    private final BiFunction&lt;AdminClient, Float, Mono&lt;Boolean&gt;&gt; predicate;
+
+<span class="fc" id="L103">    SupportedFeature(BiFunction&lt;AdminClient, Float, Mono&lt;Boolean&gt;&gt; predicate) {</span>
+<span class="fc" id="L104">      this.predicate = predicate;</span>
+<span class="fc" id="L105">    }</span>
+
+<span class="fc" id="L107">    SupportedFeature(float fromVersion) {</span>
+<span class="pc bpc" id="L108" title="2 of 4 branches missed.">      this.predicate = (admin, ver) -&gt; Mono.just(ver != null &amp;&amp; ver &gt;= fromVersion);</span>
+<span class="fc" id="L109">    }</span>
+
+    static Mono&lt;Set&lt;SupportedFeature&gt;&gt; forVersion(AdminClient ac, String kafkaVersionStr) {
+<span class="fc" id="L112">      @Nullable Float kafkaVersion = KafkaVersion.parse(kafkaVersionStr).orElse(null);</span>
+<span class="fc" id="L113">      return Flux.fromArray(SupportedFeature.values())</span>
+<span class="fc" id="L114">          .flatMap(f -&gt; f.predicate.apply(ac, kafkaVersion).map(enabled -&gt; Tuples.of(f, enabled)))</span>
+<span class="fc" id="L115">          .filter(Tuple2::getT2)</span>
+<span class="fc" id="L116">          .map(Tuple2::getT1)</span>
+<span class="fc" id="L117">          .collect(Collectors.toSet());</span>
+    }
+  }
+
+<span class="pc bnc" id="L121" title="All 36 branches missed.">  @Value</span>
+  public static class ClusterDescription {
+    @Nullable
+<span class="fc" id="L124">    Node controller;</span>
+<span class="nc" id="L125">    String clusterId;</span>
+<span class="fc" id="L126">    Collection&lt;Node&gt; nodes;</span>
+    @Nullable // null, if ACL is disabled
+<span class="fc" id="L128">    Set&lt;AclOperation&gt; authorizedOperations;</span>
+  }
+
+<span class="nc" id="L131">  @Builder</span>
+<span class="fc" id="L132">  private record ConfigRelatedInfo(String version,</span>
+                                   Set&lt;SupportedFeature&gt; features,
+                                   boolean topicDeletionIsAllowed) {
+
+<span class="fc" id="L136">    static final Duration UPDATE_DURATION = Duration.of(1, ChronoUnit.HOURS);</span>
+
+    private static Mono&lt;ConfigRelatedInfo&gt; extract(AdminClient ac) {
+<span class="fc" id="L139">      return ReactiveAdminClient.describeClusterImpl(ac, Set.of())</span>
+<span class="fc" id="L140">          .flatMap(desc -&gt; {</span>
+            // choosing node from which we will get configs (starting with controller)
+<span class="fc" id="L142">            var targetNodeId = Optional.ofNullable(desc.controller)</span>
+<span class="fc" id="L143">                .map(Node::id)</span>
+<span class="fc" id="L144">                .orElse(desc.getNodes().iterator().next().id());</span>
+<span class="fc" id="L145">            return loadBrokersConfig(ac, List.of(targetNodeId))</span>
+<span class="pc bpc" id="L146" title="1 of 2 branches missed.">                .map(map -&gt; map.isEmpty() ? List.&lt;ConfigEntry&gt;of() : map.get(targetNodeId))</span>
+<span class="fc" id="L147">                .flatMap(configs -&gt; {</span>
+<span class="fc" id="L148">                  String version = &quot;1.0-UNKNOWN&quot;;</span>
+<span class="fc" id="L149">                  boolean topicDeletionEnabled = true;</span>
+<span class="fc bfc" id="L150" title="All 2 branches covered.">                  for (ConfigEntry entry : configs) {</span>
+<span class="fc bfc" id="L151" title="All 2 branches covered.">                    if (entry.name().contains(&quot;inter.broker.protocol.version&quot;)) {</span>
+<span class="fc" id="L152">                      version = entry.value();</span>
+                    }
+<span class="fc bfc" id="L154" title="All 2 branches covered.">                    if (entry.name().equals(&quot;delete.topic.enable&quot;)) {</span>
+<span class="fc" id="L155">                      topicDeletionEnabled = Boolean.parseBoolean(entry.value());</span>
+                    }
+<span class="fc" id="L157">                  }</span>
+<span class="fc" id="L158">                  final String finalVersion = version;</span>
+<span class="fc" id="L159">                  final boolean finalTopicDeletionEnabled = topicDeletionEnabled;</span>
+<span class="fc" id="L160">                  return SupportedFeature.forVersion(ac, version)</span>
+<span class="fc" id="L161">                      .map(features -&gt; new ConfigRelatedInfo(finalVersion, features, finalTopicDeletionEnabled));</span>
+                });
+          })
+<span class="fc" id="L164">          .cache(UPDATE_DURATION);</span>
+    }
+  }
+
+  public static Mono&lt;ReactiveAdminClient&gt; create(AdminClient adminClient) {
+<span class="fc" id="L169">    Mono&lt;ConfigRelatedInfo&gt; configRelatedInfoMono = ConfigRelatedInfo.extract(adminClient);</span>
+<span class="fc" id="L170">    return configRelatedInfoMono.map(info -&gt; new ReactiveAdminClient(adminClient, configRelatedInfoMono, info));</span>
+  }
+
+
+  private static Mono&lt;Boolean&gt; isAuthorizedSecurityEnabled(AdminClient ac, @Nullable Float kafkaVersion) {
+<span class="fc" id="L175">    return toMono(ac.describeAcls(AclBindingFilter.ANY).values())</span>
+<span class="fc" id="L176">        .thenReturn(true)</span>
+<span class="pc bpc" id="L177" title="5 of 6 branches missed.">        .doOnError(th -&gt; !(th instanceof SecurityDisabledException)</span>
+                &amp;&amp; !(th instanceof InvalidRequestException)
+                &amp;&amp; !(th instanceof UnsupportedVersionException),
+<span class="nc" id="L180">            th -&gt; log.debug(&quot;Error checking if security enabled&quot;, th))</span>
+<span class="fc" id="L181">        .onErrorReturn(false);</span>
+  }
+
+  // NOTE: if KafkaFuture returns null, that Mono will be empty(!), since Reactor does not support nullable results
+  // (see MonoSink.success(..) javadoc for details)
+  public static &lt;T&gt; Mono&lt;T&gt; toMono(KafkaFuture&lt;T&gt; future) {
+<span class="fc" id="L187">    return Mono.&lt;T&gt;create(sink -&gt; future.whenComplete((res, ex) -&gt; {</span>
+<span class="fc bfc" id="L188" title="All 2 branches covered.">      if (ex != null) {</span>
+        // KafkaFuture doc is unclear about what exception wrapper will be used
+        // (from docs it should be ExecutionException, be we actually see CompletionException, so checking both
+<span class="pc bpc" id="L191" title="2 of 4 branches missed.">        if (ex instanceof CompletionException || ex instanceof ExecutionException) {</span>
+<span class="nc" id="L192">          sink.error(ex.getCause()); //unwrapping exception</span>
+        } else {
+<span class="fc" id="L194">          sink.error(ex);</span>
+        }
+      } else {
+<span class="fc" id="L197">        sink.success(res);</span>
+      }
+<span class="fc" id="L199">    })).doOnCancel(() -&gt; future.cancel(true))</span>
+        // AdminClient is using single thread for kafka communication
+        // and by default all downstream operations (like map(..)) on created Mono will be executed on this thread.
+        // If some of downstream operation are blocking (by mistake) this can lead to
+        // other AdminClient's requests stucking, which can cause timeout exceptions.
+        // So, we explicitly setting Scheduler for downstream processing.
+<span class="fc" id="L205">        .publishOn(Schedulers.parallel());</span>
+  }
+
+  //---------------------------------------------------------------------------------
+
+<span class="fc" id="L210">  @Getter(AccessLevel.PACKAGE) // visible for testing</span>
+  private final AdminClient client;
+  private final Mono&lt;ConfigRelatedInfo&gt; configRelatedInfoMono;
+
+  private volatile ConfigRelatedInfo configRelatedInfo;
+
+  public Set&lt;SupportedFeature&gt; getClusterFeatures() {
+<span class="fc" id="L217">    return configRelatedInfo.features();</span>
+  }
+
+  public Mono&lt;Set&lt;String&gt;&gt; listTopics(boolean listInternal) {
+<span class="fc" id="L221">    return toMono(client.listTopics(new ListTopicsOptions().listInternal(listInternal)).names());</span>
+  }
+
+  public Mono&lt;Void&gt; deleteTopic(String topicName) {
+<span class="fc" id="L225">    return toMono(client.deleteTopics(List.of(topicName)).all());</span>
+  }
+
+  public String getVersion() {
+<span class="fc" id="L229">    return configRelatedInfo.version();</span>
+  }
+
+  public boolean isTopicDeletionEnabled() {
+<span class="fc" id="L233">    return configRelatedInfo.topicDeletionIsAllowed();</span>
+  }
+
+  public Mono&lt;Void&gt; updateInternalStats(@Nullable Node controller) {
+<span class="pc bpc" id="L237" title="1 of 2 branches missed.">    if (controller == null) {</span>
+<span class="nc" id="L238">      return Mono.empty();</span>
+    }
+<span class="fc" id="L240">    return configRelatedInfoMono</span>
+<span class="fc" id="L241">        .doOnNext(info -&gt; this.configRelatedInfo = info)</span>
+<span class="fc" id="L242">        .then();</span>
+  }
+
+  public Mono&lt;Map&lt;String, List&lt;ConfigEntry&gt;&gt;&gt; getTopicsConfig() {
+<span class="fc" id="L246">    return listTopics(true).flatMap(topics -&gt; getTopicsConfig(topics, false));</span>
+  }
+
+  //NOTE: skips not-found topics (for which UnknownTopicOrPartitionException was thrown by AdminClient)
+  //and topics for which DESCRIBE_CONFIGS permission is not set (TopicAuthorizationException was thrown)
+  public Mono&lt;Map&lt;String, List&lt;ConfigEntry&gt;&gt;&gt; getTopicsConfig(Collection&lt;String&gt; topicNames, boolean includeDoc) {
+<span class="pc bpc" id="L252" title="1 of 4 branches missed.">    var includeDocFixed = includeDoc &amp;&amp; getClusterFeatures().contains(SupportedFeature.CONFIG_DOCUMENTATION_RETRIEVAL);</span>
+    // we need to partition calls, because it can lead to AdminClient timeouts in case of large topics count
+<span class="fc" id="L254">    return partitionCalls(</span>
+        topicNames,
+        200,
+<span class="fc" id="L257">        part -&gt; getTopicsConfigImpl(part, includeDocFixed),</span>
+<span class="fc" id="L258">        mapMerger()</span>
+    );
+  }
+
+  private Mono&lt;Map&lt;String, List&lt;ConfigEntry&gt;&gt;&gt; getTopicsConfigImpl(Collection&lt;String&gt; topicNames, boolean includeDoc) {
+<span class="fc" id="L263">    List&lt;ConfigResource&gt; resources = topicNames.stream()</span>
+<span class="fc" id="L264">        .map(topicName -&gt; new ConfigResource(ConfigResource.Type.TOPIC, topicName))</span>
+<span class="fc" id="L265">        .collect(toList());</span>
+
+<span class="fc" id="L267">    return toMonoWithExceptionFilter(</span>
+<span class="fc" id="L268">        client.describeConfigs(</span>
+            resources,
+<span class="fc" id="L270">            new DescribeConfigsOptions().includeSynonyms(true).includeDocumentation(includeDoc)).values(),</span>
+        UnknownTopicOrPartitionException.class,
+        TopicAuthorizationException.class
+<span class="fc" id="L273">    ).map(config -&gt; config.entrySet().stream()</span>
+<span class="fc" id="L274">        .collect(toMap(</span>
+<span class="fc" id="L275">            c -&gt; c.getKey().name(),</span>
+<span class="fc" id="L276">            c -&gt; List.copyOf(c.getValue().entries()))));</span>
+  }
+
+  private static Mono&lt;Map&lt;Integer, List&lt;ConfigEntry&gt;&gt;&gt; loadBrokersConfig(AdminClient client, List&lt;Integer&gt; brokerIds) {
+<span class="fc" id="L280">    List&lt;ConfigResource&gt; resources = brokerIds.stream()</span>
+<span class="fc" id="L281">        .map(brokerId -&gt; new ConfigResource(ConfigResource.Type.BROKER, Integer.toString(brokerId)))</span>
+<span class="fc" id="L282">        .collect(toList());</span>
+<span class="fc" id="L283">    return toMono(client.describeConfigs(resources).all())</span>
+        // some kafka backends don't support broker's configs retrieval,
+        // and throw various exceptions on describeConfigs() call
+<span class="pc bnc" id="L286" title="All 4 branches missed.">        .onErrorResume(th -&gt; th instanceof InvalidRequestException // MSK Serverless</span>
+                || th instanceof UnknownTopicOrPartitionException, // Azure event hub
+            th -&gt; {
+<span class="nc" id="L289">              log.trace(&quot;Error while getting configs for brokers {}&quot;, brokerIds, th);</span>
+<span class="nc" id="L290">              return Mono.just(Map.of());</span>
+            })
+        // there are situations when kafka-ui user has no DESCRIBE_CONFIGS permission on cluster
+<span class="fc" id="L293">        .onErrorResume(ClusterAuthorizationException.class, th -&gt; {</span>
+<span class="nc" id="L294">          log.trace(&quot;AuthorizationException while getting configs for brokers {}&quot;, brokerIds, th);</span>
+<span class="nc" id="L295">          return Mono.just(Map.of());</span>
+        })
+        // catching all remaining exceptions, but logging on WARN level
+<span class="pc" id="L298">        .onErrorResume(th -&gt; true, th -&gt; {</span>
+<span class="nc" id="L299">          log.warn(&quot;Unexpected error while getting configs for brokers {}&quot;, brokerIds, th);</span>
+<span class="nc" id="L300">          return Mono.just(Map.of());</span>
+        })
+<span class="fc" id="L302">        .map(config -&gt; config.entrySet().stream()</span>
+<span class="fc" id="L303">            .collect(toMap(</span>
+<span class="fc" id="L304">                c -&gt; Integer.valueOf(c.getKey().name()),</span>
+<span class="fc" id="L305">                c -&gt; new ArrayList&lt;&gt;(c.getValue().entries()))));</span>
+  }
+
+  /**
+   * Return per-broker configs or empty map if broker's configs retrieval not supported.
+   */
+  public Mono&lt;Map&lt;Integer, List&lt;ConfigEntry&gt;&gt;&gt; loadBrokersConfig(List&lt;Integer&gt; brokerIds) {
+<span class="fc" id="L312">    return loadBrokersConfig(client, brokerIds);</span>
+  }
+
+  public Mono&lt;Map&lt;String, TopicDescription&gt;&gt; describeTopics() {
+<span class="fc" id="L316">    return listTopics(true).flatMap(this::describeTopics);</span>
+  }
+
+  public Mono&lt;Map&lt;String, TopicDescription&gt;&gt; describeTopics(Collection&lt;String&gt; topics) {
+    // we need to partition calls, because it can lead to AdminClient timeouts in case of large topics count
+<span class="fc" id="L321">    return partitionCalls(</span>
+        topics,
+        200,
+        this::describeTopicsImpl,
+<span class="fc" id="L325">        mapMerger()</span>
+    );
+  }
+
+  private Mono&lt;Map&lt;String, TopicDescription&gt;&gt; describeTopicsImpl(Collection&lt;String&gt; topics) {
+<span class="fc" id="L330">    return toMonoWithExceptionFilter(</span>
+<span class="fc" id="L331">        client.describeTopics(topics).topicNameValues(),</span>
+        UnknownTopicOrPartitionException.class,
+        // we only describe topics that we see from listTopics() API, so we should have permission to do it,
+        // but also adding this exception here for rare case when access restricted after we called listTopics()
+        TopicAuthorizationException.class
+    );
+  }
+
+  /**
+   * Returns TopicDescription mono, or Empty Mono if topic not visible.
+   */
+  public Mono&lt;TopicDescription&gt; describeTopic(String topic) {
+<span class="fc" id="L343">    return describeTopics(List.of(topic)).flatMap(m -&gt; Mono.justOrEmpty(m.get(topic)));</span>
+  }
+
+  /**
+   * Kafka API often returns Map responses with KafkaFuture values. If we do allOf()
+   * logic resulting Mono will be failing if any of Futures finished with error.
+   * In some situations it is not what we want, ex. we call describeTopics(List names) method and
+   * we getting UnknownTopicOrPartitionException for unknown topics and we what to just not put
+   * such topics in resulting map.
+   * &lt;p/&gt;
+   * This method converts input map into Mono[Map] ignoring keys for which KafkaFutures
+   * finished with &lt;code&gt;classes&lt;/code&gt; exceptions and empty Monos.
+   */
+  @SafeVarargs
+  static &lt;K, V&gt; Mono&lt;Map&lt;K, V&gt;&gt; toMonoWithExceptionFilter(Map&lt;K, KafkaFuture&lt;V&gt;&gt; values,
+                                                          Class&lt;? extends KafkaException&gt;... classes) {
+<span class="fc bfc" id="L359" title="All 2 branches covered.">    if (values.isEmpty()) {</span>
+<span class="fc" id="L360">      return Mono.just(Map.of());</span>
+    }
+
+<span class="fc" id="L363">    List&lt;Mono&lt;Tuple2&lt;K, Optional&lt;V&gt;&gt;&gt;&gt; monos = values.entrySet().stream()</span>
+<span class="fc" id="L364">        .map(e -&gt;</span>
+<span class="fc" id="L365">            toMono(e.getValue())</span>
+<span class="fc" id="L366">                .map(r -&gt; Tuples.of(e.getKey(), Optional.of(r)))</span>
+<span class="fc" id="L367">                .defaultIfEmpty(Tuples.of(e.getKey(), Optional.empty())) //tracking empty Monos</span>
+<span class="fc" id="L368">                .onErrorResume(</span>
+                    // tracking Monos with suppressible error
+<span class="fc" id="L370">                    th -&gt; Stream.of(classes).anyMatch(clazz -&gt; th.getClass().isAssignableFrom(clazz)),</span>
+<span class="fc" id="L371">                    th -&gt; Mono.just(Tuples.of(e.getKey(), Optional.empty()))))</span>
+<span class="fc" id="L372">        .toList();</span>
+
+<span class="fc" id="L374">    return Mono.zip(</span>
+        monos,
+<span class="fc" id="L376">        resultsArr -&gt; Stream.of(resultsArr)</span>
+<span class="fc" id="L377">            .map(obj -&gt; (Tuple2&lt;K, Optional&lt;V&gt;&gt;) obj)</span>
+<span class="fc" id="L378">            .filter(t -&gt; t.getT2().isPresent()) //skipping empty &amp; suppressible-errors</span>
+<span class="fc" id="L379">            .collect(Collectors.toMap(Tuple2::getT1, t -&gt; t.getT2().get()))</span>
+    );
+  }
+
+  public Mono&lt;Map&lt;Integer, Map&lt;String, DescribeLogDirsResponse.LogDirInfo&gt;&gt;&gt; describeLogDirs() {
+<span class="nc" id="L384">    return describeCluster()</span>
+<span class="nc" id="L385">        .map(d -&gt; d.getNodes().stream().map(Node::id).collect(toList()))</span>
+<span class="nc" id="L386">        .flatMap(this::describeLogDirs);</span>
+  }
+
+  public Mono&lt;Map&lt;Integer, Map&lt;String, DescribeLogDirsResponse.LogDirInfo&gt;&gt;&gt; describeLogDirs(
+      Collection&lt;Integer&gt; brokerIds) {
+<span class="fc" id="L391">    return toMono(client.describeLogDirs(brokerIds).all())</span>
+<span class="pc" id="L392">        .onErrorResume(UnsupportedVersionException.class, th -&gt; Mono.just(Map.of()))</span>
+<span class="pc" id="L393">        .onErrorResume(ClusterAuthorizationException.class, th -&gt; Mono.just(Map.of()))</span>
+<span class="pc" id="L394">        .onErrorResume(th -&gt; true, th -&gt; {</span>
+<span class="nc" id="L395">          log.warn(&quot;Error while calling describeLogDirs&quot;, th);</span>
+<span class="nc" id="L396">          return Mono.just(Map.of());</span>
+        });
+  }
+
+  public Mono&lt;ClusterDescription&gt; describeCluster() {
+<span class="fc" id="L401">    return describeClusterImpl(client, getClusterFeatures());</span>
+  }
+
+  private static Mono&lt;ClusterDescription&gt; describeClusterImpl(AdminClient client, Set&lt;SupportedFeature&gt; features) {
+<span class="fc" id="L405">    boolean includeAuthorizedOperations =</span>
+<span class="fc" id="L406">        features.contains(SupportedFeature.DESCRIBE_CLUSTER_INCLUDE_AUTHORIZED_OPERATIONS);</span>
+<span class="fc" id="L407">    DescribeClusterResult result = client.describeCluster(</span>
+<span class="fc" id="L408">        new DescribeClusterOptions().includeAuthorizedOperations(includeAuthorizedOperations));</span>
+<span class="fc" id="L409">    var allOfFuture = KafkaFuture.allOf(</span>
+<span class="fc" id="L410">        result.controller(), result.clusterId(), result.nodes(), result.authorizedOperations());</span>
+<span class="fc" id="L411">    return toMono(allOfFuture).then(</span>
+<span class="fc" id="L412">        Mono.fromCallable(() -&gt;</span>
+<span class="fc" id="L413">          new ClusterDescription(</span>
+<span class="fc" id="L414">            result.controller().get(),</span>
+<span class="fc" id="L415">            result.clusterId().get(),</span>
+<span class="fc" id="L416">            result.nodes().get(),</span>
+<span class="fc" id="L417">            result.authorizedOperations().get()</span>
+          )
+        )
+    );
+  }
+
+  public Mono&lt;Void&gt; deleteConsumerGroups(Collection&lt;String&gt; groupIds) {
+<span class="fc" id="L424">    return toMono(client.deleteConsumerGroups(groupIds).all())</span>
+<span class="fc" id="L425">        .onErrorResume(GroupIdNotFoundException.class,</span>
+<span class="fc" id="L426">            th -&gt; Mono.error(new NotFoundException(&quot;The group id does not exist&quot;)))</span>
+<span class="fc" id="L427">        .onErrorResume(GroupNotEmptyException.class,</span>
+<span class="fc" id="L428">            th -&gt; Mono.error(new IllegalEntityStateException(&quot;The group is not empty&quot;)));</span>
+  }
+
+  public Mono&lt;Void&gt; createTopic(String name,
+                                int numPartitions,
+                                @Nullable Integer replicationFactor,
+                                Map&lt;String, String&gt; configs) {
+<span class="fc" id="L435">    var newTopic = new NewTopic(</span>
+        name,
+<span class="fc" id="L437">        Optional.of(numPartitions),</span>
+<span class="fc" id="L438">        Optional.ofNullable(replicationFactor).map(Integer::shortValue)</span>
+<span class="fc" id="L439">    ).configs(configs);</span>
+<span class="fc" id="L440">    return toMono(client.createTopics(List.of(newTopic)).all());</span>
+  }
+
+  public Mono&lt;Void&gt; alterPartitionReassignments(
+      Map&lt;TopicPartition, Optional&lt;NewPartitionReassignment&gt;&gt; reassignments) {
+<span class="nc" id="L445">    return toMono(client.alterPartitionReassignments(reassignments).all());</span>
+  }
+
+  public Mono&lt;Void&gt; createPartitions(Map&lt;String, NewPartitions&gt; newPartitionsMap) {
+<span class="fc" id="L449">    return toMono(client.createPartitions(newPartitionsMap).all());</span>
+  }
+
+
+  // NOTE: places whole current topic config with new one. Entries that were present in old config,
+  // but missed in new will be set to default
+  public Mono&lt;Void&gt; updateTopicConfig(String topicName, Map&lt;String, String&gt; configs) {
+<span class="pc bpc" id="L456" title="1 of 2 branches missed.">    if (getClusterFeatures().contains(SupportedFeature.INCREMENTAL_ALTER_CONFIGS)) {</span>
+<span class="fc" id="L457">      return getTopicsConfigImpl(List.of(topicName), false)</span>
+<span class="fc" id="L458">          .map(conf -&gt; conf.getOrDefault(topicName, List.of()))</span>
+<span class="fc" id="L459">          .flatMap(currentConfigs -&gt; incrementalAlterConfig(topicName, currentConfigs, configs));</span>
+    } else {
+<span class="nc" id="L461">      return alterConfig(topicName, configs);</span>
+    }
+  }
+
+  public Mono&lt;List&lt;String&gt;&gt; listConsumerGroupNames() {
+<span class="fc" id="L466">    return listConsumerGroups().map(lst -&gt; lst.stream().map(ConsumerGroupListing::groupId).toList());</span>
+  }
+
+  public Mono&lt;Collection&lt;ConsumerGroupListing&gt;&gt; listConsumerGroups() {
+<span class="fc" id="L470">    return toMono(client.listConsumerGroups().all());</span>
+  }
+
+  public Mono&lt;Map&lt;String, ConsumerGroupDescription&gt;&gt; describeConsumerGroups(Collection&lt;String&gt; groupIds) {
+<span class="fc" id="L474">    return partitionCalls(</span>
+        groupIds,
+        25,
+        4,
+<span class="fc" id="L478">        ids -&gt; toMono(client.describeConsumerGroups(ids).all()),</span>
+<span class="fc" id="L479">        mapMerger()</span>
+    );
+  }
+
+  // group -&gt; partition -&gt; offset
+  // NOTE: partitions with no committed offsets will be skipped
+  public Mono&lt;Table&lt;String, TopicPartition, Long&gt;&gt; listConsumerGroupOffsets(List&lt;String&gt; consumerGroups,
+                                                                            // all partitions if null passed
+                                                                            @Nullable List&lt;TopicPartition&gt; partitions) {
+<span class="fc" id="L488">    Function&lt;Collection&lt;String&gt;, Mono&lt;Map&lt;String, Map&lt;TopicPartition, OffsetAndMetadata&gt;&gt;&gt;&gt; call =</span>
+<span class="fc" id="L489">        groups -&gt; toMono(</span>
+<span class="fc" id="L490">            client.listConsumerGroupOffsets(</span>
+<span class="fc" id="L491">                groups.stream()</span>
+<span class="fc" id="L492">                    .collect(Collectors.toMap(</span>
+<span class="fc" id="L493">                        g -&gt; g,</span>
+<span class="fc" id="L494">                        g -&gt; new ListConsumerGroupOffsetsSpec().topicPartitions(partitions)</span>
+<span class="fc" id="L495">                    ))).all()</span>
+        );
+
+<span class="fc" id="L498">    Mono&lt;Map&lt;String, Map&lt;TopicPartition, OffsetAndMetadata&gt;&gt;&gt; merged = partitionCalls(</span>
+        consumerGroups,
+        25,
+        4,
+        call,
+<span class="fc" id="L503">        mapMerger()</span>
+    );
+
+<span class="fc" id="L506">    return merged.map(map -&gt; {</span>
+<span class="fc" id="L507">      var table = ImmutableTable.&lt;String, TopicPartition, Long&gt;builder();</span>
+<span class="fc" id="L508">      map.forEach((g, tpOffsets) -&gt; tpOffsets.forEach((tp, offset) -&gt; {</span>
+<span class="fc bfc" id="L509" title="All 2 branches covered.">        if (offset != null) {</span>
+          // offset will be null for partitions that don't have committed offset for this group
+<span class="fc" id="L511">          table.put(g, tp, offset.offset());</span>
+        }
+<span class="fc" id="L513">      }));</span>
+<span class="fc" id="L514">      return table.build();</span>
+    });
+  }
+
+  public Mono&lt;Void&gt; alterConsumerGroupOffsets(String groupId, Map&lt;TopicPartition, Long&gt; offsets) {
+<span class="fc" id="L519">    return toMono(client.alterConsumerGroupOffsets(</span>
+            groupId,
+<span class="fc" id="L521">            offsets.entrySet().stream()</span>
+<span class="fc" id="L522">                .collect(toMap(Map.Entry::getKey, e -&gt; new OffsetAndMetadata(e.getValue()))))</span>
+<span class="fc" id="L523">        .all());</span>
+  }
+
+  /**
+   * List offset for the topic's partitions and OffsetSpec.
+   *
+   * @param failOnUnknownLeader true - throw exception in case of no-leader partitions,
+   *                            false - skip partitions with no leader
+   */
+  public Mono&lt;Map&lt;TopicPartition, Long&gt;&gt; listTopicOffsets(String topic,
+                                                          OffsetSpec offsetSpec,
+                                                          boolean failOnUnknownLeader) {
+<span class="fc" id="L535">    return describeTopic(topic)</span>
+<span class="fc" id="L536">        .map(td -&gt; filterPartitionsWithLeaderCheck(List.of(td), p -&gt; true, failOnUnknownLeader))</span>
+<span class="fc" id="L537">        .flatMap(partitions -&gt; listOffsetsUnsafe(partitions, offsetSpec));</span>
+  }
+
+  /**
+   * List offset for the specified partitions and OffsetSpec.
+   *
+   * @param failOnUnknownLeader true - throw exception in case of no-leader partitions,
+   *                            false - skip partitions with no leader
+   */
+  public Mono&lt;Map&lt;TopicPartition, Long&gt;&gt; listOffsets(Collection&lt;TopicPartition&gt; partitions,
+                                                     OffsetSpec offsetSpec,
+                                                     boolean failOnUnknownLeader) {
+<span class="fc" id="L549">    return filterPartitionsWithLeaderCheck(partitions, failOnUnknownLeader)</span>
+<span class="fc" id="L550">        .flatMap(parts -&gt; listOffsetsUnsafe(parts, offsetSpec));</span>
+  }
+
+  /**
+   * List offset for the specified topics, skipping no-leader partitions.
+   */
+  public Mono&lt;Map&lt;TopicPartition, Long&gt;&gt; listOffsets(Collection&lt;TopicDescription&gt; topicDescriptions,
+                                                     OffsetSpec offsetSpec) {
+<span class="fc" id="L558">    return listOffsetsUnsafe(filterPartitionsWithLeaderCheck(topicDescriptions, p -&gt; true, false), offsetSpec);</span>
+  }
+
+  private Mono&lt;Collection&lt;TopicPartition&gt;&gt; filterPartitionsWithLeaderCheck(Collection&lt;TopicPartition&gt; partitions,
+                                                                           boolean failOnUnknownLeader) {
+<span class="fc" id="L563">    var targetTopics = partitions.stream().map(TopicPartition::topic).collect(Collectors.toSet());</span>
+<span class="fc" id="L564">    return describeTopicsImpl(targetTopics)</span>
+<span class="fc" id="L565">        .map(descriptions -&gt;</span>
+<span class="fc" id="L566">            filterPartitionsWithLeaderCheck(</span>
+<span class="fc" id="L567">                descriptions.values(), partitions::contains, failOnUnknownLeader));</span>
+  }
+
+  @VisibleForTesting
+  static Set&lt;TopicPartition&gt; filterPartitionsWithLeaderCheck(Collection&lt;TopicDescription&gt; topicDescriptions,
+                                                              Predicate&lt;TopicPartition&gt; partitionPredicate,
+                                                              boolean failOnUnknownLeader) {
+<span class="fc" id="L574">    var goodPartitions = new HashSet&lt;TopicPartition&gt;();</span>
+<span class="fc bfc" id="L575" title="All 2 branches covered.">    for (TopicDescription description : topicDescriptions) {</span>
+<span class="fc" id="L576">      var goodTopicPartitions = new ArrayList&lt;TopicPartition&gt;();</span>
+<span class="fc bfc" id="L577" title="All 2 branches covered.">      for (TopicPartitionInfo partitionInfo : description.partitions()) {</span>
+<span class="fc" id="L578">        TopicPartition topicPartition = new TopicPartition(description.name(), partitionInfo.partition());</span>
+<span class="fc bfc" id="L579" title="All 2 branches covered.">        if (partitionInfo.leader() == null) {</span>
+<span class="fc bfc" id="L580" title="All 2 branches covered.">          if (failOnUnknownLeader) {</span>
+<span class="fc" id="L581">            throw new ValidationException(String.format(&quot;Topic partition %s has no leader&quot;, topicPartition));</span>
+          } else {
+            // if ANY of topic partitions has no leader - we have to skip all topic partitions
+<span class="fc" id="L584">            goodTopicPartitions.clear();</span>
+<span class="fc" id="L585">            break;</span>
+          }
+        }
+<span class="fc bfc" id="L588" title="All 2 branches covered.">        if (partitionPredicate.test(topicPartition)) {</span>
+<span class="fc" id="L589">          goodTopicPartitions.add(topicPartition);</span>
+        }
+<span class="fc" id="L591">      }</span>
+<span class="fc" id="L592">      goodPartitions.addAll(goodTopicPartitions);</span>
+<span class="fc" id="L593">    }</span>
+<span class="fc" id="L594">    return goodPartitions;</span>
+  }
+
+  // 1. NOTE(!): should only apply for partitions from topics where all partitions have leaders,
+  //    otherwise AdminClient will try to fetch topic metadata, fail and retry infinitely (until timeout)
+  // 2. NOTE(!): Skips partitions that were not initialized yet
+  //    (UnknownTopicOrPartitionException thrown, ex. after topic creation)
+  // 3. TODO: check if it is a bug that AdminClient never throws LeaderNotAvailableException and just retrying instead
+  @KafkaClientInternalsDependant
+  @VisibleForTesting
+  Mono&lt;Map&lt;TopicPartition, Long&gt;&gt; listOffsetsUnsafe(Collection&lt;TopicPartition&gt; partitions, OffsetSpec offsetSpec) {
+<span class="fc bfc" id="L605" title="All 2 branches covered.">    if (partitions.isEmpty()) {</span>
+<span class="fc" id="L606">      return Mono.just(Map.of());</span>
+    }
+
+<span class="fc" id="L609">    Function&lt;Collection&lt;TopicPartition&gt;, Mono&lt;Map&lt;TopicPartition, Long&gt;&gt;&gt; call =</span>
+        parts -&gt; {
+<span class="fc" id="L611">          ListOffsetsResult r = client.listOffsets(parts.stream().collect(toMap(tp -&gt; tp, tp -&gt; offsetSpec)));</span>
+<span class="fc" id="L612">          Map&lt;TopicPartition, KafkaFuture&lt;ListOffsetsResultInfo&gt;&gt; perPartitionResults = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L613">          parts.forEach(p -&gt; perPartitionResults.put(p, r.partitionResult(p)));</span>
+
+<span class="fc" id="L615">          return toMonoWithExceptionFilter(perPartitionResults, UnknownTopicOrPartitionException.class)</span>
+<span class="fc" id="L616">              .map(offsets -&gt; offsets.entrySet().stream()</span>
+                  // filtering partitions for which offsets were not found
+<span class="fc bfc" id="L618" title="All 2 branches covered.">                  .filter(e -&gt; e.getValue().offset() &gt;= 0)</span>
+<span class="fc" id="L619">                  .collect(toMap(Map.Entry::getKey, e -&gt; e.getValue().offset())));</span>
+        };
+
+<span class="fc" id="L622">    return partitionCalls(</span>
+        partitions,
+        200,
+        call,
+<span class="fc" id="L626">        mapMerger()</span>
+    );
+  }
+
+  public Mono&lt;Collection&lt;AclBinding&gt;&gt; listAcls(ResourcePatternFilter filter) {
+<span class="nc" id="L631">    Preconditions.checkArgument(getClusterFeatures().contains(SupportedFeature.AUTHORIZED_SECURITY_ENABLED));</span>
+<span class="nc" id="L632">    return toMono(client.describeAcls(new AclBindingFilter(filter, AccessControlEntryFilter.ANY)).values());</span>
+  }
+
+  public Mono&lt;Void&gt; createAcls(Collection&lt;AclBinding&gt; aclBindings) {
+<span class="nc" id="L636">    Preconditions.checkArgument(getClusterFeatures().contains(SupportedFeature.AUTHORIZED_SECURITY_ENABLED));</span>
+<span class="nc" id="L637">    return toMono(client.createAcls(aclBindings).all());</span>
+  }
+
+  public Mono&lt;Void&gt; deleteAcls(Collection&lt;AclBinding&gt; aclBindings) {
+<span class="nc" id="L641">    Preconditions.checkArgument(getClusterFeatures().contains(SupportedFeature.AUTHORIZED_SECURITY_ENABLED));</span>
+<span class="nc" id="L642">    var filters = aclBindings.stream().map(AclBinding::toFilter).collect(Collectors.toSet());</span>
+<span class="nc" id="L643">    return toMono(client.deleteAcls(filters).all()).then();</span>
+  }
+
+  public Mono&lt;Void&gt; updateBrokerConfigByName(Integer brokerId, String name, String value) {
+<span class="fc" id="L647">    ConfigResource cr = new ConfigResource(ConfigResource.Type.BROKER, String.valueOf(brokerId));</span>
+<span class="fc" id="L648">    AlterConfigOp op = new AlterConfigOp(new ConfigEntry(name, value), AlterConfigOp.OpType.SET);</span>
+<span class="fc" id="L649">    return toMono(client.incrementalAlterConfigs(Map.of(cr, List.of(op))).all());</span>
+  }
+
+  public Mono&lt;Void&gt; deleteRecords(Map&lt;TopicPartition, Long&gt; offsets) {
+<span class="fc" id="L653">    var records = offsets.entrySet().stream()</span>
+<span class="fc" id="L654">        .map(entry -&gt; Map.entry(entry.getKey(), RecordsToDelete.beforeOffset(entry.getValue())))</span>
+<span class="fc" id="L655">        .collect(toMap(Map.Entry::getKey, Map.Entry::getValue));</span>
+<span class="fc" id="L656">    return toMono(client.deleteRecords(records).all());</span>
+  }
+
+  public Mono&lt;Void&gt; alterReplicaLogDirs(Map&lt;TopicPartitionReplica, String&gt; replicaAssignment) {
+<span class="fc" id="L660">    return toMono(client.alterReplicaLogDirs(replicaAssignment).all());</span>
+  }
+
+  // returns tp -&gt; list of active producer's states (if any)
+  public Mono&lt;Map&lt;TopicPartition, List&lt;ProducerState&gt;&gt;&gt; getActiveProducersState(String topic) {
+<span class="nc" id="L665">    return describeTopic(topic)</span>
+<span class="nc" id="L666">        .map(td -&gt; client.describeProducers(</span>
+<span class="nc" id="L667">                IntStream.range(0, td.partitions().size())</span>
+<span class="nc" id="L668">                    .mapToObj(i -&gt; new TopicPartition(topic, i))</span>
+<span class="nc" id="L669">                    .toList()</span>
+<span class="nc" id="L670">            ).all()</span>
+        )
+<span class="nc" id="L672">        .flatMap(ReactiveAdminClient::toMono)</span>
+<span class="nc" id="L673">        .map(map -&gt; map.entrySet().stream()</span>
+<span class="nc bnc" id="L674" title="All 2 branches missed.">            .filter(e -&gt; !e.getValue().activeProducers().isEmpty()) // skipping partitions without producers</span>
+<span class="nc" id="L675">            .collect(toMap(Map.Entry::getKey, e -&gt; e.getValue().activeProducers())));</span>
+  }
+
+  private Mono&lt;Void&gt; incrementalAlterConfig(String topicName,
+                                            List&lt;ConfigEntry&gt; currentConfigs,
+                                            Map&lt;String, String&gt; newConfigs) {
+<span class="fc" id="L681">    var configsToDelete = currentConfigs.stream()</span>
+<span class="fc bfc" id="L682" title="All 2 branches covered.">        .filter(e -&gt; e.source() == ConfigEntry.ConfigSource.DYNAMIC_TOPIC_CONFIG) //manually set configs only</span>
+<span class="fc bfc" id="L683" title="All 2 branches covered.">        .filter(e -&gt; !newConfigs.containsKey(e.name()))</span>
+<span class="fc" id="L684">        .map(e -&gt; new AlterConfigOp(e, AlterConfigOp.OpType.DELETE));</span>
+
+<span class="fc" id="L686">    var configsToSet = newConfigs.entrySet().stream()</span>
+<span class="fc" id="L687">        .map(e -&gt; new AlterConfigOp(new ConfigEntry(e.getKey(), e.getValue()), AlterConfigOp.OpType.SET));</span>
+
+<span class="fc" id="L689">    return toMono(client.incrementalAlterConfigs(</span>
+<span class="fc" id="L690">        Map.of(</span>
+            new ConfigResource(ConfigResource.Type.TOPIC, topicName),
+<span class="fc" id="L692">            Stream.concat(configsToDelete, configsToSet).toList()</span>
+<span class="fc" id="L693">        )).all());</span>
+  }
+
+  @SuppressWarnings(&quot;deprecation&quot;)
+  private Mono&lt;Void&gt; alterConfig(String topicName, Map&lt;String, String&gt; configs) {
+<span class="nc" id="L698">    List&lt;ConfigEntry&gt; configEntries = configs.entrySet().stream()</span>
+<span class="nc" id="L699">        .flatMap(cfg -&gt; Stream.of(new ConfigEntry(cfg.getKey(), cfg.getValue())))</span>
+<span class="nc" id="L700">        .collect(toList());</span>
+<span class="nc" id="L701">    Config config = new Config(configEntries);</span>
+<span class="nc" id="L702">    var topicResource = new ConfigResource(ConfigResource.Type.TOPIC, topicName);</span>
+<span class="nc" id="L703">    return toMono(client.alterConfigs(Map.of(topicResource, config)).all());</span>
+  }
+
+  /**
+   * Splits input collection into batches, converts each batch into Mono, sequentially subscribes to them
+   * and merges output Monos into one Mono.
+   */
+  private static &lt;R, I&gt; Mono&lt;R&gt; partitionCalls(Collection&lt;I&gt; items,
+                                               int partitionSize,
+                                               Function&lt;Collection&lt;I&gt;, Mono&lt;R&gt;&gt; call,
+                                               BiFunction&lt;R, R, R&gt; merger) {
+<span class="pc bpc" id="L714" title="1 of 2 branches missed.">    if (items.isEmpty()) {</span>
+<span class="nc" id="L715">      return call.apply(items);</span>
+    }
+<span class="fc" id="L717">    Iterable&lt;List&lt;I&gt;&gt; parts = Iterables.partition(items, partitionSize);</span>
+<span class="fc" id="L718">    return Flux.fromIterable(parts)</span>
+<span class="fc" id="L719">        .concatMap(call)</span>
+<span class="fc" id="L720">        .reduce(merger);</span>
+  }
+
+  /**
+   * Splits input collection into batches, converts each batch into Mono, subscribes to them (concurrently,
+   * with specified concurrency level) and merges output Monos into one Mono.
+   */
+  private static &lt;R, I&gt; Mono&lt;R&gt; partitionCalls(Collection&lt;I&gt; items,
+                                               int partitionSize,
+                                               int concurrency,
+                                               Function&lt;Collection&lt;I&gt;, Mono&lt;R&gt;&gt; call,
+                                               BiFunction&lt;R, R, R&gt; merger) {
+<span class="pc bpc" id="L732" title="1 of 2 branches missed.">    if (items.isEmpty()) {</span>
+<span class="nc" id="L733">      return call.apply(items);</span>
+    }
+<span class="fc" id="L735">    Iterable&lt;List&lt;I&gt;&gt; parts = Iterables.partition(items, partitionSize);</span>
+<span class="fc" id="L736">    return Flux.fromIterable(parts)</span>
+<span class="fc" id="L737">        .flatMap(call, concurrency)</span>
+<span class="fc" id="L738">        .reduce(merger);</span>
+  }
+
+  private static &lt;K, V&gt; BiFunction&lt;Map&lt;K, V&gt;, Map&lt;K, V&gt;, Map&lt;K, V&gt;&gt; mapMerger() {
+<span class="fc" id="L742">    return (m1, m2) -&gt; {</span>
+<span class="nc" id="L743">      var merged = new HashMap&lt;K, V&gt;();</span>
+<span class="nc" id="L744">      merged.putAll(m1);</span>
+<span class="nc" id="L745">      merged.putAll(m2);</span>
+<span class="nc" id="L746">      return merged;</span>
+    };
+  }
+
+  @Override
+  public void close() {
+<span class="nc" id="L752">    client.close();</span>
+<span class="nc" id="L753">  }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

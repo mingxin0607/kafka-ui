@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RangePollingEmitter.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">kafka-ui-api</a> &gt; <a href="index.source.html" class="el_package">com.provectus.kafka.ui.emitter</a> &gt; <span class="el_source">RangePollingEmitter.java</span></div><h1>RangePollingEmitter.java</h1><pre class="source lang-java linenums">package com.provectus.kafka.ui.emitter;
+
+import com.provectus.kafka.ui.model.ConsumerPosition;
+import com.provectus.kafka.ui.model.TopicMessageEventDTO;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.TreeMap;
+import java.util.function.Supplier;
+import lombok.extern.slf4j.Slf4j;
+import org.apache.kafka.clients.consumer.ConsumerRecord;
+import org.apache.kafka.common.TopicPartition;
+import org.apache.kafka.common.errors.InterruptException;
+import org.apache.kafka.common.utils.Bytes;
+import reactor.core.publisher.FluxSink;
+
+<span class="fc" id="L16">@Slf4j</span>
+abstract class RangePollingEmitter extends AbstractEmitter {
+
+  private final Supplier&lt;EnhancedConsumer&gt; consumerSupplier;
+  protected final ConsumerPosition consumerPosition;
+  protected final int messagesPerPage;
+
+  protected RangePollingEmitter(Supplier&lt;EnhancedConsumer&gt; consumerSupplier,
+                                ConsumerPosition consumerPosition,
+                                int messagesPerPage,
+                                MessagesProcessing messagesProcessing,
+                                PollingSettings pollingSettings) {
+<span class="fc" id="L28">    super(messagesProcessing, pollingSettings);</span>
+<span class="fc" id="L29">    this.consumerPosition = consumerPosition;</span>
+<span class="fc" id="L30">    this.messagesPerPage = messagesPerPage;</span>
+<span class="fc" id="L31">    this.consumerSupplier = consumerSupplier;</span>
+<span class="fc" id="L32">  }</span>
+
+<span class="fc" id="L34">  protected record FromToOffset(/*inclusive*/ long from, /*exclusive*/ long to) {</span>
+  }
+
+  //should return empty map if polling should be stopped
+  protected abstract TreeMap&lt;TopicPartition, FromToOffset&gt; nextPollingRange(
+      TreeMap&lt;TopicPartition, FromToOffset&gt; prevRange, //empty on start
+      SeekOperations seekOperations
+  );
+
+  @Override
+  public void accept(FluxSink&lt;TopicMessageEventDTO&gt; sink) {
+<span class="fc" id="L45">    log.debug(&quot;Starting polling for {}&quot;, consumerPosition);</span>
+<span class="fc" id="L46">    try (EnhancedConsumer consumer = consumerSupplier.get()) {</span>
+<span class="fc" id="L47">      sendPhase(sink, &quot;Consumer created&quot;);</span>
+<span class="fc" id="L48">      var seekOperations = SeekOperations.create(consumer, consumerPosition);</span>
+<span class="fc" id="L49">      TreeMap&lt;TopicPartition, FromToOffset&gt; pollRange = nextPollingRange(new TreeMap&lt;&gt;(), seekOperations);</span>
+<span class="fc" id="L50">      log.debug(&quot;Starting from offsets {}&quot;, pollRange);</span>
+
+<span class="pc bpc" id="L52" title="1 of 6 branches missed.">      while (!sink.isCancelled() &amp;&amp; !pollRange.isEmpty() &amp;&amp; !sendLimitReached()) {</span>
+<span class="fc" id="L53">        var polled = poll(consumer, sink, pollRange);</span>
+<span class="fc" id="L54">        send(sink, polled);</span>
+<span class="fc" id="L55">        pollRange = nextPollingRange(pollRange, seekOperations);</span>
+<span class="fc" id="L56">      }</span>
+<span class="fc bfc" id="L57" title="All 2 branches covered.">      if (sink.isCancelled()) {</span>
+<span class="fc" id="L58">        log.debug(&quot;Polling finished due to sink cancellation&quot;);</span>
+      }
+<span class="fc" id="L60">      sendFinishStatsAndCompleteSink(sink);</span>
+<span class="fc" id="L61">      log.debug(&quot;Polling finished&quot;);</span>
+<span class="nc" id="L62">    } catch (InterruptException kafkaInterruptException) {</span>
+<span class="nc" id="L63">      log.debug(&quot;Polling finished due to thread interruption&quot;);</span>
+<span class="nc" id="L64">      sink.complete();</span>
+<span class="nc" id="L65">    } catch (Exception e) {</span>
+<span class="nc" id="L66">      log.error(&quot;Error occurred while consuming records&quot;, e);</span>
+<span class="nc" id="L67">      sink.error(e);</span>
+<span class="pc" id="L68">    }</span>
+<span class="fc" id="L69">  }</span>
+
+  private List&lt;ConsumerRecord&lt;Bytes, Bytes&gt;&gt; poll(EnhancedConsumer consumer,
+                                                  FluxSink&lt;TopicMessageEventDTO&gt; sink,
+                                                  TreeMap&lt;TopicPartition, FromToOffset&gt; range) {
+<span class="fc" id="L74">    log.trace(&quot;Polling range {}&quot;, range);</span>
+<span class="fc" id="L75">    sendPhase(sink,</span>
+<span class="fc" id="L76">        &quot;Polling partitions: %s&quot;.formatted(range.keySet().stream().map(TopicPartition::partition).sorted().toList()));</span>
+
+<span class="fc" id="L78">    consumer.assign(range.keySet());</span>
+<span class="fc" id="L79">    range.forEach((tp, fromTo) -&gt; consumer.seek(tp, fromTo.from));</span>
+
+<span class="fc" id="L81">    List&lt;ConsumerRecord&lt;Bytes, Bytes&gt;&gt; result = new ArrayList&lt;&gt;();</span>
+<span class="pc bpc" id="L82" title="1 of 4 branches missed.">    while (!sink.isCancelled() &amp;&amp; consumer.paused().size() &lt; range.size()) {</span>
+<span class="fc" id="L83">      var polledRecords = poll(sink, consumer);</span>
+<span class="fc" id="L84">      range.forEach((tp, fromTo) -&gt; {</span>
+<span class="fc" id="L85">        polledRecords.records(tp).stream()</span>
+<span class="fc bfc" id="L86" title="All 2 branches covered.">            .filter(r -&gt; r.offset() &lt; fromTo.to)</span>
+<span class="fc" id="L87">            .forEach(result::add);</span>
+
+        //next position is out of target range -&gt; pausing partition
+<span class="fc bfc" id="L90" title="All 2 branches covered.">        if (consumer.position(tp) &gt;= fromTo.to) {</span>
+<span class="fc" id="L91">          consumer.pause(List.of(tp));</span>
+        }
+<span class="fc" id="L93">      });</span>
+<span class="fc" id="L94">    }</span>
+<span class="fc" id="L95">    consumer.resume(consumer.paused());</span>
+<span class="fc" id="L96">    return result;</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

@@ -1,0 +1,189 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>GithubAuthorityExtractor.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">kafka-ui-api</a> &gt; <a href="index.source.html" class="el_package">com.provectus.kafka.ui.service.rbac.extractor</a> &gt; <span class="el_source">GithubAuthorityExtractor.java</span></div><h1>GithubAuthorityExtractor.java</h1><pre class="source lang-java linenums">package com.provectus.kafka.ui.service.rbac.extractor;
+
+import static com.provectus.kafka.ui.model.rbac.provider.Provider.Name.GITHUB;
+
+import com.provectus.kafka.ui.model.rbac.Role;
+import com.provectus.kafka.ui.model.rbac.provider.Provider;
+import com.provectus.kafka.ui.service.rbac.AccessControlService;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.http.HttpHeaders;
+import org.springframework.security.config.oauth2.client.CommonOAuth2Provider;
+import org.springframework.security.oauth2.client.userinfo.OAuth2UserRequest;
+import org.springframework.security.oauth2.core.user.DefaultOAuth2User;
+import org.springframework.web.reactive.function.client.WebClient;
+import reactor.core.publisher.Mono;
+
+<span class="nc" id="L25">@Slf4j</span>
+<span class="nc" id="L26">public class GithubAuthorityExtractor implements ProviderAuthorityExtractor {</span>
+
+  private static final String ORGANIZATION_ATTRIBUTE_NAME = &quot;organizations_url&quot;;
+  private static final String USERNAME_ATTRIBUTE_NAME = &quot;login&quot;;
+  private static final String ORGANIZATION_NAME = &quot;login&quot;;
+  private static final String ORGANIZATION = &quot;organization&quot;;
+  private static final String TEAM_NAME = &quot;slug&quot;;
+  private static final String GITHUB_ACCEPT_HEADER = &quot;application/vnd.github+json&quot;;
+  private static final String DUMMY = &quot;dummy&quot;;
+  // The number of results (max 100) per page of list organizations for authenticated user.
+<span class="nc" id="L36">  private static final Integer ORGANIZATIONS_PER_PAGE = 100;</span>
+
+  @Override
+  public boolean isApplicable(String provider, Map&lt;String, String&gt; customParams) {
+<span class="nc bnc" id="L40" title="All 4 branches missed.">    return GITHUB.equalsIgnoreCase(provider) || GITHUB.equalsIgnoreCase(customParams.get(TYPE));</span>
+  }
+
+  @Override
+  public Mono&lt;Set&lt;String&gt;&gt; extract(AccessControlService acs, Object value, Map&lt;String, Object&gt; additionalParams) {
+    DefaultOAuth2User principal;
+    try {
+<span class="nc" id="L47">      principal = (DefaultOAuth2User) value;</span>
+<span class="nc" id="L48">    } catch (ClassCastException e) {</span>
+<span class="nc" id="L49">      log.error(&quot;Can't cast value to DefaultOAuth2User&quot;, e);</span>
+<span class="nc" id="L50">      throw new RuntimeException();</span>
+<span class="nc" id="L51">    }</span>
+
+<span class="nc" id="L53">    Set&lt;String&gt; rolesByUsername = new HashSet&lt;&gt;();</span>
+<span class="nc" id="L54">    String username = principal.getAttribute(USERNAME_ATTRIBUTE_NAME);</span>
+<span class="nc bnc" id="L55" title="All 2 branches missed.">    if (username == null) {</span>
+<span class="nc" id="L56">      log.debug(&quot;Github username param is not present&quot;);</span>
+    } else {
+<span class="nc" id="L58">      acs.getRoles()</span>
+<span class="nc" id="L59">          .stream()</span>
+<span class="nc" id="L60">          .filter(r -&gt; r.getSubjects()</span>
+<span class="nc" id="L61">              .stream()</span>
+<span class="nc" id="L62">              .filter(s -&gt; s.getProvider().equals(Provider.OAUTH_GITHUB))</span>
+<span class="nc" id="L63">              .filter(s -&gt; s.getType().equals(&quot;user&quot;))</span>
+<span class="nc" id="L64">              .anyMatch(s -&gt; s.getValue().equals(username)))</span>
+<span class="nc" id="L65">          .map(Role::getName)</span>
+<span class="nc" id="L66">          .forEach(rolesByUsername::add);</span>
+    }
+
+<span class="nc" id="L69">    OAuth2UserRequest req = (OAuth2UserRequest) additionalParams.get(&quot;request&quot;);</span>
+<span class="nc" id="L70">    String infoEndpoint = req.getClientRegistration().getProviderDetails().getUserInfoEndpoint().getUri();</span>
+
+<span class="nc bnc" id="L72" title="All 2 branches missed.">    if (infoEndpoint == null) {</span>
+<span class="nc" id="L73">      infoEndpoint = CommonOAuth2Provider.GITHUB</span>
+<span class="nc" id="L74">          .getBuilder(DUMMY)</span>
+<span class="nc" id="L75">          .clientId(DUMMY)</span>
+<span class="nc" id="L76">          .build()</span>
+<span class="nc" id="L77">          .getProviderDetails()</span>
+<span class="nc" id="L78">          .getUserInfoEndpoint()</span>
+<span class="nc" id="L79">          .getUri();</span>
+    }
+<span class="nc" id="L81">    var webClient = WebClient.create(infoEndpoint);</span>
+
+<span class="nc" id="L83">    Mono&lt;Set&lt;String&gt;&gt; rolesByOrganization = getOrganizationRoles(principal, additionalParams, acs, webClient);</span>
+<span class="nc" id="L84">    Mono&lt;Set&lt;String&gt;&gt; rolesByTeams = getTeamRoles(webClient, additionalParams, acs);</span>
+
+<span class="nc" id="L86">    return Mono.zip(rolesByOrganization, rolesByTeams)</span>
+<span class="nc" id="L87">        .map((t) -&gt; Stream.of(t.getT1(), t.getT2(), rolesByUsername)</span>
+<span class="nc" id="L88">            .flatMap(Collection::stream)</span>
+<span class="nc" id="L89">            .collect(Collectors.toSet()));</span>
+  }
+
+  private Mono&lt;Set&lt;String&gt;&gt; getOrganizationRoles(DefaultOAuth2User principal, Map&lt;String, Object&gt; additionalParams,
+                                                 AccessControlService acs, WebClient webClient) {
+<span class="nc" id="L94">    String organization = principal.getAttribute(ORGANIZATION_ATTRIBUTE_NAME);</span>
+<span class="nc bnc" id="L95" title="All 2 branches missed.">    if (organization == null) {</span>
+<span class="nc" id="L96">      log.debug(&quot;Github organization param is not present&quot;);</span>
+<span class="nc" id="L97">      return Mono.just(Collections.emptySet());</span>
+    }
+
+<span class="nc" id="L100">    final Mono&lt;List&lt;Map&lt;String, Object&gt;&gt;&gt; userOrganizations = webClient</span>
+<span class="nc" id="L101">        .get()</span>
+<span class="nc" id="L102">        .uri(uriBuilder -&gt; uriBuilder.path(&quot;/orgs&quot;)</span>
+<span class="nc" id="L103">            .queryParam(&quot;per_page&quot;, ORGANIZATIONS_PER_PAGE)</span>
+<span class="nc" id="L104">            .build())</span>
+<span class="nc" id="L105">        .headers(headers -&gt; {</span>
+<span class="nc" id="L106">          headers.set(HttpHeaders.ACCEPT, GITHUB_ACCEPT_HEADER);</span>
+<span class="nc" id="L107">          OAuth2UserRequest request = (OAuth2UserRequest) additionalParams.get(&quot;request&quot;);</span>
+<span class="nc" id="L108">          headers.setBearerAuth(request.getAccessToken().getTokenValue());</span>
+<span class="nc" id="L109">        })</span>
+<span class="nc" id="L110">        .retrieve()</span>
+        //@formatter:off
+<span class="nc" id="L112">        .bodyToMono(new ParameterizedTypeReference&lt;&gt;() {});</span>
+    //@formatter:on
+
+<span class="nc" id="L115">    return userOrganizations</span>
+<span class="nc" id="L116">        .map(orgsMap -&gt; acs.getRoles()</span>
+<span class="nc" id="L117">            .stream()</span>
+<span class="nc" id="L118">            .filter(role -&gt; role.getSubjects()</span>
+<span class="nc" id="L119">                .stream()</span>
+<span class="nc" id="L120">                .filter(s -&gt; s.getProvider().equals(Provider.OAUTH_GITHUB))</span>
+<span class="nc" id="L121">                .filter(s -&gt; s.getType().equals(ORGANIZATION))</span>
+<span class="nc" id="L122">                .anyMatch(subject -&gt; orgsMap.stream()</span>
+<span class="nc" id="L123">                    .map(org -&gt; org.get(ORGANIZATION_NAME).toString())</span>
+<span class="nc" id="L124">                    .anyMatch(orgName -&gt; orgName.equalsIgnoreCase(subject.getValue()))</span>
+                ))
+<span class="nc" id="L126">            .map(Role::getName)</span>
+<span class="nc" id="L127">            .collect(Collectors.toSet()));</span>
+  }
+
+  @SuppressWarnings(&quot;unchecked&quot;)
+  private Mono&lt;Set&lt;String&gt;&gt; getTeamRoles(WebClient webClient, Map&lt;String, Object&gt; additionalParams,
+                                         AccessControlService acs) {
+
+<span class="nc" id="L134">    var requestedTeams = acs.getRoles()</span>
+<span class="nc" id="L135">        .stream()</span>
+<span class="nc" id="L136">        .filter(r -&gt; r.getSubjects()</span>
+<span class="nc" id="L137">            .stream()</span>
+<span class="nc" id="L138">            .filter(s -&gt; s.getProvider().equals(Provider.OAUTH_GITHUB))</span>
+<span class="nc" id="L139">            .anyMatch(s -&gt; s.getType().equals(&quot;team&quot;)))</span>
+<span class="nc" id="L140">        .collect(Collectors.toSet());</span>
+
+<span class="nc bnc" id="L142" title="All 2 branches missed.">    if (requestedTeams.isEmpty()) {</span>
+<span class="nc" id="L143">      log.debug(&quot;No roles with github teams found, skipping&quot;);</span>
+<span class="nc" id="L144">      return Mono.just(Collections.emptySet());</span>
+    }
+
+<span class="nc" id="L147">    final Mono&lt;List&lt;Map&lt;String, Object&gt;&gt;&gt; rawTeams = webClient</span>
+<span class="nc" id="L148">        .get()</span>
+<span class="nc" id="L149">        .uri(uriBuilder -&gt; uriBuilder.path(&quot;/teams&quot;)</span>
+<span class="nc" id="L150">            .queryParam(&quot;per_page&quot;, ORGANIZATIONS_PER_PAGE)</span>
+<span class="nc" id="L151">            .build())</span>
+<span class="nc" id="L152">        .headers(headers -&gt; {</span>
+<span class="nc" id="L153">          headers.set(HttpHeaders.ACCEPT, GITHUB_ACCEPT_HEADER);</span>
+<span class="nc" id="L154">          OAuth2UserRequest request = (OAuth2UserRequest) additionalParams.get(&quot;request&quot;);</span>
+<span class="nc" id="L155">          headers.setBearerAuth(request.getAccessToken().getTokenValue());</span>
+<span class="nc" id="L156">        })</span>
+<span class="nc" id="L157">        .retrieve()</span>
+        //@formatter:off
+<span class="nc" id="L159">        .bodyToMono(new ParameterizedTypeReference&lt;&gt;() {});</span>
+    //@formatter:on
+
+<span class="nc" id="L162">    final Mono&lt;List&lt;String&gt;&gt; mappedTeams = rawTeams</span>
+<span class="nc" id="L163">        .map(teams -&gt; teams.stream()</span>
+<span class="nc" id="L164">            .map(teamInfo -&gt; {</span>
+<span class="nc" id="L165">              var name = teamInfo.get(TEAM_NAME);</span>
+<span class="nc" id="L166">              var orgInfo = (Map&lt;String, Object&gt;) teamInfo.get(ORGANIZATION);</span>
+<span class="nc" id="L167">              var orgName = orgInfo.get(ORGANIZATION_NAME);</span>
+<span class="nc" id="L168">              return orgName + &quot;/&quot; + name;</span>
+            })
+<span class="nc" id="L170">            .map(Object::toString)</span>
+<span class="nc" id="L171">            .collect(Collectors.toList())</span>
+        );
+
+<span class="nc" id="L174">    return mappedTeams</span>
+<span class="nc" id="L175">        .map(teams -&gt; acs.getRoles()</span>
+<span class="nc" id="L176">            .stream()</span>
+<span class="nc" id="L177">            .filter(role -&gt; role.getSubjects()</span>
+<span class="nc" id="L178">                .stream()</span>
+<span class="nc" id="L179">                .filter(s -&gt; s.getProvider().equals(Provider.OAUTH_GITHUB))</span>
+<span class="nc" id="L180">                .filter(s -&gt; s.getType().equals(&quot;team&quot;))</span>
+<span class="nc" id="L181">                .anyMatch(subject -&gt; teams.stream()</span>
+<span class="nc" id="L182">                    .anyMatch(teamName -&gt; teamName.equalsIgnoreCase(subject.getValue()))</span>
+                ))
+<span class="nc" id="L184">            .map(Role::getName)</span>
+<span class="nc" id="L185">            .collect(Collectors.toSet()));</span>
+  }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

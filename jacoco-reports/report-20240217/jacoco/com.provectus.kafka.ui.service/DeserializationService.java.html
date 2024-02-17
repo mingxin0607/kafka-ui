@@ -1,0 +1,156 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DeserializationService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">kafka-ui-api</a> &gt; <a href="index.source.html" class="el_package">com.provectus.kafka.ui.service</a> &gt; <span class="el_source">DeserializationService.java</span></div><h1>DeserializationService.java</h1><pre class="source lang-java linenums">package com.provectus.kafka.ui.service;
+
+import com.provectus.kafka.ui.config.ClustersProperties;
+import com.provectus.kafka.ui.model.KafkaCluster;
+import com.provectus.kafka.ui.model.SerdeDescriptionDTO;
+import com.provectus.kafka.ui.serde.api.SchemaDescription;
+import com.provectus.kafka.ui.serde.api.Serde;
+import com.provectus.kafka.ui.serdes.ClusterSerdes;
+import com.provectus.kafka.ui.serdes.ConsumerRecordDeserializer;
+import com.provectus.kafka.ui.serdes.ProducerRecordCreator;
+import com.provectus.kafka.ui.serdes.SerdeInstance;
+import com.provectus.kafka.ui.serdes.SerdesInitializer;
+import java.io.Closeable;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import javax.annotation.Nullable;
+import javax.validation.ValidationException;
+import org.springframework.core.env.Environment;
+import org.springframework.stereotype.Component;
+
+/**
+ * Class is responsible for managing serdes for kafka clusters.
+ * NOTE: Since Serde interface is designed to be blocking it is required that DeserializationService
+ * (and all Serde-related code) calls executed within special thread pool (boundedElastic).
+ */
+@Component
+public class DeserializationService implements Closeable {
+
+<span class="fc" id="L31">  private final Map&lt;String, ClusterSerdes&gt; clusterSerdes = new ConcurrentHashMap&lt;&gt;();</span>
+
+  public DeserializationService(Environment env,
+                                ClustersStorage clustersStorage,
+<span class="fc" id="L35">                                ClustersProperties clustersProperties) {</span>
+<span class="fc" id="L36">    var serdesInitializer = new SerdesInitializer();</span>
+<span class="fc bfc" id="L37" title="All 2 branches covered.">    for (int i = 0; i &lt; clustersProperties.getClusters().size(); i++) {</span>
+<span class="fc" id="L38">      var clusterProperties = clustersProperties.getClusters().get(i);</span>
+<span class="fc" id="L39">      var cluster = clustersStorage.getClusterByName(clusterProperties.getName()).get();</span>
+<span class="fc" id="L40">      clusterSerdes.put(cluster.getName(), serdesInitializer.init(env, clustersProperties, i));</span>
+    }
+<span class="fc" id="L42">  }</span>
+
+  private ClusterSerdes getSerdesFor(KafkaCluster cluster) {
+<span class="fc" id="L45">    return clusterSerdes.get(cluster.getName());</span>
+  }
+
+  private Serde.Serializer getSerializer(KafkaCluster cluster,
+                                         String topic,
+                                         Serde.Target type,
+                                         String serdeName) {
+<span class="fc" id="L52">    var serdes = getSerdesFor(cluster);</span>
+<span class="fc" id="L53">    var serde = serdes.serdeForName(serdeName)</span>
+<span class="pc" id="L54">        .orElseThrow(() -&gt; new ValidationException(</span>
+<span class="nc" id="L55">            String.format(&quot;Serde %s not found&quot;, serdeName)));</span>
+<span class="pc bpc" id="L56" title="1 of 2 branches missed.">    if (!serde.canSerialize(topic, type)) {</span>
+<span class="nc" id="L57">      throw new ValidationException(</span>
+<span class="nc" id="L58">          String.format(&quot;Serde %s can't be applied for '%s' topic's %s serialization&quot;, serde, topic, type));</span>
+    }
+<span class="fc" id="L60">    return serde.serializer(topic, type);</span>
+  }
+
+  private SerdeInstance getSerdeForDeserialize(KafkaCluster cluster,
+                                               String topic,
+                                               Serde.Target type,
+                                               @Nullable String serdeName) {
+<span class="fc" id="L67">    var serdes = getSerdesFor(cluster);</span>
+<span class="fc bfc" id="L68" title="All 2 branches covered.">    if (serdeName != null) {</span>
+<span class="fc" id="L69">      var serde = serdes.serdeForName(serdeName)</span>
+<span class="pc" id="L70">          .orElseThrow(() -&gt; new ValidationException(String.format(&quot;Serde '%s' not found&quot;, serdeName)));</span>
+<span class="pc bpc" id="L71" title="1 of 2 branches missed.">      if (!serde.canDeserialize(topic, type)) {</span>
+<span class="nc" id="L72">        throw new ValidationException(</span>
+<span class="nc" id="L73">            String.format(&quot;Serde '%s' can't be applied to '%s' topic %s&quot;, serdeName, topic, type));</span>
+      }
+<span class="fc" id="L75">      return serde;</span>
+    } else {
+<span class="fc" id="L77">      return serdes.suggestSerdeForDeserialize(topic, type);</span>
+    }
+  }
+
+  public ProducerRecordCreator producerRecordCreator(KafkaCluster cluster,
+                                                     String topic,
+                                                     String keySerdeName,
+                                                     String valueSerdeName) {
+<span class="fc" id="L85">    return new ProducerRecordCreator(</span>
+<span class="fc" id="L86">        getSerializer(cluster, topic, Serde.Target.KEY, keySerdeName),</span>
+<span class="fc" id="L87">        getSerializer(cluster, topic, Serde.Target.VALUE, valueSerdeName)</span>
+    );
+  }
+
+  public ConsumerRecordDeserializer deserializerFor(KafkaCluster cluster,
+                                                    String topic,
+                                                    @Nullable String keySerdeName,
+                                                    @Nullable String valueSerdeName) {
+<span class="fc" id="L95">    var keySerde = getSerdeForDeserialize(cluster, topic, Serde.Target.KEY, keySerdeName);</span>
+<span class="fc" id="L96">    var valueSerde = getSerdeForDeserialize(cluster, topic, Serde.Target.VALUE, valueSerdeName);</span>
+<span class="fc" id="L97">    var fallbackSerde = getSerdesFor(cluster).getFallbackSerde();</span>
+<span class="fc" id="L98">    return new ConsumerRecordDeserializer(</span>
+<span class="fc" id="L99">        keySerde.getName(),</span>
+<span class="fc" id="L100">        keySerde.deserializer(topic, Serde.Target.KEY),</span>
+<span class="fc" id="L101">        valueSerde.getName(),</span>
+<span class="fc" id="L102">        valueSerde.deserializer(topic, Serde.Target.VALUE),</span>
+<span class="fc" id="L103">        fallbackSerde.getName(),</span>
+<span class="fc" id="L104">        fallbackSerde.deserializer(topic, Serde.Target.KEY),</span>
+<span class="fc" id="L105">        fallbackSerde.deserializer(topic, Serde.Target.VALUE),</span>
+<span class="fc" id="L106">        cluster.getMasking().getMaskerForTopic(topic)</span>
+    );
+  }
+
+  public List&lt;SerdeDescriptionDTO&gt; getSerdesForSerialize(KafkaCluster cluster,
+                                                         String topic,
+                                                         Serde.Target serdeType) {
+<span class="nc" id="L113">    var serdes = getSerdesFor(cluster);</span>
+<span class="nc" id="L114">    var preferred = serdes.suggestSerdeForSerialize(topic, serdeType);</span>
+<span class="nc" id="L115">    var result = new ArrayList&lt;SerdeDescriptionDTO&gt;();</span>
+<span class="nc" id="L116">    result.add(toDto(preferred, topic, serdeType, true));</span>
+<span class="nc" id="L117">    serdes.all()</span>
+<span class="nc bnc" id="L118" title="All 2 branches missed.">        .filter(s -&gt; !s.getName().equals(preferred.getName()))</span>
+<span class="nc" id="L119">        .filter(s -&gt; s.canSerialize(topic, serdeType))</span>
+<span class="nc" id="L120">        .forEach(s -&gt; result.add(toDto(s, topic, serdeType, false)));</span>
+<span class="nc" id="L121">    return result;</span>
+  }
+
+  public List&lt;SerdeDescriptionDTO&gt; getSerdesForDeserialize(KafkaCluster cluster,
+                                                           String topic,
+                                                           Serde.Target serdeType) {
+<span class="nc" id="L127">    var serdes = getSerdesFor(cluster);</span>
+<span class="nc" id="L128">    var preferred = serdes.suggestSerdeForDeserialize(topic, serdeType);</span>
+<span class="nc" id="L129">    var result = new ArrayList&lt;SerdeDescriptionDTO&gt;();</span>
+<span class="nc" id="L130">    result.add(toDto(preferred, topic, serdeType, true));</span>
+<span class="nc" id="L131">    serdes.all()</span>
+<span class="nc bnc" id="L132" title="All 2 branches missed.">        .filter(s -&gt; !s.getName().equals(preferred.getName()))</span>
+<span class="nc" id="L133">        .filter(s -&gt; s.canDeserialize(topic, serdeType))</span>
+<span class="nc" id="L134">        .forEach(s -&gt; result.add(toDto(s, topic, serdeType, false)));</span>
+<span class="nc" id="L135">    return result;</span>
+  }
+
+  private SerdeDescriptionDTO toDto(SerdeInstance serdeInstance,
+                                    String topic,
+                                    Serde.Target serdeType,
+                                    boolean preferred) {
+<span class="nc" id="L142">    var schemaOpt = serdeInstance.getSchema(topic, serdeType);</span>
+<span class="nc" id="L143">    return new SerdeDescriptionDTO()</span>
+<span class="nc" id="L144">        .name(serdeInstance.getName())</span>
+<span class="nc" id="L145">        .description(serdeInstance.description().orElse(null))</span>
+<span class="nc" id="L146">        .schema(schemaOpt.map(SchemaDescription::getSchema).orElse(null))</span>
+<span class="nc" id="L147">        .additionalProperties(schemaOpt.map(SchemaDescription::getAdditionalProperties).orElse(null))</span>
+<span class="nc" id="L148">        .preferred(preferred);</span>
+  }
+
+  @Override
+  public void close() {
+<span class="nc" id="L153">    clusterSerdes.values().forEach(ClusterSerdes::close);</span>
+<span class="nc" id="L154">  }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

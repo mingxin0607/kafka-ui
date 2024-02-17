@@ -1,0 +1,285 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RetryingKafkaConnectClient.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">kafka-ui-api</a> &gt; <a href="index.source.html" class="el_package">com.provectus.kafka.ui.client</a> &gt; <span class="el_source">RetryingKafkaConnectClient.java</span></div><h1>RetryingKafkaConnectClient.java</h1><pre class="source lang-java linenums">package com.provectus.kafka.ui.client;
+
+import static com.provectus.kafka.ui.config.ClustersProperties.ConnectCluster;
+
+import com.provectus.kafka.ui.config.ClustersProperties;
+import com.provectus.kafka.ui.connect.ApiClient;
+import com.provectus.kafka.ui.connect.api.KafkaConnectClientApi;
+import com.provectus.kafka.ui.connect.model.Connector;
+import com.provectus.kafka.ui.connect.model.ConnectorPlugin;
+import com.provectus.kafka.ui.connect.model.ConnectorPluginConfigValidationResponse;
+import com.provectus.kafka.ui.connect.model.ConnectorStatus;
+import com.provectus.kafka.ui.connect.model.ConnectorTask;
+import com.provectus.kafka.ui.connect.model.ConnectorTopics;
+import com.provectus.kafka.ui.connect.model.NewConnector;
+import com.provectus.kafka.ui.connect.model.TaskStatus;
+import com.provectus.kafka.ui.exception.KafkaConnectConflictReponseException;
+import com.provectus.kafka.ui.exception.ValidationException;
+import com.provectus.kafka.ui.util.WebClientConfigurator;
+import java.time.Duration;
+import java.util.List;
+import java.util.Map;
+import javax.annotation.Nullable;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.ResponseEntity;
+import org.springframework.util.unit.DataSize;
+import org.springframework.web.client.RestClientException;
+import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.reactive.function.client.WebClientResponseException;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
+import reactor.util.retry.Retry;
+
+<span class="fc" id="L33">@Slf4j</span>
+public class RetryingKafkaConnectClient extends KafkaConnectClientApi {
+  private static final int MAX_RETRIES = 5;
+<span class="fc" id="L36">  private static final Duration RETRIES_DELAY = Duration.ofMillis(200);</span>
+
+  public RetryingKafkaConnectClient(ConnectCluster config,
+                                    @Nullable ClustersProperties.TruststoreConfig truststoreConfig,
+                                    DataSize maxBuffSize) {
+<span class="fc" id="L41">    super(new RetryingApiClient(config, truststoreConfig, maxBuffSize));</span>
+<span class="fc" id="L42">  }</span>
+
+  private static Retry conflictCodeRetry() {
+<span class="fc" id="L45">    return Retry</span>
+<span class="fc" id="L46">        .fixedDelay(MAX_RETRIES, RETRIES_DELAY)</span>
+<span class="fc" id="L47">        .filter(e -&gt; e instanceof WebClientResponseException.Conflict)</span>
+<span class="fc" id="L48">        .onRetryExhaustedThrow((spec, signal) -&gt;</span>
+<span class="nc" id="L49">            new KafkaConnectConflictReponseException(</span>
+<span class="nc" id="L50">                (WebClientResponseException.Conflict) signal.failure()));</span>
+  }
+
+  private static &lt;T&gt; Mono&lt;T&gt; withRetryOnConflict(Mono&lt;T&gt; publisher) {
+<span class="fc" id="L54">    return publisher.retryWhen(conflictCodeRetry());</span>
+  }
+
+  private static &lt;T&gt; Flux&lt;T&gt; withRetryOnConflict(Flux&lt;T&gt; publisher) {
+<span class="fc" id="L58">    return publisher.retryWhen(conflictCodeRetry());</span>
+  }
+
+  private static &lt;T&gt; Mono&lt;T&gt; withBadRequestErrorHandling(Mono&lt;T&gt; publisher) {
+<span class="fc" id="L62">    return publisher</span>
+<span class="fc" id="L63">        .onErrorResume(WebClientResponseException.BadRequest.class, e -&gt;</span>
+<span class="fc" id="L64">            Mono.error(new ValidationException(&quot;Invalid configuration&quot;)))</span>
+<span class="fc" id="L65">        .onErrorResume(WebClientResponseException.InternalServerError.class, e -&gt;</span>
+<span class="fc" id="L66">            Mono.error(new ValidationException(&quot;Invalid configuration&quot;)));</span>
+  }
+
+  @Override
+  public Mono&lt;Connector&gt; createConnector(NewConnector newConnector) throws RestClientException {
+<span class="fc" id="L71">    return withBadRequestErrorHandling(</span>
+<span class="fc" id="L72">        super.createConnector(newConnector)</span>
+    );
+  }
+
+  @Override
+  public Mono&lt;Connector&gt; setConnectorConfig(String connectorName, Map&lt;String, Object&gt; requestBody)
+      throws RestClientException {
+<span class="fc" id="L79">    return withBadRequestErrorHandling(</span>
+<span class="fc" id="L80">        super.setConnectorConfig(connectorName, requestBody)</span>
+    );
+  }
+
+  @Override
+  public Mono&lt;ResponseEntity&lt;Connector&gt;&gt; createConnectorWithHttpInfo(NewConnector newConnector)
+      throws WebClientResponseException {
+<span class="nc" id="L87">    return withRetryOnConflict(super.createConnectorWithHttpInfo(newConnector));</span>
+  }
+
+  @Override
+  public Mono&lt;Void&gt; deleteConnector(String connectorName) throws WebClientResponseException {
+<span class="fc" id="L92">    return withRetryOnConflict(super.deleteConnector(connectorName));</span>
+  }
+
+  @Override
+  public Mono&lt;ResponseEntity&lt;Void&gt;&gt; deleteConnectorWithHttpInfo(String connectorName)
+      throws WebClientResponseException {
+<span class="nc" id="L98">    return withRetryOnConflict(super.deleteConnectorWithHttpInfo(connectorName));</span>
+  }
+
+
+  @Override
+  public Mono&lt;Connector&gt; getConnector(String connectorName) throws WebClientResponseException {
+<span class="fc" id="L104">    return withRetryOnConflict(super.getConnector(connectorName));</span>
+  }
+
+  @Override
+  public Mono&lt;ResponseEntity&lt;Connector&gt;&gt; getConnectorWithHttpInfo(String connectorName)
+      throws WebClientResponseException {
+<span class="nc" id="L110">    return withRetryOnConflict(super.getConnectorWithHttpInfo(connectorName));</span>
+  }
+
+  @Override
+  public Mono&lt;Map&lt;String, Object&gt;&gt; getConnectorConfig(String connectorName) throws WebClientResponseException {
+<span class="fc" id="L115">    return withRetryOnConflict(super.getConnectorConfig(connectorName));</span>
+  }
+
+  @Override
+  public Mono&lt;ResponseEntity&lt;Map&lt;String, Object&gt;&gt;&gt; getConnectorConfigWithHttpInfo(String connectorName)
+      throws WebClientResponseException {
+<span class="nc" id="L121">    return withRetryOnConflict(super.getConnectorConfigWithHttpInfo(connectorName));</span>
+  }
+
+  @Override
+  public Flux&lt;ConnectorPlugin&gt; getConnectorPlugins() throws WebClientResponseException {
+<span class="fc" id="L126">    return withRetryOnConflict(super.getConnectorPlugins());</span>
+  }
+
+  @Override
+  public Mono&lt;ResponseEntity&lt;List&lt;ConnectorPlugin&gt;&gt;&gt; getConnectorPluginsWithHttpInfo()
+      throws WebClientResponseException {
+<span class="nc" id="L132">    return withRetryOnConflict(super.getConnectorPluginsWithHttpInfo());</span>
+  }
+
+  @Override
+  public Mono&lt;ConnectorStatus&gt; getConnectorStatus(String connectorName) throws WebClientResponseException {
+<span class="fc" id="L137">    return withRetryOnConflict(super.getConnectorStatus(connectorName));</span>
+  }
+
+  @Override
+  public Mono&lt;ResponseEntity&lt;ConnectorStatus&gt;&gt; getConnectorStatusWithHttpInfo(String connectorName)
+      throws WebClientResponseException {
+<span class="nc" id="L143">    return withRetryOnConflict(super.getConnectorStatusWithHttpInfo(connectorName));</span>
+  }
+
+  @Override
+  public Mono&lt;TaskStatus&gt; getConnectorTaskStatus(String connectorName, Integer taskId)
+      throws WebClientResponseException {
+<span class="fc" id="L149">    return withRetryOnConflict(super.getConnectorTaskStatus(connectorName, taskId));</span>
+  }
+
+  @Override
+  public Mono&lt;ResponseEntity&lt;TaskStatus&gt;&gt; getConnectorTaskStatusWithHttpInfo(String connectorName, Integer taskId)
+      throws WebClientResponseException {
+<span class="nc" id="L155">    return withRetryOnConflict(super.getConnectorTaskStatusWithHttpInfo(connectorName, taskId));</span>
+  }
+
+  @Override
+  public Flux&lt;ConnectorTask&gt; getConnectorTasks(String connectorName) throws WebClientResponseException {
+<span class="fc" id="L160">    return withRetryOnConflict(super.getConnectorTasks(connectorName));</span>
+  }
+
+  @Override
+  public Mono&lt;ResponseEntity&lt;List&lt;ConnectorTask&gt;&gt;&gt; getConnectorTasksWithHttpInfo(String connectorName)
+      throws WebClientResponseException {
+<span class="nc" id="L166">    return withRetryOnConflict(super.getConnectorTasksWithHttpInfo(connectorName));</span>
+  }
+
+  @Override
+  public Mono&lt;Map&lt;String, ConnectorTopics&gt;&gt; getConnectorTopics(String connectorName) throws WebClientResponseException {
+<span class="fc" id="L171">    return withRetryOnConflict(super.getConnectorTopics(connectorName));</span>
+  }
+
+  @Override
+  public Mono&lt;ResponseEntity&lt;Map&lt;String, ConnectorTopics&gt;&gt;&gt; getConnectorTopicsWithHttpInfo(String connectorName)
+      throws WebClientResponseException {
+<span class="nc" id="L177">    return withRetryOnConflict(super.getConnectorTopicsWithHttpInfo(connectorName));</span>
+  }
+
+  @Override
+  public Flux&lt;String&gt; getConnectors(String search) throws WebClientResponseException {
+<span class="fc" id="L182">    return withRetryOnConflict(super.getConnectors(search));</span>
+  }
+
+  @Override
+  public Mono&lt;ResponseEntity&lt;List&lt;String&gt;&gt;&gt; getConnectorsWithHttpInfo(String search) throws WebClientResponseException {
+<span class="nc" id="L187">    return withRetryOnConflict(super.getConnectorsWithHttpInfo(search));</span>
+  }
+
+  @Override
+  public Mono&lt;Void&gt; pauseConnector(String connectorName) throws WebClientResponseException {
+<span class="nc" id="L192">    return withRetryOnConflict(super.pauseConnector(connectorName));</span>
+  }
+
+  @Override
+  public Mono&lt;ResponseEntity&lt;Void&gt;&gt; pauseConnectorWithHttpInfo(String connectorName) throws WebClientResponseException {
+<span class="nc" id="L197">    return withRetryOnConflict(super.pauseConnectorWithHttpInfo(connectorName));</span>
+  }
+
+  @Override
+  public Mono&lt;Void&gt; restartConnector(String connectorName, Boolean includeTasks, Boolean onlyFailed)
+      throws WebClientResponseException {
+<span class="nc" id="L203">    return withRetryOnConflict(super.restartConnector(connectorName, includeTasks, onlyFailed));</span>
+  }
+
+  @Override
+  public Mono&lt;ResponseEntity&lt;Void&gt;&gt; restartConnectorWithHttpInfo(String connectorName, Boolean includeTasks,
+                                                                 Boolean onlyFailed) throws WebClientResponseException {
+<span class="nc" id="L209">    return withRetryOnConflict(super.restartConnectorWithHttpInfo(connectorName, includeTasks, onlyFailed));</span>
+  }
+
+  @Override
+  public Mono&lt;Void&gt; restartConnectorTask(String connectorName, Integer taskId) throws WebClientResponseException {
+<span class="nc" id="L214">    return withRetryOnConflict(super.restartConnectorTask(connectorName, taskId));</span>
+  }
+
+  @Override
+  public Mono&lt;ResponseEntity&lt;Void&gt;&gt; restartConnectorTaskWithHttpInfo(String connectorName, Integer taskId)
+      throws WebClientResponseException {
+<span class="nc" id="L220">    return withRetryOnConflict(super.restartConnectorTaskWithHttpInfo(connectorName, taskId));</span>
+  }
+
+  @Override
+  public Mono&lt;Void&gt; resumeConnector(String connectorName) throws WebClientResponseException {
+<span class="nc" id="L225">    return super.resumeConnector(connectorName);</span>
+  }
+
+  @Override
+  public Mono&lt;ResponseEntity&lt;Void&gt;&gt; resumeConnectorWithHttpInfo(String connectorName)
+      throws WebClientResponseException {
+<span class="nc" id="L231">    return withRetryOnConflict(super.resumeConnectorWithHttpInfo(connectorName));</span>
+  }
+
+  @Override
+  public Mono&lt;ResponseEntity&lt;Connector&gt;&gt; setConnectorConfigWithHttpInfo(String connectorName,
+                                                                        Map&lt;String, Object&gt; requestBody)
+      throws WebClientResponseException {
+<span class="nc" id="L238">    return withRetryOnConflict(super.setConnectorConfigWithHttpInfo(connectorName, requestBody));</span>
+  }
+
+  @Override
+  public Mono&lt;ConnectorPluginConfigValidationResponse&gt; validateConnectorPluginConfig(String pluginName,
+                                                                                     Map&lt;String, Object&gt; requestBody)
+      throws WebClientResponseException {
+<span class="fc" id="L245">    return withRetryOnConflict(super.validateConnectorPluginConfig(pluginName, requestBody));</span>
+  }
+
+  @Override
+  public Mono&lt;ResponseEntity&lt;ConnectorPluginConfigValidationResponse&gt;&gt; validateConnectorPluginConfigWithHttpInfo(
+      String pluginName, Map&lt;String, Object&gt; requestBody) throws WebClientResponseException {
+<span class="nc" id="L251">    return withRetryOnConflict(super.validateConnectorPluginConfigWithHttpInfo(pluginName, requestBody));</span>
+  }
+
+  private static class RetryingApiClient extends ApiClient {
+
+    public RetryingApiClient(ConnectCluster config,
+                             ClustersProperties.TruststoreConfig truststoreConfig,
+                             DataSize maxBuffSize) {
+<span class="fc" id="L259">      super(buildWebClient(maxBuffSize, config, truststoreConfig), null, null);</span>
+<span class="fc" id="L260">      setBasePath(config.getAddress());</span>
+<span class="fc" id="L261">      setUsername(config.getUsername());</span>
+<span class="fc" id="L262">      setPassword(config.getPassword());</span>
+<span class="fc" id="L263">    }</span>
+
+    public static WebClient buildWebClient(DataSize maxBuffSize,
+                                           ConnectCluster config,
+                                           ClustersProperties.TruststoreConfig truststoreConfig) {
+<span class="fc" id="L268">      return new WebClientConfigurator()</span>
+<span class="fc" id="L269">          .configureSsl(</span>
+              truststoreConfig,
+              new ClustersProperties.KeystoreConfig(
+<span class="fc" id="L272">                  config.getKeystoreLocation(),</span>
+<span class="fc" id="L273">                  config.getKeystorePassword()</span>
+              )
+          )
+<span class="fc" id="L276">          .configureBasicAuth(</span>
+<span class="fc" id="L277">              config.getUsername(),</span>
+<span class="fc" id="L278">              config.getPassword()</span>
+          )
+<span class="fc" id="L280">          .configureBufferSize(maxBuffSize)</span>
+<span class="fc" id="L281">          .build();</span>
+    }
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

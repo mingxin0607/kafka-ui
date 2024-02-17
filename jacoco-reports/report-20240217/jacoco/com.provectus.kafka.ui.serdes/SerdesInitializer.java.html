@@ -1,0 +1,282 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SerdesInitializer.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">kafka-ui-api</a> &gt; <a href="index.source.html" class="el_package">com.provectus.kafka.ui.serdes</a> &gt; <span class="el_source">SerdesInitializer.java</span></div><h1>SerdesInitializer.java</h1><pre class="source lang-java linenums">package com.provectus.kafka.ui.serdes;
+
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
+import com.google.common.base.Strings;
+import com.google.common.collect.ImmutableMap;
+import com.provectus.kafka.ui.config.ClustersProperties;
+import com.provectus.kafka.ui.config.ClustersProperties.SerdeConfig;
+import com.provectus.kafka.ui.exception.ValidationException;
+import com.provectus.kafka.ui.serde.api.PropertyResolver;
+import com.provectus.kafka.ui.serde.api.Serde;
+import com.provectus.kafka.ui.serdes.builtin.AvroEmbeddedSerde;
+import com.provectus.kafka.ui.serdes.builtin.Base64Serde;
+import com.provectus.kafka.ui.serdes.builtin.ConsumerOffsetsSerde;
+import com.provectus.kafka.ui.serdes.builtin.HexSerde;
+import com.provectus.kafka.ui.serdes.builtin.Int32Serde;
+import com.provectus.kafka.ui.serdes.builtin.Int64Serde;
+import com.provectus.kafka.ui.serdes.builtin.ProtobufFileSerde;
+import com.provectus.kafka.ui.serdes.builtin.ProtobufRawSerde;
+import com.provectus.kafka.ui.serdes.builtin.StringSerde;
+import com.provectus.kafka.ui.serdes.builtin.UInt32Serde;
+import com.provectus.kafka.ui.serdes.builtin.UInt64Serde;
+import com.provectus.kafka.ui.serdes.builtin.UuidBinarySerde;
+import com.provectus.kafka.ui.serdes.builtin.sr.SchemaRegistrySerde;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.Optional;
+import java.util.regex.Pattern;
+import javax.annotation.Nullable;
+import lombok.SneakyThrows;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.core.env.Environment;
+
+<span class="fc" id="L34">@Slf4j</span>
+public class SerdesInitializer {
+
+  private final Map&lt;String, Class&lt;? extends BuiltInSerde&gt;&gt; builtInSerdeClasses;
+  private final CustomSerdeLoader customSerdeLoader;
+
+  public SerdesInitializer() {
+<span class="fc" id="L41">    this(</span>
+<span class="fc" id="L42">        ImmutableMap.&lt;String, Class&lt;? extends BuiltInSerde&gt;&gt;builder()</span>
+<span class="fc" id="L43">            .put(StringSerde.name(), StringSerde.class)</span>
+<span class="fc" id="L44">            .put(SchemaRegistrySerde.name(), SchemaRegistrySerde.class)</span>
+<span class="fc" id="L45">            .put(ProtobufFileSerde.name(), ProtobufFileSerde.class)</span>
+<span class="fc" id="L46">            .put(Int32Serde.name(), Int32Serde.class)</span>
+<span class="fc" id="L47">            .put(Int64Serde.name(), Int64Serde.class)</span>
+<span class="fc" id="L48">            .put(UInt32Serde.name(), UInt32Serde.class)</span>
+<span class="fc" id="L49">            .put(UInt64Serde.name(), UInt64Serde.class)</span>
+<span class="fc" id="L50">            .put(AvroEmbeddedSerde.name(), AvroEmbeddedSerde.class)</span>
+<span class="fc" id="L51">            .put(Base64Serde.name(), Base64Serde.class)</span>
+<span class="fc" id="L52">            .put(HexSerde.name(), HexSerde.class)</span>
+<span class="fc" id="L53">            .put(UuidBinarySerde.name(), UuidBinarySerde.class)</span>
+<span class="fc" id="L54">            .put(ProtobufRawSerde.name(), ProtobufRawSerde.class)</span>
+<span class="fc" id="L55">            .build(),</span>
+        new CustomSerdeLoader()
+    );
+<span class="fc" id="L58">  }</span>
+
+  @VisibleForTesting
+  SerdesInitializer(Map&lt;String, Class&lt;? extends BuiltInSerde&gt;&gt; builtInSerdeClasses,
+<span class="fc" id="L62">                    CustomSerdeLoader customSerdeLoader) {</span>
+<span class="fc" id="L63">    this.builtInSerdeClasses = builtInSerdeClasses;</span>
+<span class="fc" id="L64">    this.customSerdeLoader = customSerdeLoader;</span>
+<span class="fc" id="L65">  }</span>
+
+  /**
+   * Initialization algorithm:
+   * First, we iterate over explicitly configured serdes from cluster config:
+   * &gt; if serde has name = one of built-in serde's names:
+   * - if serde's properties are empty, we treat it as serde should be
+   * auto-configured - we try to do that
+   * - if serde's properties not empty, we treat it as an intention to
+   * override default configuration, so we configuring it with specific config (calling configure(..))
+   * &lt;p/&gt;
+   * &gt; if serde has className = one of built-in serde's classes:
+   * - initializing it with specific config and with default classloader
+   * &lt;p/&gt;
+   * &gt; if serde has custom className != one of built-in serde's classes:
+   * - initializing it with specific config and with custom classloader (see CustomSerdeLoader)
+   * &lt;p/&gt;
+   * Second, we iterate over remaining built-in serdes (that we NOT explicitly configured by config)
+   * trying to auto-configure them and  registering with empty patterns - they will be present
+   * in Serde selection in UI, but not assigned to any topic k/v.
+   */
+  public ClusterSerdes init(Environment env,
+                            ClustersProperties clustersProperties,
+                            int clusterIndex) {
+<span class="fc" id="L89">    ClustersProperties.Cluster clusterProperties = clustersProperties.getClusters().get(clusterIndex);</span>
+<span class="fc" id="L90">    log.debug(&quot;Configuring serdes for cluster {}&quot;, clusterProperties.getName());</span>
+
+<span class="fc" id="L92">    var globalPropertiesResolver = new PropertyResolverImpl(env);</span>
+<span class="fc" id="L93">    var clusterPropertiesResolver = new PropertyResolverImpl(env, &quot;kafka.clusters.&quot; + clusterIndex);</span>
+
+<span class="fc" id="L95">    Map&lt;String, SerdeInstance&gt; registeredSerdes = new LinkedHashMap&lt;&gt;();</span>
+    // initializing serdes from config
+<span class="fc bfc" id="L97" title="All 2 branches covered.">    if (clusterProperties.getSerde() != null) {</span>
+<span class="fc bfc" id="L98" title="All 2 branches covered.">      for (int i = 0; i &lt; clusterProperties.getSerde().size(); i++) {</span>
+<span class="fc" id="L99">        SerdeConfig serdeConfig = clusterProperties.getSerde().get(i);</span>
+<span class="pc bpc" id="L100" title="1 of 2 branches missed.">        if (Strings.isNullOrEmpty(serdeConfig.getName())) {</span>
+<span class="nc" id="L101">          throw new ValidationException(&quot;'name' property not set for serde: &quot; + serdeConfig);</span>
+        }
+<span class="pc bpc" id="L103" title="1 of 2 branches missed.">        if (registeredSerdes.containsKey(serdeConfig.getName())) {</span>
+<span class="nc" id="L104">          throw new ValidationException(&quot;Multiple serdes with same name: &quot; + serdeConfig.getName());</span>
+        }
+<span class="fc" id="L106">        var instance = createSerdeFromConfig(</span>
+            serdeConfig,
+            new PropertyResolverImpl(env, &quot;kafka.clusters.&quot; + clusterIndex + &quot;.serde.&quot; + i + &quot;.properties&quot;),
+            clusterPropertiesResolver,
+            globalPropertiesResolver
+        );
+<span class="fc" id="L112">        registeredSerdes.put(serdeConfig.getName(), instance);</span>
+      }
+    }
+
+    // initializing remaining built-in serdes with empty selection patters
+<span class="fc" id="L117">    builtInSerdeClasses.forEach((name, clazz) -&gt; {</span>
+<span class="fc bfc" id="L118" title="All 2 branches covered.">      if (!registeredSerdes.containsKey(name)) {</span>
+<span class="fc" id="L119">        BuiltInSerde serde = createSerdeInstance(clazz);</span>
+<span class="fc bfc" id="L120" title="All 2 branches covered.">        if (autoConfigureSerde(serde, clusterPropertiesResolver, globalPropertiesResolver)) {</span>
+<span class="fc" id="L121">          registeredSerdes.put(name, new SerdeInstance(name, serde, null, null, null));</span>
+        }
+      }
+<span class="fc" id="L124">    });</span>
+
+<span class="fc" id="L126">    registerTopicRelatedSerde(registeredSerdes);</span>
+
+<span class="fc" id="L128">    return new ClusterSerdes(</span>
+        registeredSerdes,
+<span class="fc" id="L130">        Optional.ofNullable(clusterProperties.getDefaultKeySerde())</span>
+<span class="pc" id="L131">            .map(name -&gt; Preconditions.checkNotNull(registeredSerdes.get(name), &quot;Default key serde not found&quot;))</span>
+<span class="fc" id="L132">            .orElse(null),</span>
+<span class="fc" id="L133">        Optional.ofNullable(clusterProperties.getDefaultValueSerde())</span>
+<span class="pc" id="L134">            .map(name -&gt; Preconditions.checkNotNull(registeredSerdes.get(name), &quot;Default value serde not found&quot;))</span>
+<span class="fc" id="L135">            .or(() -&gt; Optional.ofNullable(registeredSerdes.get(SchemaRegistrySerde.name())))</span>
+<span class="fc" id="L136">            .or(() -&gt; Optional.ofNullable(registeredSerdes.get(ProtobufFileSerde.name())))</span>
+<span class="fc" id="L137">            .orElse(null),</span>
+<span class="fc" id="L138">        createFallbackSerde()</span>
+    );
+  }
+
+  /**
+   * Registers serdse that should only be used for specific (hard-coded) topics, like ConsumerOffsetsSerde.
+   */
+  private void registerTopicRelatedSerde(Map&lt;String, SerdeInstance&gt; serdes) {
+<span class="fc" id="L146">    registerConsumerOffsetsSerde(serdes);</span>
+<span class="fc" id="L147">  }</span>
+
+  private void registerConsumerOffsetsSerde(Map&lt;String, SerdeInstance&gt; serdes) {
+<span class="fc" id="L150">    var pattern = Pattern.compile(ConsumerOffsetsSerde.TOPIC);</span>
+<span class="fc" id="L151">    serdes.put(</span>
+<span class="fc" id="L152">        ConsumerOffsetsSerde.name(),</span>
+        new SerdeInstance(
+<span class="fc" id="L154">            ConsumerOffsetsSerde.name(),</span>
+            new ConsumerOffsetsSerde(),
+            pattern,
+            pattern,
+            null
+        )
+    );
+<span class="fc" id="L161">  }</span>
+
+  private SerdeInstance createFallbackSerde() {
+<span class="fc" id="L164">    StringSerde serde = new StringSerde();</span>
+<span class="fc" id="L165">    serde.configure(PropertyResolverImpl.empty(), PropertyResolverImpl.empty(), PropertyResolverImpl.empty());</span>
+<span class="fc" id="L166">    return new SerdeInstance(&quot;Fallback&quot;, serde, null, null, null);</span>
+  }
+
+<span class="fc" id="L169">  @SneakyThrows</span>
+  private SerdeInstance createSerdeFromConfig(SerdeConfig serdeConfig,
+                                              PropertyResolver serdeProps,
+                                              PropertyResolver clusterProps,
+                                              PropertyResolver globalProps) {
+<span class="fc bfc" id="L174" title="All 2 branches covered.">    if (builtInSerdeClasses.containsKey(serdeConfig.getName())) {</span>
+<span class="fc" id="L175">      return createSerdeWithBuiltInSerdeName(serdeConfig, serdeProps, clusterProps, globalProps);</span>
+    }
+<span class="pc bpc" id="L177" title="1 of 2 branches missed.">    if (serdeConfig.getClassName() != null) {</span>
+<span class="fc" id="L178">      var builtInSerdeClass = builtInSerdeClasses.values().stream()</span>
+<span class="fc" id="L179">          .filter(c -&gt; c.getName().equals(serdeConfig.getClassName()))</span>
+<span class="fc" id="L180">          .findAny();</span>
+      // built-in serde type with custom name
+<span class="fc bfc" id="L182" title="All 2 branches covered.">      if (builtInSerdeClass.isPresent()) {</span>
+<span class="fc" id="L183">        return createSerdeWithBuiltInClass(builtInSerdeClass.get(), serdeConfig, serdeProps, clusterProps, globalProps);</span>
+      }
+    }
+<span class="fc" id="L186">    log.info(&quot;Loading custom serde {}&quot;, serdeConfig.getName());</span>
+<span class="fc" id="L187">    return loadAndInitCustomSerde(serdeConfig, serdeProps, clusterProps, globalProps);</span>
+  }
+
+  private SerdeInstance createSerdeWithBuiltInSerdeName(SerdeConfig serdeConfig,
+                                                        PropertyResolver serdeProps,
+                                                        PropertyResolver clusterProps,
+                                                        PropertyResolver globalProps) {
+<span class="fc" id="L194">    String name = serdeConfig.getName();</span>
+<span class="pc bpc" id="L195" title="1 of 2 branches missed.">    if (serdeConfig.getClassName() != null) {</span>
+<span class="nc" id="L196">      throw new ValidationException(&quot;className can't be set for built-in serde&quot;);</span>
+    }
+<span class="pc bpc" id="L198" title="1 of 2 branches missed.">    if (serdeConfig.getFilePath() != null) {</span>
+<span class="nc" id="L199">      throw new ValidationException(&quot;filePath can't be set for built-in serde types&quot;);</span>
+    }
+<span class="fc" id="L201">    var clazz = builtInSerdeClasses.get(name);</span>
+<span class="fc" id="L202">    BuiltInSerde serde = createSerdeInstance(clazz);</span>
+<span class="pc bpc" id="L203" title="1 of 4 branches missed.">    if (serdeConfig.getProperties() == null || serdeConfig.getProperties().isEmpty()) {</span>
+<span class="fc bfc" id="L204" title="All 2 branches covered.">      if (!autoConfigureSerde(serde, clusterProps, globalProps)) {</span>
+        // no properties provided and serde does not support auto-configuration
+<span class="fc" id="L206">        throw new ValidationException(name + &quot; serde is not configured&quot;);</span>
+      }
+    } else {
+      // configuring serde with explicitly set properties
+<span class="fc" id="L210">      serde.configure(serdeProps, clusterProps, globalProps);</span>
+    }
+<span class="fc" id="L212">    return new SerdeInstance(</span>
+        name,
+        serde,
+<span class="fc" id="L215">        nullablePattern(serdeConfig.getTopicKeysPattern()),</span>
+<span class="fc" id="L216">        nullablePattern(serdeConfig.getTopicValuesPattern()),</span>
+        null
+    );
+  }
+
+  private boolean autoConfigureSerde(BuiltInSerde serde, PropertyResolver clusterProps, PropertyResolver globalProps) {
+<span class="fc bfc" id="L222" title="All 2 branches covered.">    if (serde.canBeAutoConfigured(clusterProps, globalProps)) {</span>
+<span class="fc" id="L223">      serde.autoConfigure(clusterProps, globalProps);</span>
+<span class="fc" id="L224">      return true;</span>
+    }
+<span class="fc" id="L226">    return false;</span>
+  }
+
+<span class="nc" id="L229">  @SneakyThrows</span>
+  private SerdeInstance createSerdeWithBuiltInClass(Class&lt;? extends BuiltInSerde&gt; clazz,
+                                                    SerdeConfig serdeConfig,
+                                                    PropertyResolver serdeProps,
+                                                    PropertyResolver clusterProps,
+                                                    PropertyResolver globalProps) {
+<span class="pc bpc" id="L235" title="1 of 2 branches missed.">    if (serdeConfig.getFilePath() != null) {</span>
+<span class="nc" id="L236">      throw new ValidationException(&quot;filePath can't be set for built-in serde type&quot;);</span>
+    }
+<span class="fc" id="L238">    BuiltInSerde serde = createSerdeInstance(clazz);</span>
+<span class="fc" id="L239">    serde.configure(serdeProps, clusterProps, globalProps);</span>
+<span class="fc" id="L240">    return new SerdeInstance(</span>
+<span class="fc" id="L241">        serdeConfig.getName(),</span>
+        serde,
+<span class="fc" id="L243">        nullablePattern(serdeConfig.getTopicKeysPattern()),</span>
+<span class="fc" id="L244">        nullablePattern(serdeConfig.getTopicValuesPattern()),</span>
+        null
+    );
+  }
+
+<span class="nc" id="L249">  @SneakyThrows</span>
+  private &lt;T extends Serde&gt; T createSerdeInstance(Class&lt;T&gt; clazz) {
+<span class="fc" id="L251">    return clazz.getDeclaredConstructor().newInstance();</span>
+  }
+
+  private SerdeInstance loadAndInitCustomSerde(SerdeConfig serdeConfig,
+                                               PropertyResolver serdeProps,
+                                               PropertyResolver clusterProps,
+                                               PropertyResolver globalProps) {
+<span class="pc bpc" id="L258" title="1 of 2 branches missed.">    if (Strings.isNullOrEmpty(serdeConfig.getClassName())) {</span>
+<span class="nc" id="L259">      throw new ValidationException(</span>
+<span class="nc" id="L260">          &quot;'className' property not set for custom serde &quot; + serdeConfig.getName());</span>
+    }
+<span class="pc bpc" id="L262" title="1 of 2 branches missed.">    if (Strings.isNullOrEmpty(serdeConfig.getFilePath())) {</span>
+<span class="nc" id="L263">      throw new ValidationException(</span>
+<span class="nc" id="L264">          &quot;'filePath' property not set for custom serde &quot; + serdeConfig.getName());</span>
+    }
+<span class="fc" id="L266">    var loaded = customSerdeLoader.loadAndConfigure(</span>
+<span class="fc" id="L267">        serdeConfig.getClassName(), serdeConfig.getFilePath(), serdeProps, clusterProps, globalProps);</span>
+<span class="fc" id="L268">    return new SerdeInstance(</span>
+<span class="fc" id="L269">        serdeConfig.getName(),</span>
+<span class="fc" id="L270">        loaded.getSerde(),</span>
+<span class="fc" id="L271">        nullablePattern(serdeConfig.getTopicKeysPattern()),</span>
+<span class="fc" id="L272">        nullablePattern(serdeConfig.getTopicValuesPattern()),</span>
+<span class="fc" id="L273">        loaded.getClassLoader()</span>
+    );
+  }
+
+  @Nullable
+  private Pattern nullablePattern(@Nullable String pattern) {
+<span class="pc bpc" id="L279" title="1 of 2 branches missed.">    return pattern == null ? null : Pattern.compile(pattern);</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

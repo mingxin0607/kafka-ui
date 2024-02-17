@@ -1,0 +1,315 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SchemaRegistrySerde.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">kafka-ui-api</a> &gt; <a href="index.source.html" class="el_package">com.provectus.kafka.ui.serdes.builtin.sr</a> &gt; <span class="el_source">SchemaRegistrySerde.java</span></div><h1>SchemaRegistrySerde.java</h1><pre class="source lang-java linenums">package com.provectus.kafka.ui.serdes.builtin.sr;
+
+import static com.provectus.kafka.ui.serdes.builtin.sr.Serialize.serializeAvro;
+import static com.provectus.kafka.ui.serdes.builtin.sr.Serialize.serializeJson;
+import static com.provectus.kafka.ui.serdes.builtin.sr.Serialize.serializeProto;
+import static io.confluent.kafka.serializers.AbstractKafkaSchemaSerDeConfig.BASIC_AUTH_CREDENTIALS_SOURCE;
+import static io.confluent.kafka.serializers.AbstractKafkaSchemaSerDeConfig.USER_INFO_CONFIG;
+
+import com.google.common.annotations.VisibleForTesting;
+import com.provectus.kafka.ui.exception.ValidationException;
+import com.provectus.kafka.ui.serde.api.DeserializeResult;
+import com.provectus.kafka.ui.serde.api.PropertyResolver;
+import com.provectus.kafka.ui.serde.api.SchemaDescription;
+import com.provectus.kafka.ui.serdes.BuiltInSerde;
+import com.provectus.kafka.ui.util.jsonschema.AvroJsonSchemaConverter;
+import com.provectus.kafka.ui.util.jsonschema.ProtobufSchemaConverter;
+import io.confluent.kafka.schemaregistry.ParsedSchema;
+import io.confluent.kafka.schemaregistry.avro.AvroSchema;
+import io.confluent.kafka.schemaregistry.avro.AvroSchemaProvider;
+import io.confluent.kafka.schemaregistry.client.CachedSchemaRegistryClient;
+import io.confluent.kafka.schemaregistry.client.SchemaMetadata;
+import io.confluent.kafka.schemaregistry.client.SchemaRegistryClient;
+import io.confluent.kafka.schemaregistry.client.SchemaRegistryClientConfig;
+import io.confluent.kafka.schemaregistry.client.rest.exceptions.RestClientException;
+import io.confluent.kafka.schemaregistry.json.JsonSchema;
+import io.confluent.kafka.schemaregistry.json.JsonSchemaProvider;
+import io.confluent.kafka.schemaregistry.protobuf.ProtobufSchema;
+import io.confluent.kafka.schemaregistry.protobuf.ProtobufSchemaProvider;
+import java.net.URI;
+import java.nio.ByteBuffer;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.concurrent.Callable;
+import javax.annotation.Nullable;
+import lombok.SneakyThrows;
+import org.apache.kafka.common.config.SslConfigs;
+
+
+<span class="fc" id="L41">public class SchemaRegistrySerde implements BuiltInSerde {</span>
+
+  private static final byte SR_PAYLOAD_MAGIC_BYTE = 0x0;
+  private static final int SR_PAYLOAD_PREFIX_LENGTH = 5;
+
+  public static String name() {
+<span class="fc" id="L47">    return &quot;SchemaRegistry&quot;;</span>
+  }
+
+  private static final String SCHEMA_REGISTRY = &quot;schemaRegistry&quot;;
+
+  private SchemaRegistryClient schemaRegistryClient;
+  private List&lt;String&gt; schemaRegistryUrls;
+  private String valueSchemaNameTemplate;
+  private String keySchemaNameTemplate;
+  private boolean checkSchemaExistenceForDeserialize;
+
+  private Map&lt;SchemaType, MessageFormatter&gt; schemaRegistryFormatters;
+
+  @Override
+  public boolean canBeAutoConfigured(PropertyResolver kafkaClusterProperties,
+                                     PropertyResolver globalProperties) {
+<span class="fc" id="L63">    return kafkaClusterProperties.getListProperty(SCHEMA_REGISTRY, String.class)</span>
+<span class="pc bpc" id="L64" title="1 of 2 branches missed.">        .filter(lst -&gt; !lst.isEmpty())</span>
+<span class="fc" id="L65">        .isPresent();</span>
+  }
+
+  @Override
+  public void autoConfigure(PropertyResolver kafkaClusterProperties,
+                            PropertyResolver globalProperties) {
+<span class="fc" id="L71">    var urls = kafkaClusterProperties.getListProperty(SCHEMA_REGISTRY, String.class)</span>
+<span class="pc bpc" id="L72" title="1 of 2 branches missed.">        .filter(lst -&gt; !lst.isEmpty())</span>
+<span class="pc" id="L73">        .orElseThrow(() -&gt; new ValidationException(&quot;No urls provided for schema registry&quot;));</span>
+<span class="fc" id="L74">    configure(</span>
+        urls,
+<span class="fc" id="L76">        createSchemaRegistryClient(</span>
+            urls,
+<span class="fc" id="L78">            kafkaClusterProperties.getProperty(&quot;schemaRegistryAuth.username&quot;, String.class).orElse(null),</span>
+<span class="fc" id="L79">            kafkaClusterProperties.getProperty(&quot;schemaRegistryAuth.password&quot;, String.class).orElse(null),</span>
+<span class="fc" id="L80">            kafkaClusterProperties.getProperty(&quot;schemaRegistrySsl.keystoreLocation&quot;, String.class).orElse(null),</span>
+<span class="fc" id="L81">            kafkaClusterProperties.getProperty(&quot;schemaRegistrySsl.keystorePassword&quot;, String.class).orElse(null),</span>
+<span class="fc" id="L82">            kafkaClusterProperties.getProperty(&quot;ssl.truststoreLocation&quot;, String.class).orElse(null),</span>
+<span class="fc" id="L83">            kafkaClusterProperties.getProperty(&quot;ssl.truststorePassword&quot;, String.class).orElse(null)</span>
+        ),
+<span class="fc" id="L85">        kafkaClusterProperties.getProperty(&quot;schemaRegistryKeySchemaNameTemplate&quot;, String.class).orElse(&quot;%s-key&quot;),</span>
+<span class="fc" id="L86">        kafkaClusterProperties.getProperty(&quot;schemaRegistrySchemaNameTemplate&quot;, String.class).orElse(&quot;%s-value&quot;),</span>
+<span class="fc" id="L87">        kafkaClusterProperties.getProperty(&quot;schemaRegistryCheckSchemaExistenceForDeserialize&quot;, Boolean.class)</span>
+<span class="fc" id="L88">            .orElse(false)</span>
+    );
+<span class="fc" id="L90">  }</span>
+
+  @Override
+  public void configure(PropertyResolver serdeProperties,
+                        PropertyResolver kafkaClusterProperties,
+                        PropertyResolver globalProperties) {
+<span class="nc" id="L96">    var urls = serdeProperties.getListProperty(&quot;url&quot;, String.class)</span>
+<span class="nc" id="L97">        .or(() -&gt; kafkaClusterProperties.getListProperty(SCHEMA_REGISTRY, String.class))</span>
+<span class="nc bnc" id="L98" title="All 2 branches missed.">        .filter(lst -&gt; !lst.isEmpty())</span>
+<span class="nc" id="L99">        .orElseThrow(() -&gt; new ValidationException(&quot;No urls provided for schema registry&quot;));</span>
+<span class="nc" id="L100">    configure(</span>
+        urls,
+<span class="nc" id="L102">        createSchemaRegistryClient(</span>
+            urls,
+<span class="nc" id="L104">            serdeProperties.getProperty(&quot;username&quot;, String.class).orElse(null),</span>
+<span class="nc" id="L105">            serdeProperties.getProperty(&quot;password&quot;, String.class).orElse(null),</span>
+<span class="nc" id="L106">            serdeProperties.getProperty(&quot;keystoreLocation&quot;, String.class).orElse(null),</span>
+<span class="nc" id="L107">            serdeProperties.getProperty(&quot;keystorePassword&quot;, String.class).orElse(null),</span>
+<span class="nc" id="L108">            kafkaClusterProperties.getProperty(&quot;ssl.truststoreLocation&quot;, String.class).orElse(null),</span>
+<span class="nc" id="L109">            kafkaClusterProperties.getProperty(&quot;ssl.truststorePassword&quot;, String.class).orElse(null)</span>
+        ),
+<span class="nc" id="L111">        serdeProperties.getProperty(&quot;keySchemaNameTemplate&quot;, String.class).orElse(&quot;%s-key&quot;),</span>
+<span class="nc" id="L112">        serdeProperties.getProperty(&quot;schemaNameTemplate&quot;, String.class).orElse(&quot;%s-value&quot;),</span>
+<span class="nc" id="L113">        serdeProperties.getProperty(&quot;checkSchemaExistenceForDeserialize&quot;, Boolean.class)</span>
+<span class="nc" id="L114">            .orElse(false)</span>
+    );
+<span class="nc" id="L116">  }</span>
+
+  @VisibleForTesting
+  void configure(
+      List&lt;String&gt; schemaRegistryUrls,
+      SchemaRegistryClient schemaRegistryClient,
+      String keySchemaNameTemplate,
+      String valueSchemaNameTemplate,
+      boolean checkTopicSchemaExistenceForDeserialize) {
+<span class="fc" id="L125">    this.schemaRegistryUrls = schemaRegistryUrls;</span>
+<span class="fc" id="L126">    this.schemaRegistryClient = schemaRegistryClient;</span>
+<span class="fc" id="L127">    this.keySchemaNameTemplate = keySchemaNameTemplate;</span>
+<span class="fc" id="L128">    this.valueSchemaNameTemplate = valueSchemaNameTemplate;</span>
+<span class="fc" id="L129">    this.schemaRegistryFormatters = MessageFormatter.createMap(schemaRegistryClient);</span>
+<span class="fc" id="L130">    this.checkSchemaExistenceForDeserialize = checkTopicSchemaExistenceForDeserialize;</span>
+<span class="fc" id="L131">  }</span>
+
+  private static SchemaRegistryClient createSchemaRegistryClient(List&lt;String&gt; urls,
+                                                                 @Nullable String username,
+                                                                 @Nullable String password,
+                                                                 @Nullable String keyStoreLocation,
+                                                                 @Nullable String keyStorePassword,
+                                                                 @Nullable String trustStoreLocation,
+                                                                 @Nullable String trustStorePassword) {
+<span class="fc" id="L140">    Map&lt;String, String&gt; configs = new HashMap&lt;&gt;();</span>
+<span class="pc bpc" id="L141" title="3 of 4 branches missed.">    if (username != null &amp;&amp; password != null) {</span>
+<span class="nc" id="L142">      configs.put(BASIC_AUTH_CREDENTIALS_SOURCE, &quot;USER_INFO&quot;);</span>
+<span class="nc" id="L143">      configs.put(USER_INFO_CONFIG, username + &quot;:&quot; + password);</span>
+<span class="pc bpc" id="L144" title="1 of 2 branches missed.">    } else if (username != null) {</span>
+<span class="nc" id="L145">      throw new ValidationException(</span>
+          &quot;You specified username but do not specified password&quot;);
+<span class="pc bpc" id="L147" title="1 of 2 branches missed.">    } else if (password != null) {</span>
+<span class="nc" id="L148">      throw new ValidationException(</span>
+          &quot;You specified password but do not specified username&quot;);
+    }
+
+    // We require at least a truststore. The logic is done similar to SchemaRegistryService.securedWebClientOnTLS
+<span class="pc bpc" id="L153" title="3 of 4 branches missed.">    if (trustStoreLocation != null &amp;&amp; trustStorePassword != null) {</span>
+<span class="nc" id="L154">      configs.put(SchemaRegistryClientConfig.CLIENT_NAMESPACE + SslConfigs.SSL_TRUSTSTORE_LOCATION_CONFIG,</span>
+          trustStoreLocation);
+<span class="nc" id="L156">      configs.put(SchemaRegistryClientConfig.CLIENT_NAMESPACE + SslConfigs.SSL_TRUSTSTORE_PASSWORD_CONFIG,</span>
+          trustStorePassword);
+    }
+
+<span class="pc bpc" id="L160" title="3 of 4 branches missed.">    if (keyStoreLocation != null &amp;&amp; keyStorePassword != null) {</span>
+<span class="nc" id="L161">      configs.put(SchemaRegistryClientConfig.CLIENT_NAMESPACE + SslConfigs.SSL_KEYSTORE_LOCATION_CONFIG,</span>
+          keyStoreLocation);
+<span class="nc" id="L163">      configs.put(SchemaRegistryClientConfig.CLIENT_NAMESPACE + SslConfigs.SSL_KEYSTORE_PASSWORD_CONFIG,</span>
+          keyStorePassword);
+<span class="nc" id="L165">      configs.put(SchemaRegistryClientConfig.CLIENT_NAMESPACE + SslConfigs.SSL_KEY_PASSWORD_CONFIG,</span>
+          keyStorePassword);
+    }
+
+<span class="fc" id="L169">    return new CachedSchemaRegistryClient(</span>
+        urls,
+        1_000,
+<span class="fc" id="L172">        List.of(new AvroSchemaProvider(), new ProtobufSchemaProvider(), new JsonSchemaProvider()),</span>
+        configs
+    );
+  }
+
+  @Override
+  public Optional&lt;String&gt; getDescription() {
+<span class="nc" id="L179">    return Optional.empty();</span>
+  }
+
+  @Override
+  public boolean canDeserialize(String topic, Target type) {
+<span class="fc" id="L184">    String subject = schemaSubject(topic, type);</span>
+<span class="fc bfc" id="L185" title="All 2 branches covered.">    return !checkSchemaExistenceForDeserialize</span>
+<span class="fc bfc" id="L186" title="All 2 branches covered.">        || getSchemaBySubject(subject).isPresent();</span>
+  }
+
+  @Override
+  public boolean canSerialize(String topic, Target type) {
+<span class="fc" id="L191">    String subject = schemaSubject(topic, type);</span>
+<span class="fc" id="L192">    return getSchemaBySubject(subject).isPresent();</span>
+  }
+
+  @Override
+  public Optional&lt;SchemaDescription&gt; getSchema(String topic, Target type) {
+<span class="fc" id="L197">    String subject = schemaSubject(topic, type);</span>
+<span class="fc" id="L198">    return getSchemaBySubject(subject)</span>
+<span class="fc" id="L199">        .flatMap(schemaMetadata -&gt;</span>
+            //schema can be not-found, when schema contexts configured improperly
+<span class="fc" id="L201">            getSchemaById(schemaMetadata.getId())</span>
+<span class="fc" id="L202">                .map(parsedSchema -&gt;</span>
+<span class="fc" id="L203">                    new SchemaDescription(</span>
+<span class="fc" id="L204">                        convertSchema(schemaMetadata, parsedSchema),</span>
+<span class="fc" id="L205">                        Map.of(</span>
+                            &quot;subject&quot;, subject,
+<span class="fc" id="L207">                            &quot;schemaId&quot;, schemaMetadata.getId(),</span>
+<span class="fc" id="L208">                            &quot;latestVersion&quot;, schemaMetadata.getVersion(),</span>
+<span class="fc" id="L209">                            &quot;type&quot;, schemaMetadata.getSchemaType() // AVRO / PROTOBUF / JSON</span>
+                        )
+                    )));
+  }
+
+<span class="nc" id="L214">  @SneakyThrows</span>
+  private String convertSchema(SchemaMetadata schema, ParsedSchema parsedSchema) {
+<span class="fc" id="L216">    URI basePath = new URI(schemaRegistryUrls.get(0))</span>
+<span class="fc" id="L217">        .resolve(Integer.toString(schema.getId()));</span>
+<span class="fc" id="L218">    SchemaType schemaType = SchemaType.fromString(schema.getSchemaType())</span>
+<span class="pc" id="L219">        .orElseThrow(() -&gt; new IllegalStateException(&quot;Unknown schema type: &quot; + schema.getSchemaType()));</span>
+<span class="pc bpc" id="L220" title="3 of 4 branches missed.">    return switch (schemaType) {</span>
+<span class="nc" id="L221">      case PROTOBUF -&gt; new ProtobufSchemaConverter()</span>
+<span class="nc" id="L222">          .convert(basePath, ((ProtobufSchema) parsedSchema).toDescriptor())</span>
+<span class="nc" id="L223">          .toJson();</span>
+<span class="fc" id="L224">      case AVRO -&gt; new AvroJsonSchemaConverter()</span>
+<span class="fc" id="L225">          .convert(basePath, ((AvroSchema) parsedSchema).rawSchema())</span>
+<span class="fc" id="L226">          .toJson();</span>
+      case JSON -&gt;
+          //need to use confluent JsonSchema since it includes resolved references
+<span class="nc" id="L229">          ((JsonSchema) parsedSchema).rawSchema().toString();</span>
+    };
+  }
+
+  private Optional&lt;ParsedSchema&gt; getSchemaById(int id) {
+<span class="fc" id="L234">    return wrapWith404Handler(() -&gt; schemaRegistryClient.getSchemaById(id));</span>
+  }
+
+  private Optional&lt;SchemaMetadata&gt; getSchemaBySubject(String subject) {
+<span class="fc" id="L238">    return wrapWith404Handler(() -&gt; schemaRegistryClient.getLatestSchemaMetadata(subject));</span>
+  }
+
+<span class="nc" id="L241">  @SneakyThrows</span>
+  private &lt;T&gt; Optional&lt;T&gt; wrapWith404Handler(Callable&lt;T&gt; call) {
+    try {
+<span class="fc" id="L244">      return Optional.ofNullable(call.call());</span>
+<span class="fc" id="L245">    } catch (RestClientException restClientException) {</span>
+<span class="pc bpc" id="L246" title="1 of 2 branches missed.">      if (restClientException.getStatus() == 404) {</span>
+<span class="fc" id="L247">        return Optional.empty();</span>
+      } else {
+<span class="nc" id="L249">        throw new RuntimeException(&quot;Error calling SchemaRegistryClient&quot;, restClientException);</span>
+      }
+    }
+  }
+
+  private String schemaSubject(String topic, Target type) {
+<span class="fc bfc" id="L255" title="All 2 branches covered.">    return String.format(type == Target.KEY ? keySchemaNameTemplate : valueSchemaNameTemplate, topic);</span>
+  }
+
+  @Override
+  public Serializer serializer(String topic, Target type) {
+<span class="fc" id="L260">    String subject = schemaSubject(topic, type);</span>
+<span class="fc" id="L261">    SchemaMetadata meta = getSchemaBySubject(subject)</span>
+<span class="pc" id="L262">        .orElseThrow(() -&gt; new ValidationException(</span>
+<span class="nc" id="L263">            String.format(&quot;No schema for subject '%s' found&quot;, subject)));</span>
+<span class="fc" id="L264">    ParsedSchema schema = getSchemaById(meta.getId())</span>
+<span class="pc" id="L265">        .orElseThrow(() -&gt; new IllegalStateException(</span>
+<span class="nc" id="L266">            String.format(&quot;Schema found for id %s, subject '%s'&quot;, meta.getId(), subject)));</span>
+<span class="fc" id="L267">    SchemaType schemaType = SchemaType.fromString(meta.getSchemaType())</span>
+<span class="pc" id="L268">        .orElseThrow(() -&gt; new IllegalStateException(&quot;Unknown schema type: &quot; + meta.getSchemaType()));</span>
+<span class="pc bpc" id="L269" title="1 of 4 branches missed.">    return switch (schemaType) {</span>
+<span class="fc" id="L270">      case PROTOBUF -&gt; input -&gt;</span>
+<span class="fc" id="L271">          serializeProto(schemaRegistryClient, topic, type, (ProtobufSchema) schema, meta.getId(), input);</span>
+<span class="fc" id="L272">      case AVRO -&gt; input -&gt;</span>
+<span class="fc" id="L273">          serializeAvro((AvroSchema) schema, meta.getId(), input);</span>
+<span class="fc" id="L274">      case JSON -&gt; input -&gt;</span>
+<span class="fc" id="L275">          serializeJson((JsonSchema) schema, meta.getId(), input);</span>
+    };
+  }
+
+  @Override
+  public Deserializer deserializer(String topic, Target type) {
+<span class="fc" id="L281">    return (headers, data) -&gt; {</span>
+<span class="fc" id="L282">      var schemaId = extractSchemaIdFromMsg(data);</span>
+<span class="fc" id="L283">      SchemaType format = getMessageFormatBySchemaId(schemaId);</span>
+<span class="fc" id="L284">      MessageFormatter formatter = schemaRegistryFormatters.get(format);</span>
+<span class="fc" id="L285">      return new DeserializeResult(</span>
+<span class="fc" id="L286">          formatter.format(topic, data),</span>
+          DeserializeResult.Type.JSON,
+<span class="fc" id="L288">          Map.of(</span>
+<span class="fc" id="L289">              &quot;schemaId&quot;, schemaId,</span>
+<span class="fc" id="L290">              &quot;type&quot;, format.name()</span>
+          )
+      );
+    };
+  }
+
+  private SchemaType getMessageFormatBySchemaId(int schemaId) {
+<span class="fc" id="L297">    return getSchemaById(schemaId)</span>
+<span class="fc" id="L298">        .map(ParsedSchema::schemaType)</span>
+<span class="fc" id="L299">        .flatMap(SchemaType::fromString)</span>
+<span class="pc" id="L300">        .orElseThrow(() -&gt; new ValidationException(String.format(&quot;Schema for id '%d' not found &quot;, schemaId)));</span>
+  }
+
+  private int extractSchemaIdFromMsg(byte[] data) {
+<span class="fc" id="L304">    ByteBuffer buffer = ByteBuffer.wrap(data);</span>
+<span class="fc bfc" id="L305" title="All 4 branches covered.">    if (buffer.remaining() &gt;= SR_PAYLOAD_PREFIX_LENGTH &amp;&amp; buffer.get() == SR_PAYLOAD_MAGIC_BYTE) {</span>
+<span class="fc" id="L306">      return buffer.getInt();</span>
+    }
+<span class="fc" id="L308">    throw new ValidationException(</span>
+<span class="fc" id="L309">        String.format(</span>
+            &quot;Data doesn't contain magic byte and schema id prefix, so it can't be deserialized with %s serde&quot;,
+<span class="fc" id="L311">            name())</span>
+    );
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>KsqlGrammar.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">kafka-ui-api</a> &gt; <a href="index.source.html" class="el_package">com.provectus.kafka.ui.service.ksql</a> &gt; <span class="el_source">KsqlGrammar.java</span></div><h1>KsqlGrammar.java</h1><pre class="source lang-java linenums">package com.provectus.kafka.ui.service.ksql;
+
+import com.provectus.kafka.ui.exception.ValidationException;
+import java.util.List;
+import java.util.Optional;
+import ksql.KsqlGrammarLexer;
+import ksql.KsqlGrammarParser;
+import lombok.RequiredArgsConstructor;
+import lombok.Value;
+import lombok.experimental.Delegate;
+import org.antlr.v4.runtime.BaseErrorListener;
+import org.antlr.v4.runtime.CharStream;
+import org.antlr.v4.runtime.CharStreams;
+import org.antlr.v4.runtime.CommonTokenStream;
+import org.antlr.v4.runtime.IntStream;
+import org.antlr.v4.runtime.RecognitionException;
+import org.antlr.v4.runtime.Recognizer;
+import org.antlr.v4.runtime.atn.PredictionMode;
+
+class KsqlGrammar {
+
+  private KsqlGrammar() {
+  }
+
+<span class="pc bnc" id="L25" title="All 12 branches missed.">  @Value</span>
+  static class KsqlStatements {
+<span class="fc" id="L27">    List&lt;KsqlGrammarParser.SingleStatementContext&gt; statements;</span>
+  }
+
+  // returns Empty if no valid statements found
+  static Optional&lt;KsqlStatements&gt; parse(String ksql) {
+<span class="fc" id="L32">    var parsed = parseStatements(ksql);</span>
+<span class="fc" id="L33">    if (parsed.singleStatement().stream()</span>
+<span class="pc bpc" id="L34" title="2 of 4 branches missed.">        .anyMatch(s -&gt; s.statement().exception != null)) {</span>
+<span class="nc" id="L35">      return Optional.empty();</span>
+    }
+<span class="fc" id="L37">    return Optional.of(new KsqlStatements(parsed.singleStatement()));</span>
+  }
+
+  static boolean isSelect(KsqlGrammarParser.SingleStatementContext statement) {
+<span class="fc" id="L41">    return statement.statement() instanceof ksql.KsqlGrammarParser.QueryStatementContext;</span>
+  }
+
+  private static ksql.KsqlGrammarParser.StatementsContext parseStatements(final String sql) {
+<span class="fc" id="L45">    var lexer = new KsqlGrammarLexer(CaseInsensitiveStream.from(CharStreams.fromString(sql)));</span>
+<span class="fc" id="L46">    var tokenStream = new CommonTokenStream(lexer);</span>
+<span class="fc" id="L47">    var grammarParser = new ksql.KsqlGrammarParser(tokenStream);</span>
+
+<span class="fc" id="L49">    lexer.addErrorListener(new BaseErrorListener() {</span>
+      @Override
+      public void syntaxError(Recognizer&lt;?, ?&gt; recognizer, Object offendingSymbol,
+                              int line, int charPositionInLine,
+                              String msg, RecognitionException e) {
+<span class="nc" id="L54">        throw new ValidationException(&quot;Invalid syntax: &quot; + msg);</span>
+      }
+    });
+<span class="fc" id="L57">    grammarParser.getInterpreter().setPredictionMode(PredictionMode.LL);</span>
+    try {
+<span class="fc" id="L59">      return grammarParser.statements();</span>
+<span class="nc" id="L60">    } catch (Exception e) {</span>
+<span class="nc" id="L61">      throw new ValidationException(&quot;Error parsing ksql query: &quot; + e.getMessage());</span>
+    }
+  }
+
+  // impl copied from https://github.com/confluentinc/ksql/blob/master/ksqldb-parser/src/main/java/io/confluent/ksql/parser/CaseInsensitiveStream.java
+<span class="fc" id="L66">  @RequiredArgsConstructor</span>
+  private static class CaseInsensitiveStream implements CharStream {
+<span class="pc" id="L68">    @Delegate</span>
+    final CharStream stream;
+
+    public static CaseInsensitiveStream from(CharStream stream) {
+      // we only need to override LA method
+<span class="fc" id="L73">      return new CaseInsensitiveStream(stream) {</span>
+        @Override
+        public int LA(final int i) {
+<span class="fc" id="L76">          final int result = stream.LA(i);</span>
+<span class="fc bfc" id="L77" title="All 2 branches covered.">          switch (result) {</span>
+            case 0:
+            case IntStream.EOF:
+<span class="fc" id="L80">              return result;</span>
+            default:
+<span class="fc" id="L82">              return Character.toUpperCase(result);</span>
+          }
+        }
+      };
+    }
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

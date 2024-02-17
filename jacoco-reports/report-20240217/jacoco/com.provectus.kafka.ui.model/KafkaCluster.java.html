@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>KafkaCluster.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">kafka-ui-api</a> &gt; <a href="index.source.html" class="el_package">com.provectus.kafka.ui.model</a> &gt; <span class="el_source">KafkaCluster.java</span></div><h1>KafkaCluster.java</h1><pre class="source lang-java linenums">package com.provectus.kafka.ui.model;
+
+import com.provectus.kafka.ui.config.ClustersProperties;
+import com.provectus.kafka.ui.connect.api.KafkaConnectClientApi;
+import com.provectus.kafka.ui.emitter.PollingSettings;
+import com.provectus.kafka.ui.service.ksql.KsqlApiClient;
+import com.provectus.kafka.ui.service.masking.DataMasking;
+import com.provectus.kafka.ui.sr.api.KafkaSrClientApi;
+import com.provectus.kafka.ui.util.ReactiveFailover;
+import java.util.Map;
+import java.util.Properties;
+import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+
+<span class="nc bnc" id="L17" title="All 98 branches missed.">@Data</span>
+<span class="pc" id="L18">@Builder(toBuilder = true)</span>
+<span class="fc" id="L19">@AllArgsConstructor(access = AccessLevel.PRIVATE)</span>
+public class KafkaCluster {
+<span class="fc" id="L21">  private final ClustersProperties.Cluster originalProperties;</span>
+
+<span class="fc" id="L23">  private final String name;</span>
+<span class="nc" id="L24">  private final String version;</span>
+<span class="fc" id="L25">  private final String bootstrapServers;</span>
+<span class="fc" id="L26">  private final Properties properties;</span>
+<span class="fc" id="L27">  private final boolean readOnly;</span>
+<span class="fc" id="L28">  private final MetricsConfig metricsConfig;</span>
+<span class="fc" id="L29">  private final DataMasking masking;</span>
+<span class="fc" id="L30">  private final PollingSettings pollingSettings;</span>
+<span class="fc" id="L31">  private final ReactiveFailover&lt;KafkaSrClientApi&gt; schemaRegistryClient;</span>
+<span class="fc" id="L32">  private final Map&lt;String, ReactiveFailover&lt;KafkaConnectClientApi&gt;&gt; connectsClients;</span>
+<span class="fc" id="L33">  private final ReactiveFailover&lt;KsqlApiClient&gt; ksqlClient;</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

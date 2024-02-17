@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>InternalConsumerGroup.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">kafka-ui-api</a> &gt; <a href="index.source.html" class="el_package">com.provectus.kafka.ui.model</a> &gt; <span class="el_source">InternalConsumerGroup.java</span></div><h1>InternalConsumerGroup.java</h1><pre class="source lang-java linenums">package com.provectus.kafka.ui.model;
+
+import java.util.Collection;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+import lombok.Builder;
+import lombok.Data;
+import org.apache.kafka.clients.admin.ConsumerGroupDescription;
+import org.apache.kafka.common.ConsumerGroupState;
+import org.apache.kafka.common.Node;
+import org.apache.kafka.common.TopicPartition;
+
+<span class="nc bnc" id="L16" title="All 82 branches missed.">@Data</span>
+<span class="pc" id="L17">@Builder(toBuilder = true)</span>
+public class InternalConsumerGroup {
+<span class="fc" id="L19">  private final String groupId;</span>
+<span class="fc" id="L20">  private final boolean simple;</span>
+<span class="fc" id="L21">  private final Collection&lt;InternalMember&gt; members;</span>
+<span class="nc" id="L22">  private final Map&lt;TopicPartition, Long&gt; offsets;</span>
+<span class="nc" id="L23">  private final Map&lt;TopicPartition, Long&gt; endOffsets;</span>
+<span class="fc" id="L24">  private final Long consumerLag;</span>
+<span class="fc" id="L25">  private final Integer topicNum;</span>
+<span class="fc" id="L26">  private final String partitionAssignor;</span>
+<span class="fc" id="L27">  private final ConsumerGroupState state;</span>
+<span class="fc" id="L28">  private final Node coordinator;</span>
+
+<span class="nc bnc" id="L30" title="All 46 branches missed.">  @Data</span>
+<span class="pc" id="L31">  @Builder(toBuilder = true)</span>
+  public static class InternalMember {
+<span class="nc" id="L33">    private final String consumerId;</span>
+<span class="nc" id="L34">    private final String groupInstanceId;</span>
+<span class="nc" id="L35">    private final String clientId;</span>
+<span class="nc" id="L36">    private final String host;</span>
+<span class="fc" id="L37">    private final Set&lt;TopicPartition&gt; assignment;</span>
+  }
+
+  public static InternalConsumerGroup create(
+      ConsumerGroupDescription description,
+      Map&lt;TopicPartition, Long&gt; groupOffsets,
+      Map&lt;TopicPartition, Long&gt; topicEndOffsets) {
+<span class="fc" id="L44">    var builder = InternalConsumerGroup.builder();</span>
+<span class="fc" id="L45">    builder.groupId(description.groupId());</span>
+<span class="fc" id="L46">    builder.simple(description.isSimpleConsumerGroup());</span>
+<span class="fc" id="L47">    builder.state(description.state());</span>
+<span class="fc" id="L48">    builder.partitionAssignor(description.partitionAssignor());</span>
+<span class="fc" id="L49">    Collection&lt;InternalMember&gt; internalMembers = initInternalMembers(description);</span>
+<span class="fc" id="L50">    builder.members(internalMembers);</span>
+<span class="fc" id="L51">    builder.offsets(groupOffsets);</span>
+<span class="fc" id="L52">    builder.endOffsets(topicEndOffsets);</span>
+<span class="fc" id="L53">    builder.consumerLag(calculateConsumerLag(groupOffsets, topicEndOffsets));</span>
+<span class="fc" id="L54">    builder.topicNum(calculateTopicNum(groupOffsets, internalMembers));</span>
+<span class="fc" id="L55">    Optional.ofNullable(description.coordinator()).ifPresent(builder::coordinator);</span>
+<span class="fc" id="L56">    return builder.build();</span>
+  }
+
+  private static Long calculateConsumerLag(Map&lt;TopicPartition, Long&gt; offsets, Map&lt;TopicPartition, Long&gt; endOffsets) {
+<span class="fc" id="L60">    Long consumerLag = null;</span>
+    // consumerLag should be undefined if no committed offsets found for topic
+<span class="pc bpc" id="L62" title="1 of 2 branches missed.">    if (!offsets.isEmpty()) {</span>
+<span class="nc" id="L63">      consumerLag = offsets.entrySet().stream()</span>
+<span class="nc" id="L64">          .mapToLong(e -&gt;</span>
+<span class="nc" id="L65">              Optional.ofNullable(endOffsets)</span>
+<span class="nc" id="L66">                  .map(o -&gt; o.get(e.getKey()))</span>
+<span class="nc" id="L67">                  .map(o -&gt; o - e.getValue())</span>
+<span class="nc" id="L68">                  .orElse(0L)</span>
+<span class="nc" id="L69">          ).sum();</span>
+    }
+
+<span class="fc" id="L72">    return consumerLag;</span>
+  }
+
+  private static Integer calculateTopicNum(Map&lt;TopicPartition, Long&gt; offsets, Collection&lt;InternalMember&gt; members) {
+
+<span class="fc" id="L77">    return (int) Stream.concat(</span>
+<span class="fc" id="L78">        offsets.keySet().stream().map(TopicPartition::topic),</span>
+<span class="fc" id="L79">        members.stream()</span>
+<span class="fc" id="L80">            .flatMap(m -&gt; m.getAssignment().stream().map(TopicPartition::topic))</span>
+<span class="fc" id="L81">    ).distinct().count();</span>
+
+  }
+
+  private static Collection&lt;InternalMember&gt; initInternalMembers(ConsumerGroupDescription description) {
+<span class="fc" id="L86">    return description.members().stream()</span>
+<span class="fc" id="L87">        .map(m -&gt;</span>
+<span class="fc" id="L88">            InternalConsumerGroup.InternalMember.builder()</span>
+<span class="fc" id="L89">                .assignment(m.assignment().topicPartitions())</span>
+<span class="fc" id="L90">                .clientId(m.clientId())</span>
+<span class="fc" id="L91">                .groupInstanceId(m.groupInstanceId().orElse(&quot;&quot;))</span>
+<span class="fc" id="L92">                .consumerId(m.consumerId())</span>
+<span class="fc" id="L93">                .clientId(m.clientId())</span>
+<span class="fc" id="L94">                .host(m.host())</span>
+<span class="fc" id="L95">                .build()</span>
+<span class="fc" id="L96">        ).collect(Collectors.toList());</span>
+  }
+
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>KafkaConfigSanitizer.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">kafka-ui-api</a> &gt; <a href="index.source.html" class="el_package">com.provectus.kafka.ui.service</a> &gt; <span class="el_source">KafkaConfigSanitizer.java</span></div><h1>KafkaConfigSanitizer.java</h1><pre class="source lang-java linenums">package com.provectus.kafka.ui.service;
+
+import static java.util.regex.Pattern.CASE_INSENSITIVE;
+
+import com.google.common.collect.ImmutableList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
+import javax.annotation.Nullable;
+import org.apache.kafka.common.config.ConfigDef;
+import org.apache.kafka.common.config.SaslConfigs;
+import org.apache.kafka.common.config.SslConfigs;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Component;
+
+@Component
+class KafkaConfigSanitizer {
+
+  private static final String SANITIZED_VALUE = &quot;******&quot;;
+
+<span class="fc" id="L26">  private static final String[] REGEX_PARTS = {&quot;*&quot;, &quot;$&quot;, &quot;^&quot;, &quot;+&quot;};</span>
+
+<span class="fc" id="L28">  private static final List&lt;String&gt; DEFAULT_PATTERNS_TO_SANITIZE = ImmutableList.&lt;String&gt;builder()</span>
+<span class="fc" id="L29">      .addAll(kafkaConfigKeysToSanitize())</span>
+<span class="fc" id="L30">      .add(</span>
+          &quot;basic.auth.user.info&quot;,  /* For Schema Registry credentials */
+          &quot;password&quot;, &quot;secret&quot;, &quot;token&quot;, &quot;key&quot;, &quot;.*credentials.*&quot;,   /* General credential patterns */
+          &quot;aws.access.*&quot;, &quot;aws.secret.*&quot;, &quot;aws.session.*&quot;   /* AWS-related credential patterns */
+      )
+<span class="fc" id="L35">      .build();</span>
+
+  private final List&lt;Pattern&gt; sanitizeKeysPatterns;
+
+  KafkaConfigSanitizer(
+      @Value(&quot;${kafka.config.sanitizer.enabled:true}&quot;) boolean enabled,
+      @Value(&quot;${kafka.config.sanitizer.patterns:}&quot;) List&lt;String&gt; patternsToSanitize
+<span class="fc" id="L42">  ) {</span>
+<span class="fc bfc" id="L43" title="All 2 branches covered.">    this.sanitizeKeysPatterns = enabled</span>
+<span class="fc bfc" id="L44" title="All 2 branches covered.">        ? compile(patternsToSanitize.isEmpty() ? DEFAULT_PATTERNS_TO_SANITIZE : patternsToSanitize)</span>
+<span class="fc" id="L45">        : List.of();</span>
+<span class="fc" id="L46">  }</span>
+
+  private static List&lt;Pattern&gt; compile(Collection&lt;String&gt; patternStrings) {
+<span class="fc" id="L49">    return patternStrings.stream()</span>
+<span class="fc bfc" id="L50" title="All 2 branches covered.">        .map(p -&gt; isRegex(p)</span>
+<span class="fc" id="L51">            ? Pattern.compile(p, CASE_INSENSITIVE)</span>
+<span class="fc" id="L52">            : Pattern.compile(&quot;.*&quot; + p + &quot;$&quot;, CASE_INSENSITIVE))</span>
+<span class="fc" id="L53">        .toList();</span>
+  }
+
+  private static boolean isRegex(String str) {
+<span class="fc" id="L57">    return Arrays.stream(REGEX_PARTS).anyMatch(str::contains);</span>
+  }
+
+  private static Set&lt;String&gt; kafkaConfigKeysToSanitize() {
+<span class="fc" id="L61">    final ConfigDef configDef = new ConfigDef();</span>
+<span class="fc" id="L62">    SslConfigs.addClientSslSupport(configDef);</span>
+<span class="fc" id="L63">    SaslConfigs.addClientSaslSupport(configDef);</span>
+<span class="fc" id="L64">    return configDef.configKeys().entrySet().stream()</span>
+<span class="fc" id="L65">        .filter(entry -&gt; entry.getValue().type().equals(ConfigDef.Type.PASSWORD))</span>
+<span class="fc" id="L66">        .map(Map.Entry::getKey)</span>
+<span class="fc" id="L67">        .collect(Collectors.toSet());</span>
+  }
+
+  @Nullable
+  public Object sanitize(String key, @Nullable Object value) {
+<span class="fc bfc" id="L72" title="All 2 branches covered.">    for (Pattern pattern : sanitizeKeysPatterns) {</span>
+<span class="fc bfc" id="L73" title="All 2 branches covered.">      if (pattern.matcher(key).matches()) {</span>
+<span class="fc" id="L74">        return SANITIZED_VALUE;</span>
+      }
+<span class="fc" id="L76">    }</span>
+<span class="fc" id="L77">    return value;</span>
+  }
+
+  public Map&lt;String, Object&gt; sanitizeConnectorConfig(@Nullable Map&lt;String, Object&gt; original) {
+<span class="fc" id="L81">    var result = new HashMap&lt;String, Object&gt;(); //null-values supporting map!</span>
+<span class="pc bpc" id="L82" title="1 of 2 branches missed.">    if (original != null) {</span>
+<span class="fc" id="L83">      original.forEach((k, v) -&gt; result.put(k, sanitize(k, v)));</span>
+    }
+<span class="fc" id="L85">    return result;</span>
+  }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

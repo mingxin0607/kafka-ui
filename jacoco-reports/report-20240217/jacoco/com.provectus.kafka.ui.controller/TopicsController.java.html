@@ -1,0 +1,380 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TopicsController.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">kafka-ui-api</a> &gt; <a href="index.source.html" class="el_package">com.provectus.kafka.ui.controller</a> &gt; <span class="el_source">TopicsController.java</span></div><h1>TopicsController.java</h1><pre class="source lang-java linenums">package com.provectus.kafka.ui.controller;
+
+import static com.provectus.kafka.ui.model.rbac.permission.TopicAction.CREATE;
+import static com.provectus.kafka.ui.model.rbac.permission.TopicAction.DELETE;
+import static com.provectus.kafka.ui.model.rbac.permission.TopicAction.EDIT;
+import static com.provectus.kafka.ui.model.rbac.permission.TopicAction.MESSAGES_READ;
+import static com.provectus.kafka.ui.model.rbac.permission.TopicAction.VIEW;
+import static java.util.stream.Collectors.toList;
+
+import com.provectus.kafka.ui.api.TopicsApi;
+import com.provectus.kafka.ui.mapper.ClusterMapper;
+import com.provectus.kafka.ui.model.InternalTopic;
+import com.provectus.kafka.ui.model.InternalTopicConfig;
+import com.provectus.kafka.ui.model.PartitionsIncreaseDTO;
+import com.provectus.kafka.ui.model.PartitionsIncreaseResponseDTO;
+import com.provectus.kafka.ui.model.ReplicationFactorChangeDTO;
+import com.provectus.kafka.ui.model.ReplicationFactorChangeResponseDTO;
+import com.provectus.kafka.ui.model.SortOrderDTO;
+import com.provectus.kafka.ui.model.TopicAnalysisDTO;
+import com.provectus.kafka.ui.model.TopicColumnsToSortDTO;
+import com.provectus.kafka.ui.model.TopicConfigDTO;
+import com.provectus.kafka.ui.model.TopicCreationDTO;
+import com.provectus.kafka.ui.model.TopicDTO;
+import com.provectus.kafka.ui.model.TopicDetailsDTO;
+import com.provectus.kafka.ui.model.TopicProducerStateDTO;
+import com.provectus.kafka.ui.model.TopicUpdateDTO;
+import com.provectus.kafka.ui.model.TopicsResponseDTO;
+import com.provectus.kafka.ui.model.rbac.AccessContext;
+import com.provectus.kafka.ui.service.TopicsService;
+import com.provectus.kafka.ui.service.analyze.TopicAnalysisService;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Map;
+import javax.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ServerWebExchange;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
+
+@RestController
+<span class="fc" id="L46">@RequiredArgsConstructor</span>
+<span class="fc" id="L47">@Slf4j</span>
+public class TopicsController extends AbstractController implements TopicsApi {
+
+<span class="fc" id="L50">  private static final Integer DEFAULT_PAGE_SIZE = 25;</span>
+
+  private final TopicsService topicsService;
+  private final TopicAnalysisService topicAnalysisService;
+  private final ClusterMapper clusterMapper;
+
+  @Override
+  public Mono&lt;ResponseEntity&lt;TopicDTO&gt;&gt; createTopic(
+      String clusterName, @Valid Mono&lt;TopicCreationDTO&gt; topicCreationMono, ServerWebExchange exchange) {
+<span class="fc" id="L59">    return topicCreationMono.flatMap(topicCreation -&gt; {</span>
+<span class="fc" id="L60">      var context = AccessContext.builder()</span>
+<span class="fc" id="L61">          .cluster(clusterName)</span>
+<span class="fc" id="L62">          .topicActions(CREATE)</span>
+<span class="fc" id="L63">          .operationName(&quot;createTopic&quot;)</span>
+<span class="fc" id="L64">          .operationParams(topicCreation)</span>
+<span class="fc" id="L65">          .build();</span>
+
+<span class="fc" id="L67">      return validateAccess(context)</span>
+<span class="fc" id="L68">          .then(topicsService.createTopic(getCluster(clusterName), topicCreation))</span>
+<span class="fc" id="L69">          .map(clusterMapper::toTopic)</span>
+<span class="fc" id="L70">          .map(s -&gt; new ResponseEntity&lt;&gt;(s, HttpStatus.OK))</span>
+<span class="fc" id="L71">          .switchIfEmpty(Mono.just(ResponseEntity.notFound().build()))</span>
+<span class="fc" id="L72">          .doOnEach(sig -&gt; audit(context, sig));</span>
+    });
+  }
+
+  @Override
+  public Mono&lt;ResponseEntity&lt;TopicDTO&gt;&gt; recreateTopic(String clusterName,
+                                                      String topicName, ServerWebExchange exchange) {
+<span class="fc" id="L79">    var context = AccessContext.builder()</span>
+<span class="fc" id="L80">        .cluster(clusterName)</span>
+<span class="fc" id="L81">        .topic(topicName)</span>
+<span class="fc" id="L82">        .topicActions(VIEW, CREATE, DELETE)</span>
+<span class="fc" id="L83">        .operationName(&quot;recreateTopic&quot;)</span>
+<span class="fc" id="L84">        .build();</span>
+
+<span class="fc" id="L86">    return validateAccess(context).then(</span>
+<span class="fc" id="L87">        topicsService.recreateTopic(getCluster(clusterName), topicName)</span>
+<span class="fc" id="L88">            .map(clusterMapper::toTopic)</span>
+<span class="fc" id="L89">            .map(s -&gt; new ResponseEntity&lt;&gt;(s, HttpStatus.CREATED))</span>
+<span class="fc" id="L90">    ).doOnEach(sig -&gt; audit(context, sig));</span>
+  }
+
+  @Override
+  public Mono&lt;ResponseEntity&lt;TopicDTO&gt;&gt; cloneTopic(
+      String clusterName, String topicName, String newTopicName, ServerWebExchange exchange) {
+
+<span class="fc" id="L97">    var context = AccessContext.builder()</span>
+<span class="fc" id="L98">        .cluster(clusterName)</span>
+<span class="fc" id="L99">        .topic(topicName)</span>
+<span class="fc" id="L100">        .topicActions(VIEW, CREATE)</span>
+<span class="fc" id="L101">        .operationName(&quot;cloneTopic&quot;)</span>
+<span class="fc" id="L102">        .operationParams(Map.of(&quot;newTopicName&quot;, newTopicName))</span>
+<span class="fc" id="L103">        .build();</span>
+
+<span class="fc" id="L105">    return validateAccess(context)</span>
+<span class="fc" id="L106">        .then(topicsService.cloneTopic(getCluster(clusterName), topicName, newTopicName)</span>
+<span class="fc" id="L107">            .map(clusterMapper::toTopic)</span>
+<span class="fc" id="L108">            .map(s -&gt; new ResponseEntity&lt;&gt;(s, HttpStatus.CREATED))</span>
+<span class="fc" id="L109">        ).doOnEach(sig -&gt; audit(context, sig));</span>
+  }
+
+  @Override
+  public Mono&lt;ResponseEntity&lt;Void&gt;&gt; deleteTopic(
+      String clusterName, String topicName, ServerWebExchange exchange) {
+
+<span class="nc" id="L116">    var context = AccessContext.builder()</span>
+<span class="nc" id="L117">        .cluster(clusterName)</span>
+<span class="nc" id="L118">        .topic(topicName)</span>
+<span class="nc" id="L119">        .topicActions(DELETE)</span>
+<span class="nc" id="L120">        .operationName(&quot;deleteTopic&quot;)</span>
+<span class="nc" id="L121">        .build();</span>
+
+<span class="nc" id="L123">    return validateAccess(context)</span>
+<span class="nc" id="L124">        .then(</span>
+<span class="nc" id="L125">            topicsService.deleteTopic(getCluster(clusterName), topicName)</span>
+<span class="nc" id="L126">                .thenReturn(ResponseEntity.ok().&lt;Void&gt;build())</span>
+<span class="nc" id="L127">        ).doOnEach(sig -&gt; audit(context, sig));</span>
+  }
+
+
+  @Override
+  public Mono&lt;ResponseEntity&lt;Flux&lt;TopicConfigDTO&gt;&gt;&gt; getTopicConfigs(
+      String clusterName, String topicName, ServerWebExchange exchange) {
+
+<span class="fc" id="L135">    var context = AccessContext.builder()</span>
+<span class="fc" id="L136">        .cluster(clusterName)</span>
+<span class="fc" id="L137">        .topic(topicName)</span>
+<span class="fc" id="L138">        .topicActions(VIEW)</span>
+<span class="fc" id="L139">        .operationName(&quot;getTopicConfigs&quot;)</span>
+<span class="fc" id="L140">        .build();</span>
+
+<span class="fc" id="L142">    return validateAccess(context).then(</span>
+<span class="fc" id="L143">        topicsService.getTopicConfigs(getCluster(clusterName), topicName)</span>
+<span class="fc" id="L144">            .map(lst -&gt; lst.stream()</span>
+<span class="fc" id="L145">                .map(InternalTopicConfig::from)</span>
+<span class="fc" id="L146">                .map(clusterMapper::toTopicConfig)</span>
+<span class="fc" id="L147">                .toList())</span>
+<span class="fc" id="L148">            .map(Flux::fromIterable)</span>
+<span class="fc" id="L149">            .map(ResponseEntity::ok)</span>
+<span class="fc" id="L150">    ).doOnEach(sig -&gt; audit(context, sig));</span>
+  }
+
+  @Override
+  public Mono&lt;ResponseEntity&lt;TopicDetailsDTO&gt;&gt; getTopicDetails(
+      String clusterName, String topicName, ServerWebExchange exchange) {
+
+<span class="fc" id="L157">    var context = AccessContext.builder()</span>
+<span class="fc" id="L158">        .cluster(clusterName)</span>
+<span class="fc" id="L159">        .topic(topicName)</span>
+<span class="fc" id="L160">        .topicActions(VIEW)</span>
+<span class="fc" id="L161">        .operationName(&quot;getTopicDetails&quot;)</span>
+<span class="fc" id="L162">        .build();</span>
+
+<span class="fc" id="L164">    return validateAccess(context).then(</span>
+<span class="fc" id="L165">        topicsService.getTopicDetails(getCluster(clusterName), topicName)</span>
+<span class="fc" id="L166">            .map(clusterMapper::toTopicDetails)</span>
+<span class="fc" id="L167">            .map(ResponseEntity::ok)</span>
+<span class="fc" id="L168">    ).doOnEach(sig -&gt; audit(context, sig));</span>
+  }
+
+  @Override
+  public Mono&lt;ResponseEntity&lt;TopicsResponseDTO&gt;&gt; getTopics(String clusterName,
+                                                           @Valid Integer page,
+                                                           @Valid Integer perPage,
+                                                           @Valid Boolean showInternal,
+                                                           @Valid String search,
+                                                           @Valid TopicColumnsToSortDTO orderBy,
+                                                           @Valid SortOrderDTO sortOrder,
+                                                           ServerWebExchange exchange) {
+
+<span class="fc" id="L181">    AccessContext context = AccessContext.builder()</span>
+<span class="fc" id="L182">        .cluster(clusterName)</span>
+<span class="fc" id="L183">        .operationName(&quot;getTopics&quot;)</span>
+<span class="fc" id="L184">        .build();</span>
+
+<span class="fc" id="L186">    return topicsService.getTopicsForPagination(getCluster(clusterName))</span>
+<span class="fc" id="L187">        .flatMap(topics -&gt; accessControlService.filterViewableTopics(topics, clusterName))</span>
+<span class="fc" id="L188">        .flatMap(topics -&gt; {</span>
+<span class="fc bfc" id="L189" title="All 4 branches covered.">          int pageSize = perPage != null &amp;&amp; perPage &gt; 0 ? perPage : DEFAULT_PAGE_SIZE;</span>
+<span class="fc bfc" id="L190" title="All 4 branches covered.">          var topicsToSkip = ((page != null &amp;&amp; page &gt; 0 ? page : 1) - 1) * pageSize;</span>
+<span class="pc bpc" id="L191" title="1 of 4 branches missed.">          var comparator = sortOrder == null || !sortOrder.equals(SortOrderDTO.DESC)</span>
+<span class="fc" id="L192">              ? getComparatorForTopic(orderBy) : getComparatorForTopic(orderBy).reversed();</span>
+<span class="fc" id="L193">          List&lt;InternalTopic&gt; filtered = topics.stream()</span>
+<span class="pc bpc" id="L194" title="1 of 4 branches missed.">              .filter(topic -&gt; !topic.isInternal()</span>
+<span class="fc bfc" id="L195" title="All 2 branches covered.">                  || showInternal != null &amp;&amp; showInternal)</span>
+<span class="fc bfc" id="L196" title="All 4 branches covered.">              .filter(topic -&gt; search == null || StringUtils.containsIgnoreCase(topic.getName(), search))</span>
+<span class="fc" id="L197">              .sorted(comparator)</span>
+<span class="fc" id="L198">              .toList();</span>
+<span class="fc" id="L199">          var totalPages = (filtered.size() / pageSize)</span>
+<span class="fc bfc" id="L200" title="All 2 branches covered.">              + (filtered.size() % pageSize == 0 ? 0 : 1);</span>
+
+<span class="fc" id="L202">          List&lt;String&gt; topicsPage = filtered.stream()</span>
+<span class="fc" id="L203">              .skip(topicsToSkip)</span>
+<span class="fc" id="L204">              .limit(pageSize)</span>
+<span class="fc" id="L205">              .map(InternalTopic::getName)</span>
+<span class="fc" id="L206">              .collect(toList());</span>
+
+<span class="fc" id="L208">          return topicsService.loadTopics(getCluster(clusterName), topicsPage)</span>
+<span class="fc" id="L209">              .map(topicsToRender -&gt;</span>
+<span class="fc" id="L210">                  new TopicsResponseDTO()</span>
+<span class="fc" id="L211">                      .topics(topicsToRender.stream().map(clusterMapper::toTopic).toList())</span>
+<span class="fc" id="L212">                      .pageCount(totalPages));</span>
+        })
+<span class="fc" id="L214">        .map(ResponseEntity::ok)</span>
+<span class="fc" id="L215">        .doOnEach(sig -&gt; audit(context, sig));</span>
+  }
+
+  @Override
+  public Mono&lt;ResponseEntity&lt;TopicDTO&gt;&gt; updateTopic(
+      String clusterName, String topicName, @Valid Mono&lt;TopicUpdateDTO&gt; topicUpdate,
+      ServerWebExchange exchange) {
+
+<span class="fc" id="L223">    var context = AccessContext.builder()</span>
+<span class="fc" id="L224">        .cluster(clusterName)</span>
+<span class="fc" id="L225">        .topic(topicName)</span>
+<span class="fc" id="L226">        .topicActions(VIEW, EDIT)</span>
+<span class="fc" id="L227">        .operationName(&quot;updateTopic&quot;)</span>
+<span class="fc" id="L228">        .build();</span>
+
+<span class="fc" id="L230">    return validateAccess(context).then(</span>
+        topicsService
+<span class="fc" id="L232">            .updateTopic(getCluster(clusterName), topicName, topicUpdate)</span>
+<span class="fc" id="L233">            .map(clusterMapper::toTopic)</span>
+<span class="fc" id="L234">            .map(ResponseEntity::ok)</span>
+<span class="fc" id="L235">    ).doOnEach(sig -&gt; audit(context, sig));</span>
+  }
+
+  @Override
+  public Mono&lt;ResponseEntity&lt;PartitionsIncreaseResponseDTO&gt;&gt; increaseTopicPartitions(
+      String clusterName, String topicName,
+      Mono&lt;PartitionsIncreaseDTO&gt; partitionsIncrease,
+      ServerWebExchange exchange) {
+
+<span class="fc" id="L244">    var context = AccessContext.builder()</span>
+<span class="fc" id="L245">        .cluster(clusterName)</span>
+<span class="fc" id="L246">        .topic(topicName)</span>
+<span class="fc" id="L247">        .topicActions(VIEW, EDIT)</span>
+<span class="fc" id="L248">        .build();</span>
+
+<span class="fc" id="L250">    return validateAccess(context).then(</span>
+<span class="fc" id="L251">        partitionsIncrease.flatMap(partitions -&gt;</span>
+<span class="fc" id="L252">            topicsService.increaseTopicPartitions(getCluster(clusterName), topicName, partitions)</span>
+<span class="fc" id="L253">        ).map(ResponseEntity::ok)</span>
+<span class="fc" id="L254">    ).doOnEach(sig -&gt; audit(context, sig));</span>
+  }
+
+  @Override
+  public Mono&lt;ResponseEntity&lt;ReplicationFactorChangeResponseDTO&gt;&gt; changeReplicationFactor(
+      String clusterName, String topicName,
+      Mono&lt;ReplicationFactorChangeDTO&gt; replicationFactorChange,
+      ServerWebExchange exchange) {
+
+<span class="nc" id="L263">    var context = AccessContext.builder()</span>
+<span class="nc" id="L264">        .cluster(clusterName)</span>
+<span class="nc" id="L265">        .topic(topicName)</span>
+<span class="nc" id="L266">        .topicActions(VIEW, EDIT)</span>
+<span class="nc" id="L267">        .operationName(&quot;changeReplicationFactor&quot;)</span>
+<span class="nc" id="L268">        .build();</span>
+
+<span class="nc" id="L270">    return validateAccess(context).then(</span>
+        replicationFactorChange
+<span class="nc" id="L272">            .flatMap(rfc -&gt;</span>
+<span class="nc" id="L273">                topicsService.changeReplicationFactor(getCluster(clusterName), topicName, rfc))</span>
+<span class="nc" id="L274">            .map(ResponseEntity::ok)</span>
+<span class="nc" id="L275">    ).doOnEach(sig -&gt; audit(context, sig));</span>
+  }
+
+  @Override
+  public Mono&lt;ResponseEntity&lt;Void&gt;&gt; analyzeTopic(String clusterName, String topicName, ServerWebExchange exchange) {
+
+<span class="nc" id="L281">    var context = AccessContext.builder()</span>
+<span class="nc" id="L282">        .cluster(clusterName)</span>
+<span class="nc" id="L283">        .topic(topicName)</span>
+<span class="nc" id="L284">        .topicActions(MESSAGES_READ)</span>
+<span class="nc" id="L285">        .operationName(&quot;analyzeTopic&quot;)</span>
+<span class="nc" id="L286">        .build();</span>
+
+<span class="nc" id="L288">    return validateAccess(context).then(</span>
+<span class="nc" id="L289">        topicAnalysisService.analyze(getCluster(clusterName), topicName)</span>
+<span class="nc" id="L290">            .doOnEach(sig -&gt; audit(context, sig))</span>
+<span class="nc" id="L291">            .thenReturn(ResponseEntity.ok().build())</span>
+    );
+  }
+
+  @Override
+  public Mono&lt;ResponseEntity&lt;Void&gt;&gt; cancelTopicAnalysis(String clusterName, String topicName,
+                                                        ServerWebExchange exchange) {
+<span class="nc" id="L298">    var context = AccessContext.builder()</span>
+<span class="nc" id="L299">        .cluster(clusterName)</span>
+<span class="nc" id="L300">        .topic(topicName)</span>
+<span class="nc" id="L301">        .topicActions(MESSAGES_READ)</span>
+<span class="nc" id="L302">        .operationName(&quot;cancelTopicAnalysis&quot;)</span>
+<span class="nc" id="L303">        .build();</span>
+
+<span class="nc" id="L305">    return validateAccess(context)</span>
+<span class="nc" id="L306">        .then(Mono.fromRunnable(() -&gt; topicAnalysisService.cancelAnalysis(getCluster(clusterName), topicName)))</span>
+<span class="nc" id="L307">        .doOnEach(sig -&gt; audit(context, sig))</span>
+<span class="nc" id="L308">        .thenReturn(ResponseEntity.ok().build());</span>
+  }
+
+
+  @Override
+  public Mono&lt;ResponseEntity&lt;TopicAnalysisDTO&gt;&gt; getTopicAnalysis(String clusterName,
+                                                                 String topicName,
+                                                                 ServerWebExchange exchange) {
+
+<span class="nc" id="L317">    var context = AccessContext.builder()</span>
+<span class="nc" id="L318">        .cluster(clusterName)</span>
+<span class="nc" id="L319">        .topic(topicName)</span>
+<span class="nc" id="L320">        .topicActions(MESSAGES_READ)</span>
+<span class="nc" id="L321">        .operationName(&quot;getTopicAnalysis&quot;)</span>
+<span class="nc" id="L322">        .build();</span>
+
+<span class="nc" id="L324">    return validateAccess(context)</span>
+<span class="nc" id="L325">        .thenReturn(topicAnalysisService.getTopicAnalysis(getCluster(clusterName), topicName)</span>
+<span class="nc" id="L326">            .map(ResponseEntity::ok)</span>
+<span class="nc" id="L327">            .orElseGet(() -&gt; ResponseEntity.notFound().build()))</span>
+<span class="nc" id="L328">        .doOnEach(sig -&gt; audit(context, sig));</span>
+  }
+
+  @Override
+  public Mono&lt;ResponseEntity&lt;Flux&lt;TopicProducerStateDTO&gt;&gt;&gt; getActiveProducerStates(String clusterName,
+                                                                                   String topicName,
+                                                                                   ServerWebExchange exchange) {
+<span class="nc" id="L335">    var context = AccessContext.builder()</span>
+<span class="nc" id="L336">        .cluster(clusterName)</span>
+<span class="nc" id="L337">        .topic(topicName)</span>
+<span class="nc" id="L338">        .topicActions(VIEW)</span>
+<span class="nc" id="L339">        .operationName(&quot;getActiveProducerStates&quot;)</span>
+<span class="nc" id="L340">        .build();</span>
+
+<span class="nc" id="L342">    Comparator&lt;TopicProducerStateDTO&gt; ordering =</span>
+<span class="nc" id="L343">        Comparator.comparingInt(TopicProducerStateDTO::getPartition)</span>
+<span class="nc" id="L344">            .thenComparing(Comparator.comparing(TopicProducerStateDTO::getProducerId).reversed());</span>
+
+<span class="nc" id="L346">    Flux&lt;TopicProducerStateDTO&gt; states = topicsService.getActiveProducersState(getCluster(clusterName), topicName)</span>
+<span class="nc" id="L347">        .flatMapMany(statesMap -&gt;</span>
+<span class="nc" id="L348">            Flux.fromStream(</span>
+<span class="nc" id="L349">                statesMap.entrySet().stream()</span>
+<span class="nc" id="L350">                    .flatMap(e -&gt; e.getValue().stream().map(p -&gt; clusterMapper.map(e.getKey().partition(), p)))</span>
+<span class="nc" id="L351">                    .sorted(ordering)));</span>
+
+<span class="nc" id="L353">    return validateAccess(context)</span>
+<span class="nc" id="L354">        .thenReturn(states)</span>
+<span class="nc" id="L355">        .map(ResponseEntity::ok)</span>
+<span class="nc" id="L356">        .doOnEach(sig -&gt; audit(context, sig));</span>
+  }
+
+  private Comparator&lt;InternalTopic&gt; getComparatorForTopic(
+      TopicColumnsToSortDTO orderBy) {
+<span class="fc" id="L361">    var defaultComparator = Comparator.comparing(InternalTopic::getName);</span>
+<span class="fc bfc" id="L362" title="All 2 branches covered.">    if (orderBy == null) {</span>
+<span class="fc" id="L363">      return defaultComparator;</span>
+    }
+<span class="pc bpc" id="L365" title="3 of 5 branches missed.">    switch (orderBy) {</span>
+      case TOTAL_PARTITIONS:
+<span class="fc" id="L367">        return Comparator.comparing(InternalTopic::getPartitionCount);</span>
+      case OUT_OF_SYNC_REPLICAS:
+<span class="nc" id="L369">        return Comparator.comparing(t -&gt; t.getReplicas() - t.getInSyncReplicas());</span>
+      case REPLICATION_FACTOR:
+<span class="nc" id="L371">        return Comparator.comparing(InternalTopic::getReplicationFactor);</span>
+      case SIZE:
+<span class="nc" id="L373">        return Comparator.comparing(InternalTopic::getSegmentSize);</span>
+      case NAME:
+      default:
+<span class="fc" id="L376">        return defaultComparator;</span>
+    }
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

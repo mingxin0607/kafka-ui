@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SeekOperations.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">kafka-ui-api</a> &gt; <a href="index.source.html" class="el_package">com.provectus.kafka.ui.emitter</a> &gt; <span class="el_source">SeekOperations.java</span></div><h1>SeekOperations.java</h1><pre class="source lang-java linenums">package com.provectus.kafka.ui.emitter;
+
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
+import com.provectus.kafka.ui.model.ConsumerPosition;
+import com.provectus.kafka.ui.model.SeekTypeDTO;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.stream.Collectors;
+import javax.annotation.Nullable;
+import lombok.AccessLevel;
+import lombok.RequiredArgsConstructor;
+import org.apache.commons.lang3.mutable.MutableLong;
+import org.apache.kafka.clients.consumer.Consumer;
+import org.apache.kafka.common.TopicPartition;
+
+<span class="fc" id="L17">@RequiredArgsConstructor(access = AccessLevel.PACKAGE)</span>
+public class SeekOperations {
+
+  private final Consumer&lt;?, ?&gt; consumer;
+  private final OffsetsInfo offsetsInfo;
+  private final Map&lt;TopicPartition, Long&gt; offsetsForSeek; //only contains non-empty partitions!
+
+  public static SeekOperations create(Consumer&lt;?, ?&gt; consumer, ConsumerPosition consumerPosition) {
+    OffsetsInfo offsetsInfo;
+<span class="fc bfc" id="L26" title="All 2 branches covered.">    if (consumerPosition.getSeekTo() == null) {</span>
+<span class="fc" id="L27">      offsetsInfo = new OffsetsInfo(consumer, consumerPosition.getTopic());</span>
+    } else {
+<span class="fc" id="L29">      offsetsInfo = new OffsetsInfo(consumer, consumerPosition.getSeekTo().keySet());</span>
+    }
+<span class="fc" id="L31">    return new SeekOperations(</span>
+        consumer,
+        offsetsInfo,
+<span class="fc" id="L34">        getOffsetsForSeek(consumer, offsetsInfo, consumerPosition.getSeekType(), consumerPosition.getSeekTo())</span>
+    );
+  }
+
+  public void assignAndSeekNonEmptyPartitions() {
+<span class="fc" id="L39">    consumer.assign(offsetsForSeek.keySet());</span>
+<span class="fc" id="L40">    offsetsForSeek.forEach(consumer::seek);</span>
+<span class="fc" id="L41">  }</span>
+
+  public Map&lt;TopicPartition, Long&gt; getBeginOffsets() {
+<span class="fc" id="L44">    return offsetsInfo.getBeginOffsets();</span>
+  }
+
+  public Map&lt;TopicPartition, Long&gt; getEndOffsets() {
+<span class="fc" id="L48">    return offsetsInfo.getEndOffsets();</span>
+  }
+
+  public boolean assignedPartitionsFullyPolled() {
+<span class="fc" id="L52">    return offsetsInfo.assignedPartitionsFullyPolled();</span>
+  }
+
+  // sum of (end - start) offsets for all partitions
+  public long summaryOffsetsRange() {
+<span class="fc" id="L57">    return offsetsInfo.summaryOffsetsRange();</span>
+  }
+
+  // sum of differences between initial consumer seek and current consumer position (across all partitions)
+  public long offsetsProcessedFromSeek() {
+<span class="fc" id="L62">    MutableLong count = new MutableLong();</span>
+<span class="fc" id="L63">    offsetsForSeek.forEach((tp, initialOffset) -&gt; count.add(consumer.position(tp) - initialOffset));</span>
+<span class="fc" id="L64">    return count.getValue();</span>
+  }
+
+  // Get offsets to seek to. NOTE: offsets do not contain empty partitions offsets
+  public Map&lt;TopicPartition, Long&gt; getOffsetsForSeek() {
+<span class="fc" id="L69">    return offsetsForSeek;</span>
+  }
+
+  /**
+   * Finds offsets for ConsumerPosition. Note: will return empty map if no offsets found for desired criteria.
+   */
+  @VisibleForTesting
+  static Map&lt;TopicPartition, Long&gt; getOffsetsForSeek(Consumer&lt;?, ?&gt; consumer,
+                                                     OffsetsInfo offsetsInfo,
+                                                     SeekTypeDTO seekType,
+                                                     @Nullable Map&lt;TopicPartition, Long&gt; seekTo) {
+<span class="pc bpc" id="L80" title="1 of 5 branches missed.">    switch (seekType) {</span>
+      case LATEST:
+<span class="fc" id="L82">        return consumer.endOffsets(offsetsInfo.getNonEmptyPartitions());</span>
+      case BEGINNING:
+<span class="fc" id="L84">        return consumer.beginningOffsets(offsetsInfo.getNonEmptyPartitions());</span>
+      case OFFSET:
+<span class="fc" id="L86">        Preconditions.checkNotNull(seekTo);</span>
+<span class="fc" id="L87">        return fixOffsets(offsetsInfo, seekTo);</span>
+      case TIMESTAMP:
+<span class="fc" id="L89">        Preconditions.checkNotNull(seekTo);</span>
+<span class="fc" id="L90">        return offsetsForTimestamp(consumer, offsetsInfo, seekTo);</span>
+      default:
+<span class="nc" id="L92">        throw new IllegalStateException();</span>
+    }
+  }
+
+  private static Map&lt;TopicPartition, Long&gt; fixOffsets(OffsetsInfo offsetsInfo, Map&lt;TopicPartition, Long&gt; offsets) {
+<span class="fc" id="L97">    offsets = new HashMap&lt;&gt;(offsets);</span>
+<span class="fc" id="L98">    offsets.keySet().retainAll(offsetsInfo.getNonEmptyPartitions());</span>
+
+<span class="fc" id="L100">    Map&lt;TopicPartition, Long&gt; result = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L101">    offsets.forEach((tp, targetOffset) -&gt; {</span>
+<span class="fc" id="L102">      long endOffset = offsetsInfo.getEndOffsets().get(tp);</span>
+<span class="fc" id="L103">      long beginningOffset = offsetsInfo.getBeginOffsets().get(tp);</span>
+      // fixing offsets with min - max bounds
+<span class="fc bfc" id="L105" title="All 2 branches covered.">      if (targetOffset &gt; endOffset) {</span>
+<span class="fc" id="L106">        targetOffset = endOffset;</span>
+<span class="fc bfc" id="L107" title="All 2 branches covered.">      } else if (targetOffset &lt; beginningOffset) {</span>
+<span class="fc" id="L108">        targetOffset = beginningOffset;</span>
+      }
+<span class="fc" id="L110">      result.put(tp, targetOffset);</span>
+<span class="fc" id="L111">    });</span>
+<span class="fc" id="L112">    return result;</span>
+  }
+
+  private static Map&lt;TopicPartition, Long&gt; offsetsForTimestamp(Consumer&lt;?, ?&gt; consumer, OffsetsInfo offsetsInfo,
+                                                               Map&lt;TopicPartition, Long&gt; timestamps) {
+<span class="fc" id="L117">    timestamps = new HashMap&lt;&gt;(timestamps);</span>
+<span class="fc" id="L118">    timestamps.keySet().retainAll(offsetsInfo.getNonEmptyPartitions());</span>
+
+<span class="fc" id="L120">    return consumer.offsetsForTimes(timestamps).entrySet().stream()</span>
+<span class="pc bpc" id="L121" title="1 of 2 branches missed.">        .filter(e -&gt; e.getValue() != null)</span>
+<span class="fc" id="L122">        .collect(Collectors.toMap(Map.Entry::getKey, e -&gt; e.getValue().offset()));</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

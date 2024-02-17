@@ -1,0 +1,185 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>KafkaSrMapperImpl.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">kafka-ui-api</a> &gt; <a href="index.source.html" class="el_package">com.provectus.kafka.ui.mapper</a> &gt; <span class="el_source">KafkaSrMapperImpl.java</span></div><h1>KafkaSrMapperImpl.java</h1><pre class="source lang-java linenums">package com.provectus.kafka.ui.mapper;
+
+import com.provectus.kafka.ui.model.CompatibilityCheckResponseDTO;
+import com.provectus.kafka.ui.model.CompatibilityLevelDTO;
+import com.provectus.kafka.ui.model.NewSchemaSubjectDTO;
+import com.provectus.kafka.ui.model.SchemaReferenceDTO;
+import com.provectus.kafka.ui.model.SchemaTypeDTO;
+import com.provectus.kafka.ui.sr.model.Compatibility;
+import com.provectus.kafka.ui.sr.model.CompatibilityCheckResponse;
+import com.provectus.kafka.ui.sr.model.NewSubject;
+import com.provectus.kafka.ui.sr.model.SchemaReference;
+import com.provectus.kafka.ui.sr.model.SchemaType;
+import java.util.ArrayList;
+import java.util.List;
+import javax.annotation.processing.Generated;
+
+@Generated(
+    value = &quot;org.mapstruct.ap.MappingProcessor&quot;,
+    date = &quot;2024-02-17T12:52:26-0800&quot;,
+    comments = &quot;version: 1.5.5.Final, compiler: javac, environment: Java 17.0.9 (Private Build)&quot;
+)
+<span class="fc" id="L22">public class KafkaSrMapperImpl implements KafkaSrMapper {</span>
+
+    @Override
+    public List&lt;SchemaReferenceDTO&gt; toDto(List&lt;SchemaReference&gt; references) {
+<span class="fc bfc" id="L26" title="All 2 branches covered.">        if ( references == null ) {</span>
+<span class="fc" id="L27">            return null;</span>
+        }
+
+<span class="fc" id="L30">        List&lt;SchemaReferenceDTO&gt; list = new ArrayList&lt;SchemaReferenceDTO&gt;( references.size() );</span>
+<span class="fc bfc" id="L31" title="All 2 branches covered.">        for ( SchemaReference schemaReference : references ) {</span>
+<span class="fc" id="L32">            list.add( schemaReferenceToSchemaReferenceDTO( schemaReference ) );</span>
+<span class="fc" id="L33">        }</span>
+
+<span class="fc" id="L35">        return list;</span>
+    }
+
+    @Override
+    public CompatibilityCheckResponseDTO toDto(CompatibilityCheckResponse ccr) {
+<span class="nc bnc" id="L40" title="All 2 branches missed.">        if ( ccr == null ) {</span>
+<span class="nc" id="L41">            return null;</span>
+        }
+
+<span class="nc" id="L44">        CompatibilityCheckResponseDTO compatibilityCheckResponseDTO = new CompatibilityCheckResponseDTO();</span>
+
+<span class="nc" id="L46">        compatibilityCheckResponseDTO.setIsCompatible( ccr.getIsCompatible() );</span>
+
+<span class="nc" id="L48">        return compatibilityCheckResponseDTO;</span>
+    }
+
+    @Override
+    public CompatibilityLevelDTO.CompatibilityEnum toDto(Compatibility compatibility) {
+<span class="pc bpc" id="L53" title="1 of 2 branches missed.">        if ( compatibility == null ) {</span>
+<span class="nc" id="L54">            return null;</span>
+        }
+
+        CompatibilityLevelDTO.CompatibilityEnum compatibilityEnum;
+
+<span class="pc bpc" id="L59" title="7 of 8 branches missed.">        switch ( compatibility ) {</span>
+<span class="fc" id="L60">            case BACKWARD: compatibilityEnum = CompatibilityLevelDTO.CompatibilityEnum.BACKWARD;</span>
+<span class="fc" id="L61">            break;</span>
+<span class="nc" id="L62">            case BACKWARD_TRANSITIVE: compatibilityEnum = CompatibilityLevelDTO.CompatibilityEnum.BACKWARD_TRANSITIVE;</span>
+<span class="nc" id="L63">            break;</span>
+<span class="nc" id="L64">            case FORWARD: compatibilityEnum = CompatibilityLevelDTO.CompatibilityEnum.FORWARD;</span>
+<span class="nc" id="L65">            break;</span>
+<span class="nc" id="L66">            case FORWARD_TRANSITIVE: compatibilityEnum = CompatibilityLevelDTO.CompatibilityEnum.FORWARD_TRANSITIVE;</span>
+<span class="nc" id="L67">            break;</span>
+<span class="nc" id="L68">            case FULL: compatibilityEnum = CompatibilityLevelDTO.CompatibilityEnum.FULL;</span>
+<span class="nc" id="L69">            break;</span>
+<span class="nc" id="L70">            case FULL_TRANSITIVE: compatibilityEnum = CompatibilityLevelDTO.CompatibilityEnum.FULL_TRANSITIVE;</span>
+<span class="nc" id="L71">            break;</span>
+<span class="nc" id="L72">            case NONE: compatibilityEnum = CompatibilityLevelDTO.CompatibilityEnum.NONE;</span>
+<span class="nc" id="L73">            break;</span>
+<span class="nc" id="L74">            default: throw new IllegalArgumentException( &quot;Unexpected enum constant: &quot; + compatibility );</span>
+        }
+
+<span class="fc" id="L77">        return compatibilityEnum;</span>
+    }
+
+    @Override
+    public NewSubject fromDto(NewSchemaSubjectDTO subjectDto) {
+<span class="pc bpc" id="L82" title="1 of 2 branches missed.">        if ( subjectDto == null ) {</span>
+<span class="nc" id="L83">            return null;</span>
+        }
+
+<span class="fc" id="L86">        NewSubject newSubject = new NewSubject();</span>
+
+<span class="fc" id="L88">        newSubject.setSchema( subjectDto.getSchema() );</span>
+<span class="fc" id="L89">        newSubject.setSchemaType( schemaTypeDTOToSchemaType( subjectDto.getSchemaType() ) );</span>
+<span class="fc" id="L90">        newSubject.setReferences( schemaReferenceDTOListToSchemaReferenceList( subjectDto.getReferences() ) );</span>
+
+<span class="fc" id="L92">        return newSubject;</span>
+    }
+
+    @Override
+    public Compatibility fromDto(CompatibilityLevelDTO.CompatibilityEnum dtoEnum) {
+<span class="pc bpc" id="L97" title="1 of 2 branches missed.">        if ( dtoEnum == null ) {</span>
+<span class="nc" id="L98">            return null;</span>
+        }
+
+        Compatibility compatibility;
+
+<span class="pc bpc" id="L103" title="7 of 8 branches missed.">        switch ( dtoEnum ) {</span>
+<span class="nc" id="L104">            case BACKWARD: compatibility = Compatibility.BACKWARD;</span>
+<span class="nc" id="L105">            break;</span>
+<span class="nc" id="L106">            case BACKWARD_TRANSITIVE: compatibility = Compatibility.BACKWARD_TRANSITIVE;</span>
+<span class="nc" id="L107">            break;</span>
+<span class="nc" id="L108">            case FORWARD: compatibility = Compatibility.FORWARD;</span>
+<span class="nc" id="L109">            break;</span>
+<span class="nc" id="L110">            case FORWARD_TRANSITIVE: compatibility = Compatibility.FORWARD_TRANSITIVE;</span>
+<span class="nc" id="L111">            break;</span>
+<span class="fc" id="L112">            case FULL: compatibility = Compatibility.FULL;</span>
+<span class="fc" id="L113">            break;</span>
+<span class="nc" id="L114">            case FULL_TRANSITIVE: compatibility = Compatibility.FULL_TRANSITIVE;</span>
+<span class="nc" id="L115">            break;</span>
+<span class="nc" id="L116">            case NONE: compatibility = Compatibility.NONE;</span>
+<span class="nc" id="L117">            break;</span>
+<span class="nc" id="L118">            default: throw new IllegalArgumentException( &quot;Unexpected enum constant: &quot; + dtoEnum );</span>
+        }
+
+<span class="fc" id="L121">        return compatibility;</span>
+    }
+
+    protected SchemaReferenceDTO schemaReferenceToSchemaReferenceDTO(SchemaReference schemaReference) {
+<span class="pc bpc" id="L125" title="1 of 2 branches missed.">        if ( schemaReference == null ) {</span>
+<span class="nc" id="L126">            return null;</span>
+        }
+
+<span class="fc" id="L129">        SchemaReferenceDTO schemaReferenceDTO = new SchemaReferenceDTO();</span>
+
+<span class="fc" id="L131">        schemaReferenceDTO.setName( schemaReference.getName() );</span>
+<span class="fc" id="L132">        schemaReferenceDTO.setSubject( schemaReference.getSubject() );</span>
+<span class="fc" id="L133">        schemaReferenceDTO.setVersion( schemaReference.getVersion() );</span>
+
+<span class="fc" id="L135">        return schemaReferenceDTO;</span>
+    }
+
+    protected SchemaType schemaTypeDTOToSchemaType(SchemaTypeDTO schemaTypeDTO) {
+<span class="pc bpc" id="L139" title="1 of 2 branches missed.">        if ( schemaTypeDTO == null ) {</span>
+<span class="nc" id="L140">            return null;</span>
+        }
+
+        SchemaType schemaType;
+
+<span class="pc bpc" id="L145" title="1 of 4 branches missed.">        switch ( schemaTypeDTO ) {</span>
+<span class="fc" id="L146">            case AVRO: schemaType = SchemaType.AVRO;</span>
+<span class="fc" id="L147">            break;</span>
+<span class="fc" id="L148">            case JSON: schemaType = SchemaType.JSON;</span>
+<span class="fc" id="L149">            break;</span>
+<span class="fc" id="L150">            case PROTOBUF: schemaType = SchemaType.PROTOBUF;</span>
+<span class="fc" id="L151">            break;</span>
+<span class="nc" id="L152">            default: throw new IllegalArgumentException( &quot;Unexpected enum constant: &quot; + schemaTypeDTO );</span>
+        }
+
+<span class="fc" id="L155">        return schemaType;</span>
+    }
+
+    protected SchemaReference schemaReferenceDTOToSchemaReference(SchemaReferenceDTO schemaReferenceDTO) {
+<span class="pc bpc" id="L159" title="1 of 2 branches missed.">        if ( schemaReferenceDTO == null ) {</span>
+<span class="nc" id="L160">            return null;</span>
+        }
+
+<span class="fc" id="L163">        SchemaReference schemaReference = new SchemaReference();</span>
+
+<span class="fc" id="L165">        schemaReference.setName( schemaReferenceDTO.getName() );</span>
+<span class="fc" id="L166">        schemaReference.setSubject( schemaReferenceDTO.getSubject() );</span>
+<span class="fc" id="L167">        schemaReference.setVersion( schemaReferenceDTO.getVersion() );</span>
+
+<span class="fc" id="L169">        return schemaReference;</span>
+    }
+
+    protected List&lt;SchemaReference&gt; schemaReferenceDTOListToSchemaReferenceList(List&lt;SchemaReferenceDTO&gt; list) {
+<span class="fc bfc" id="L173" title="All 2 branches covered.">        if ( list == null ) {</span>
+<span class="fc" id="L174">            return null;</span>
+        }
+
+<span class="fc" id="L177">        List&lt;SchemaReference&gt; list1 = new ArrayList&lt;SchemaReference&gt;( list.size() );</span>
+<span class="fc bfc" id="L178" title="All 2 branches covered.">        for ( SchemaReferenceDTO schemaReferenceDTO : list ) {</span>
+<span class="fc" id="L179">            list1.add( schemaReferenceDTOToSchemaReference( schemaReferenceDTO ) );</span>
+<span class="fc" id="L180">        }</span>
+
+<span class="fc" id="L182">        return list1;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

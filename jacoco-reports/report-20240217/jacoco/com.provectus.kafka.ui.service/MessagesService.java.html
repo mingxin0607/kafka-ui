@@ -1,0 +1,273 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MessagesService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">kafka-ui-api</a> &gt; <a href="index.source.html" class="el_package">com.provectus.kafka.ui.service</a> &gt; <span class="el_source">MessagesService.java</span></div><h1>MessagesService.java</h1><pre class="source lang-java linenums">package com.provectus.kafka.ui.service;
+
+import com.google.common.util.concurrent.RateLimiter;
+import com.provectus.kafka.ui.config.ClustersProperties;
+import com.provectus.kafka.ui.emitter.BackwardEmitter;
+import com.provectus.kafka.ui.emitter.ForwardEmitter;
+import com.provectus.kafka.ui.emitter.MessageFilters;
+import com.provectus.kafka.ui.emitter.TailingEmitter;
+import com.provectus.kafka.ui.exception.TopicNotFoundException;
+import com.provectus.kafka.ui.exception.ValidationException;
+import com.provectus.kafka.ui.model.ConsumerPosition;
+import com.provectus.kafka.ui.model.CreateTopicMessageDTO;
+import com.provectus.kafka.ui.model.KafkaCluster;
+import com.provectus.kafka.ui.model.MessageFilterTypeDTO;
+import com.provectus.kafka.ui.model.SeekDirectionDTO;
+import com.provectus.kafka.ui.model.SmartFilterTestExecutionDTO;
+import com.provectus.kafka.ui.model.SmartFilterTestExecutionResultDTO;
+import com.provectus.kafka.ui.model.TopicMessageDTO;
+import com.provectus.kafka.ui.model.TopicMessageEventDTO;
+import com.provectus.kafka.ui.serdes.ProducerRecordCreator;
+import com.provectus.kafka.ui.util.SslPropertiesUtil;
+import java.time.Instant;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Properties;
+import java.util.concurrent.CompletableFuture;
+import java.util.function.Predicate;
+import java.util.function.UnaryOperator;
+import java.util.stream.Collectors;
+import javax.annotation.Nullable;
+import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.kafka.clients.admin.OffsetSpec;
+import org.apache.kafka.clients.admin.TopicDescription;
+import org.apache.kafka.clients.producer.KafkaProducer;
+import org.apache.kafka.clients.producer.ProducerConfig;
+import org.apache.kafka.clients.producer.ProducerRecord;
+import org.apache.kafka.clients.producer.RecordMetadata;
+import org.apache.kafka.common.TopicPartition;
+import org.apache.kafka.common.serialization.ByteArraySerializer;
+import org.springframework.stereotype.Service;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
+
+@Service
+<span class="fc" id="L50">@Slf4j</span>
+public class MessagesService {
+
+  private static final int DEFAULT_MAX_PAGE_SIZE = 500;
+  private static final int DEFAULT_PAGE_SIZE = 100;
+  // limiting UI messages rate to 20/sec in tailing mode
+  private static final int TAILING_UI_MESSAGE_THROTTLE_RATE = 20;
+
+  private final AdminClientService adminClientService;
+  private final DeserializationService deserializationService;
+  private final ConsumerGroupService consumerGroupService;
+  private final int maxPageSize;
+  private final int defaultPageSize;
+
+  public MessagesService(AdminClientService adminClientService,
+                         DeserializationService deserializationService,
+                         ConsumerGroupService consumerGroupService,
+<span class="fc" id="L67">                         ClustersProperties properties) {</span>
+<span class="fc" id="L68">    this.adminClientService = adminClientService;</span>
+<span class="fc" id="L69">    this.deserializationService = deserializationService;</span>
+<span class="fc" id="L70">    this.consumerGroupService = consumerGroupService;</span>
+
+<span class="fc" id="L72">    var pollingProps = Optional.ofNullable(properties.getPolling())</span>
+<span class="fc" id="L73">        .orElseGet(ClustersProperties.PollingProperties::new);</span>
+<span class="fc" id="L74">    this.maxPageSize = Optional.ofNullable(pollingProps.getMaxPageSize())</span>
+<span class="fc" id="L75">        .orElse(DEFAULT_MAX_PAGE_SIZE);</span>
+<span class="fc" id="L76">    this.defaultPageSize = Optional.ofNullable(pollingProps.getDefaultPageSize())</span>
+<span class="fc" id="L77">        .orElse(DEFAULT_PAGE_SIZE);</span>
+<span class="fc" id="L78">  }</span>
+
+  private Mono&lt;TopicDescription&gt; withExistingTopic(KafkaCluster cluster, String topicName) {
+<span class="fc" id="L81">    return adminClientService.get(cluster)</span>
+<span class="fc" id="L82">        .flatMap(client -&gt; client.describeTopic(topicName))</span>
+<span class="fc" id="L83">        .switchIfEmpty(Mono.error(new TopicNotFoundException()));</span>
+  }
+
+  public static SmartFilterTestExecutionResultDTO execSmartFilterTest(SmartFilterTestExecutionDTO execData) {
+    Predicate&lt;TopicMessageDTO&gt; predicate;
+    try {
+<span class="fc" id="L89">      predicate = MessageFilters.createMsgFilter(</span>
+<span class="fc" id="L90">          execData.getFilterCode(),</span>
+          MessageFilterTypeDTO.GROOVY_SCRIPT
+      );
+<span class="fc" id="L93">    } catch (Exception e) {</span>
+<span class="fc" id="L94">      log.info(&quot;Smart filter '{}' compilation error&quot;, execData.getFilterCode(), e);</span>
+<span class="fc" id="L95">      return new SmartFilterTestExecutionResultDTO()</span>
+<span class="fc" id="L96">          .error(&quot;Compilation error : &quot; + e.getMessage());</span>
+<span class="fc" id="L97">    }</span>
+    try {
+<span class="fc" id="L99">      var result = predicate.test(</span>
+          new TopicMessageDTO()
+<span class="fc" id="L101">              .key(execData.getKey())</span>
+<span class="fc" id="L102">              .content(execData.getValue())</span>
+<span class="fc" id="L103">              .headers(execData.getHeaders())</span>
+<span class="fc" id="L104">              .offset(execData.getOffset())</span>
+<span class="fc" id="L105">              .partition(execData.getPartition())</span>
+<span class="fc" id="L106">              .timestamp(</span>
+<span class="fc" id="L107">                  Optional.ofNullable(execData.getTimestampMs())</span>
+<span class="fc" id="L108">                      .map(ts -&gt; OffsetDateTime.ofInstant(Instant.ofEpochMilli(ts), ZoneOffset.UTC))</span>
+<span class="fc" id="L109">                      .orElse(null))</span>
+      );
+<span class="fc" id="L111">      return new SmartFilterTestExecutionResultDTO()</span>
+<span class="fc" id="L112">          .result(result);</span>
+<span class="fc" id="L113">    } catch (Exception e) {</span>
+<span class="fc" id="L114">      log.info(&quot;Smart filter {} execution error&quot;, execData, e);</span>
+<span class="fc" id="L115">      return new SmartFilterTestExecutionResultDTO()</span>
+<span class="fc" id="L116">          .error(&quot;Execution error : &quot; + e.getMessage());</span>
+    }
+  }
+
+  public Mono&lt;Void&gt; deleteTopicMessages(KafkaCluster cluster, String topicName,
+                                        List&lt;Integer&gt; partitionsToInclude) {
+<span class="fc" id="L122">    return withExistingTopic(cluster, topicName)</span>
+<span class="fc" id="L123">        .flatMap(td -&gt;</span>
+<span class="fc" id="L124">            offsetsForDeletion(cluster, topicName, partitionsToInclude)</span>
+<span class="fc" id="L125">                .flatMap(offsets -&gt;</span>
+<span class="fc" id="L126">                    adminClientService.get(cluster).flatMap(ac -&gt; ac.deleteRecords(offsets))));</span>
+  }
+
+  private Mono&lt;Map&lt;TopicPartition, Long&gt;&gt; offsetsForDeletion(KafkaCluster cluster, String topicName,
+                                                             List&lt;Integer&gt; partitionsToInclude) {
+<span class="fc" id="L131">    return adminClientService.get(cluster).flatMap(ac -&gt;</span>
+<span class="fc" id="L132">        ac.listTopicOffsets(topicName, OffsetSpec.earliest(), true)</span>
+<span class="fc" id="L133">            .zipWith(ac.listTopicOffsets(topicName, OffsetSpec.latest(), true),</span>
+                (start, end) -&gt;
+<span class="fc" id="L135">                    end.entrySet().stream()</span>
+<span class="pc bpc" id="L136" title="1 of 2 branches missed.">                        .filter(e -&gt; partitionsToInclude.isEmpty()</span>
+<span class="pc bnc" id="L137" title="All 2 branches missed.">                            || partitionsToInclude.contains(e.getKey().partition()))</span>
+                        // we only need non-empty partitions (where start offset != end offset)
+<span class="pc bpc" id="L139" title="1 of 2 branches missed.">                        .filter(entry -&gt; !entry.getValue().equals(start.get(entry.getKey())))</span>
+<span class="fc" id="L140">                        .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue)))</span>
+    );
+  }
+
+  public Mono&lt;RecordMetadata&gt; sendMessage(KafkaCluster cluster, String topic,
+                                          CreateTopicMessageDTO msg) {
+<span class="fc" id="L146">    return withExistingTopic(cluster, topic)</span>
+<span class="fc" id="L147">        .publishOn(Schedulers.boundedElastic())</span>
+<span class="fc" id="L148">        .flatMap(desc -&gt; sendMessageImpl(cluster, desc, msg));</span>
+  }
+
+  private Mono&lt;RecordMetadata&gt; sendMessageImpl(KafkaCluster cluster,
+                                               TopicDescription topicDescription,
+                                               CreateTopicMessageDTO msg) {
+<span class="pc bpc" id="L154" title="1 of 2 branches missed.">    if (msg.getPartition() != null</span>
+<span class="nc bnc" id="L155" title="All 2 branches missed.">        &amp;&amp; msg.getPartition() &gt; topicDescription.partitions().size() - 1) {</span>
+<span class="nc" id="L156">      return Mono.error(new ValidationException(&quot;Invalid partition&quot;));</span>
+    }
+<span class="fc" id="L158">    ProducerRecordCreator producerRecordCreator =</span>
+<span class="fc" id="L159">        deserializationService.producerRecordCreator(</span>
+            cluster,
+<span class="fc" id="L161">            topicDescription.name(),</span>
+<span class="fc" id="L162">            msg.getKeySerde().get(),</span>
+<span class="fc" id="L163">            msg.getValueSerde().get()</span>
+        );
+
+<span class="fc" id="L166">    try (KafkaProducer&lt;byte[], byte[]&gt; producer = createProducer(cluster, Map.of())) {</span>
+<span class="fc" id="L167">      ProducerRecord&lt;byte[], byte[]&gt; producerRecord = producerRecordCreator.create(</span>
+<span class="fc" id="L168">          topicDescription.name(),</span>
+<span class="fc" id="L169">          msg.getPartition(),</span>
+<span class="fc" id="L170">          msg.getKey().orElse(null),</span>
+<span class="fc" id="L171">          msg.getContent().orElse(null),</span>
+<span class="fc" id="L172">          msg.getHeaders()</span>
+      );
+<span class="fc" id="L174">      CompletableFuture&lt;RecordMetadata&gt; cf = new CompletableFuture&lt;&gt;();</span>
+<span class="fc" id="L175">      producer.send(producerRecord, (metadata, exception) -&gt; {</span>
+<span class="pc bpc" id="L176" title="1 of 2 branches missed.">        if (exception != null) {</span>
+<span class="nc" id="L177">          cf.completeExceptionally(exception);</span>
+        } else {
+<span class="fc" id="L179">          cf.complete(metadata);</span>
+        }
+<span class="fc" id="L181">      });</span>
+<span class="fc" id="L182">      return Mono.fromFuture(cf);</span>
+<span class="fc" id="L183">    } catch (Throwable e) {</span>
+<span class="fc" id="L184">      return Mono.error(e);</span>
+    }
+  }
+
+  public static KafkaProducer&lt;byte[], byte[]&gt; createProducer(KafkaCluster cluster,
+                                                             Map&lt;String, Object&gt; additionalProps) {
+<span class="fc" id="L190">    Properties properties = new Properties();</span>
+<span class="fc" id="L191">    SslPropertiesUtil.addKafkaSslProperties(cluster.getOriginalProperties().getSsl(), properties);</span>
+<span class="fc" id="L192">    properties.putAll(cluster.getProperties());</span>
+<span class="fc" id="L193">    properties.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, cluster.getBootstrapServers());</span>
+<span class="fc" id="L194">    properties.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, ByteArraySerializer.class);</span>
+<span class="fc" id="L195">    properties.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, ByteArraySerializer.class);</span>
+<span class="fc" id="L196">    properties.putAll(additionalProps);</span>
+<span class="fc" id="L197">    return new KafkaProducer&lt;&gt;(properties);</span>
+  }
+
+  public Flux&lt;TopicMessageEventDTO&gt; loadMessages(KafkaCluster cluster, String topic,
+                                                 ConsumerPosition consumerPosition,
+                                                 @Nullable String query,
+                                                 MessageFilterTypeDTO filterQueryType,
+                                                 @Nullable Integer pageSize,
+                                                 SeekDirectionDTO seekDirection,
+                                                 @Nullable String keySerde,
+                                                 @Nullable String valueSerde) {
+<span class="fc" id="L208">    return withExistingTopic(cluster, topic)</span>
+<span class="fc" id="L209">        .flux()</span>
+<span class="fc" id="L210">        .publishOn(Schedulers.boundedElastic())</span>
+<span class="fc" id="L211">        .flatMap(td -&gt; loadMessagesImpl(cluster, topic, consumerPosition, query,</span>
+<span class="fc" id="L212">            filterQueryType, fixPageSize(pageSize), seekDirection, keySerde, valueSerde));</span>
+  }
+
+  private int fixPageSize(@Nullable Integer pageSize) {
+<span class="fc" id="L216">    return Optional.ofNullable(pageSize)</span>
+<span class="pc bpc" id="L217" title="1 of 4 branches missed.">        .filter(ps -&gt; ps &gt; 0 &amp;&amp; ps &lt;= maxPageSize)</span>
+<span class="fc" id="L218">        .orElse(defaultPageSize);</span>
+  }
+
+  private Flux&lt;TopicMessageEventDTO&gt; loadMessagesImpl(KafkaCluster cluster,
+                                                      String topic,
+                                                      ConsumerPosition consumerPosition,
+                                                      @Nullable String query,
+                                                      MessageFilterTypeDTO filterQueryType,
+                                                      int limit,
+                                                      SeekDirectionDTO seekDirection,
+                                                      @Nullable String keySerde,
+                                                      @Nullable String valueSerde) {
+
+<span class="fc" id="L231">    var deserializer = deserializationService.deserializerFor(cluster, topic, keySerde, valueSerde);</span>
+<span class="fc" id="L232">    var filter = getMsgFilter(query, filterQueryType);</span>
+<span class="pc bpc" id="L233" title="2 of 4 branches missed.">    var emitter = switch (seekDirection) {</span>
+<span class="fc" id="L234">      case FORWARD -&gt; new ForwardEmitter(</span>
+<span class="fc" id="L235">          () -&gt; consumerGroupService.createConsumer(cluster),</span>
+<span class="fc" id="L236">          consumerPosition, limit, deserializer, filter, cluster.getPollingSettings()</span>
+      );
+<span class="nc" id="L238">      case BACKWARD -&gt; new BackwardEmitter(</span>
+<span class="nc" id="L239">          () -&gt; consumerGroupService.createConsumer(cluster),</span>
+<span class="nc" id="L240">          consumerPosition, limit, deserializer, filter, cluster.getPollingSettings()</span>
+      );
+<span class="fc" id="L242">      case TAILING -&gt; new TailingEmitter(</span>
+<span class="fc" id="L243">          () -&gt; consumerGroupService.createConsumer(cluster),</span>
+<span class="fc" id="L244">          consumerPosition, deserializer, filter, cluster.getPollingSettings()</span>
+      );
+    };
+<span class="fc" id="L247">    return Flux.create(emitter)</span>
+<span class="fc" id="L248">        .map(throttleUiPublish(seekDirection));</span>
+  }
+
+  private Predicate&lt;TopicMessageDTO&gt; getMsgFilter(String query,
+                                                  MessageFilterTypeDTO filterQueryType) {
+<span class="fc bfc" id="L253" title="All 2 branches covered.">    if (StringUtils.isEmpty(query)) {</span>
+<span class="fc" id="L254">      return evt -&gt; true;</span>
+    }
+<span class="fc" id="L256">    return MessageFilters.createMsgFilter(query, filterQueryType);</span>
+  }
+
+  private &lt;T&gt; UnaryOperator&lt;T&gt; throttleUiPublish(SeekDirectionDTO seekDirection) {
+<span class="fc bfc" id="L260" title="All 2 branches covered.">    if (seekDirection == SeekDirectionDTO.TAILING) {</span>
+<span class="fc" id="L261">      RateLimiter rateLimiter = RateLimiter.create(TAILING_UI_MESSAGE_THROTTLE_RATE);</span>
+<span class="fc" id="L262">      return m -&gt; {</span>
+<span class="fc" id="L263">        rateLimiter.acquire(1);</span>
+<span class="fc" id="L264">        return m;</span>
+      };
+    }
+    // there is no need to throttle UI production rate for non-tailing modes, since max number of produced
+    // messages is limited for them (with page size)
+<span class="fc" id="L269">    return UnaryOperator.identity();</span>
+  }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

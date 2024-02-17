@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AccessController.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">kafka-ui-api</a> &gt; <a href="index.source.html" class="el_package">com.provectus.kafka.ui.controller</a> &gt; <span class="el_source">AccessController.java</span></div><h1>AccessController.java</h1><pre class="source lang-java linenums">package com.provectus.kafka.ui.controller;
+
+import com.provectus.kafka.ui.api.AuthorizationApi;
+import com.provectus.kafka.ui.model.ActionDTO;
+import com.provectus.kafka.ui.model.AuthenticationInfoDTO;
+import com.provectus.kafka.ui.model.ResourceTypeDTO;
+import com.provectus.kafka.ui.model.UserInfoDTO;
+import com.provectus.kafka.ui.model.UserPermissionDTO;
+import com.provectus.kafka.ui.model.rbac.Permission;
+import com.provectus.kafka.ui.service.rbac.AccessControlService;
+import java.security.Principal;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.List;
+import java.util.Objects;
+import javax.annotation.Nullable;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.context.ReactiveSecurityContextHolder;
+import org.springframework.security.core.context.SecurityContext;
+import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ServerWebExchange;
+import reactor.core.publisher.Mono;
+
+@RestController
+<span class="fc" id="L27">@RequiredArgsConstructor</span>
+<span class="fc" id="L28">@Slf4j</span>
+public class AccessController implements AuthorizationApi {
+
+  private final AccessControlService accessControlService;
+
+  public Mono&lt;ResponseEntity&lt;AuthenticationInfoDTO&gt;&gt; getUserAuthInfo(ServerWebExchange exchange) {
+<span class="nc" id="L34">    Mono&lt;List&lt;UserPermissionDTO&gt;&gt; permissions = accessControlService.getUser()</span>
+<span class="nc" id="L35">        .map(user -&gt; accessControlService.getRoles()</span>
+<span class="nc" id="L36">            .stream()</span>
+<span class="nc" id="L37">            .filter(role -&gt; user.groups().contains(role.getName()))</span>
+<span class="nc" id="L38">            .map(role -&gt; mapPermissions(role.getPermissions(), role.getClusters()))</span>
+<span class="nc" id="L39">            .flatMap(Collection::stream)</span>
+<span class="nc" id="L40">            .toList()</span>
+        )
+<span class="nc" id="L42">        .switchIfEmpty(Mono.just(Collections.emptyList()));</span>
+
+<span class="nc" id="L44">    Mono&lt;String&gt; userName = ReactiveSecurityContextHolder.getContext()</span>
+<span class="nc" id="L45">        .map(SecurityContext::getAuthentication)</span>
+<span class="nc" id="L46">        .map(Principal::getName);</span>
+
+<span class="nc" id="L48">    return userName</span>
+<span class="nc" id="L49">        .zipWith(permissions)</span>
+<span class="nc" id="L50">        .map(data -&gt; {</span>
+<span class="nc" id="L51">          var dto = new AuthenticationInfoDTO(accessControlService.isRbacEnabled());</span>
+<span class="nc" id="L52">          dto.setUserInfo(new UserInfoDTO(data.getT1(), data.getT2()));</span>
+<span class="nc" id="L53">          return dto;</span>
+        })
+<span class="nc" id="L55">        .switchIfEmpty(Mono.just(new AuthenticationInfoDTO(accessControlService.isRbacEnabled())))</span>
+<span class="nc" id="L56">        .map(ResponseEntity::ok);</span>
+  }
+
+  private List&lt;UserPermissionDTO&gt; mapPermissions(List&lt;Permission&gt; permissions, List&lt;String&gt; clusters) {
+<span class="nc" id="L60">    return permissions</span>
+<span class="nc" id="L61">        .stream()</span>
+<span class="nc" id="L62">        .map(permission -&gt; {</span>
+<span class="nc" id="L63">          UserPermissionDTO dto = new UserPermissionDTO();</span>
+<span class="nc" id="L64">          dto.setClusters(clusters);</span>
+<span class="nc" id="L65">          dto.setResource(ResourceTypeDTO.fromValue(permission.getResource().toString().toUpperCase()));</span>
+<span class="nc" id="L66">          dto.setValue(permission.getValue());</span>
+<span class="nc" id="L67">          dto.setActions(permission.getActions()</span>
+<span class="nc" id="L68">              .stream()</span>
+<span class="nc" id="L69">              .map(String::toUpperCase)</span>
+<span class="nc" id="L70">              .map(this::mapAction)</span>
+<span class="nc" id="L71">              .filter(Objects::nonNull)</span>
+<span class="nc" id="L72">              .toList());</span>
+<span class="nc" id="L73">          return dto;</span>
+        })
+<span class="nc" id="L75">        .toList();</span>
+  }
+
+  @Nullable
+  private ActionDTO mapAction(String name) {
+    try {
+<span class="nc" id="L81">      return ActionDTO.fromValue(name);</span>
+<span class="nc" id="L82">    } catch (IllegalArgumentException e) {</span>
+<span class="nc" id="L83">      log.warn(&quot;Unknown Action [{}], skipping&quot;, name);</span>
+<span class="nc" id="L84">      return null;</span>
+    }
+  }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PrometheusMetricsRetriever.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">kafka-ui-api</a> &gt; <a href="index.source.html" class="el_package">com.provectus.kafka.ui.service.metrics</a> &gt; <span class="el_source">PrometheusMetricsRetriever.java</span></div><h1>PrometheusMetricsRetriever.java</h1><pre class="source lang-java linenums">package com.provectus.kafka.ui.service.metrics;
+
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Strings;
+import com.provectus.kafka.ui.config.ClustersProperties;
+import com.provectus.kafka.ui.model.KafkaCluster;
+import com.provectus.kafka.ui.model.MetricsConfig;
+import com.provectus.kafka.ui.util.WebClientConfigurator;
+import java.util.Arrays;
+import java.util.Optional;
+import lombok.extern.slf4j.Slf4j;
+import org.apache.kafka.common.Node;
+import org.springframework.stereotype.Service;
+import org.springframework.util.unit.DataSize;
+import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.util.UriComponentsBuilder;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
+
+@Service
+<span class="fc" id="L21">@Slf4j</span>
+<span class="fc" id="L22">class PrometheusMetricsRetriever implements MetricsRetriever {</span>
+
+  private static final String METRICS_ENDPOINT_PATH = &quot;/metrics&quot;;
+  private static final int DEFAULT_EXPORTER_PORT = 11001;
+
+  @Override
+  public Flux&lt;RawMetric&gt; retrieve(KafkaCluster c, Node node) {
+<span class="nc" id="L29">    log.debug(&quot;Retrieving metrics from prometheus exporter: {}:{}&quot;, node.host(), c.getMetricsConfig().getPort());</span>
+
+<span class="nc" id="L31">    MetricsConfig metricsConfig = c.getMetricsConfig();</span>
+<span class="nc" id="L32">    var webClient = new WebClientConfigurator()</span>
+<span class="nc" id="L33">        .configureBufferSize(DataSize.ofMegabytes(20))</span>
+<span class="nc" id="L34">        .configureBasicAuth(metricsConfig.getUsername(), metricsConfig.getPassword())</span>
+<span class="nc" id="L35">        .configureSsl(</span>
+<span class="nc" id="L36">            c.getOriginalProperties().getSsl(),</span>
+            new ClustersProperties.KeystoreConfig(
+<span class="nc" id="L38">                metricsConfig.getKeystoreLocation(),</span>
+<span class="nc" id="L39">                metricsConfig.getKeystorePassword()))</span>
+<span class="nc" id="L40">        .build();</span>
+
+<span class="nc" id="L42">    return retrieve(webClient, node.host(), c.getMetricsConfig());</span>
+  }
+
+  @VisibleForTesting
+  Flux&lt;RawMetric&gt; retrieve(WebClient webClient, String host, MetricsConfig metricsConfig) {
+<span class="fc" id="L47">    int port = Optional.ofNullable(metricsConfig.getPort()).orElse(DEFAULT_EXPORTER_PORT);</span>
+<span class="pc bpc" id="L48" title="2 of 4 branches missed.">    boolean sslEnabled = metricsConfig.isSsl() || metricsConfig.getKeystoreLocation() != null;</span>
+<span class="fc" id="L49">    var request = webClient.get()</span>
+<span class="fc" id="L50">        .uri(UriComponentsBuilder.newInstance()</span>
+<span class="pc bpc" id="L51" title="1 of 2 branches missed.">            .scheme(sslEnabled ? &quot;https&quot; : &quot;http&quot;)</span>
+<span class="fc" id="L52">            .host(host)</span>
+<span class="fc" id="L53">            .port(port)</span>
+<span class="fc" id="L54">            .path(METRICS_ENDPOINT_PATH).build().toUri());</span>
+
+<span class="fc" id="L56">    WebClient.ResponseSpec responseSpec = request.retrieve();</span>
+<span class="fc" id="L57">    return responseSpec.bodyToMono(String.class)</span>
+<span class="pc" id="L58">        .doOnError(e -&gt; log.error(&quot;Error while getting metrics from {}&quot;, host, e))</span>
+<span class="pc" id="L59">        .onErrorResume(th -&gt; Mono.empty())</span>
+<span class="fc" id="L60">        .flatMapMany(body -&gt;</span>
+<span class="fc" id="L61">            Flux.fromStream(</span>
+<span class="fc" id="L62">                Arrays.stream(body.split(&quot;\\n&quot;))</span>
+<span class="pc bpc" id="L63" title="1 of 4 branches missed.">                    .filter(str -&gt; !Strings.isNullOrEmpty(str) &amp;&amp; !str.startsWith(&quot;#&quot;)) // skipping comments strings</span>
+<span class="fc" id="L64">                    .map(PrometheusEndpointMetricsParser::parse)</span>
+<span class="fc" id="L65">                    .filter(Optional::isPresent)</span>
+<span class="fc" id="L66">                    .map(Optional::get)</span>
+            )
+        );
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

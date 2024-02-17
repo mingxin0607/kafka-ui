@@ -1,0 +1,263 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AvroExtractor.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">kafka-ui-api</a> &gt; <a href="index.source.html" class="el_package">com.provectus.kafka.ui.service.integration.odd.schema</a> &gt; <span class="el_source">AvroExtractor.java</span></div><h1>AvroExtractor.java</h1><pre class="source lang-java linenums">package com.provectus.kafka.ui.service.integration.odd.schema;
+
+import com.google.common.collect.ImmutableSet;
+import io.confluent.kafka.schemaregistry.avro.AvroSchema;
+import java.util.ArrayList;
+import java.util.List;
+import org.apache.avro.Schema;
+import org.opendatadiscovery.client.model.DataSetField;
+import org.opendatadiscovery.client.model.DataSetFieldType;
+import org.opendatadiscovery.oddrn.model.KafkaPath;
+
+final class AvroExtractor {
+
+  private AvroExtractor() {
+  }
+
+  static List&lt;DataSetField&gt; extract(AvroSchema avroSchema, KafkaPath topicOddrn, boolean isKey) {
+<span class="fc" id="L18">    var schema = avroSchema.rawSchema();</span>
+<span class="fc" id="L19">    List&lt;DataSetField&gt; result = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L20">    result.add(DataSetFieldsExtractors.rootField(topicOddrn, isKey));</span>
+<span class="fc" id="L21">    extract(</span>
+        schema,
+<span class="fc bfc" id="L23" title="All 2 branches covered.">        topicOddrn.oddrn() + &quot;/columns/&quot; + (isKey ? &quot;key&quot; : &quot;value&quot;),</span>
+        null,
+        null,
+        null,
+<span class="fc" id="L27">        false,</span>
+<span class="fc" id="L28">        ImmutableSet.of(),</span>
+        result
+    );
+<span class="fc" id="L31">    return result;</span>
+  }
+
+  private static void extract(Schema schema,
+                              String parentOddr,
+                              String oddrn, //null for root
+                              String name,
+                              String doc,
+                              Boolean nullable,
+                              ImmutableSet&lt;String&gt; registeredRecords,
+                              List&lt;DataSetField&gt; sink
+  ) {
+<span class="fc bfc" id="L43" title="All 5 branches covered.">    switch (schema.getType()) {</span>
+<span class="fc" id="L44">      case RECORD -&gt; extractRecord(schema, parentOddr, oddrn, name, doc, nullable, registeredRecords, sink);</span>
+<span class="fc" id="L45">      case UNION -&gt; extractUnion(schema, parentOddr, oddrn, name, doc, registeredRecords, sink);</span>
+<span class="fc" id="L46">      case ARRAY -&gt; extractArray(schema, parentOddr, oddrn, name, doc, nullable, registeredRecords, sink);</span>
+<span class="fc" id="L47">      case MAP -&gt; extractMap(schema, parentOddr, oddrn, name, doc, nullable, registeredRecords, sink);</span>
+<span class="fc" id="L48">      default -&gt; extractPrimitive(schema, parentOddr, oddrn, name, doc, nullable, sink);</span>
+    }
+<span class="fc" id="L50">  }</span>
+
+  private static DataSetField createDataSetField(String name,
+                                                 String doc,
+                                                 String parentOddrn,
+                                                 String oddrn,
+                                                 Schema schema,
+                                                 Boolean nullable) {
+<span class="fc" id="L58">    return new DataSetField()</span>
+<span class="fc" id="L59">        .name(name)</span>
+<span class="fc" id="L60">        .description(doc)</span>
+<span class="fc" id="L61">        .parentFieldOddrn(parentOddrn)</span>
+<span class="fc" id="L62">        .oddrn(oddrn)</span>
+<span class="fc" id="L63">        .type(mapSchema(schema, nullable));</span>
+  }
+
+  private static void extractRecord(Schema schema,
+                                    String parentOddr,
+                                    String oddrn, //null for root
+                                    String name,
+                                    String doc,
+                                    Boolean nullable,
+                                    ImmutableSet&lt;String&gt; registeredRecords,
+                                    List&lt;DataSetField&gt; sink) {
+<span class="fc bfc" id="L74" title="All 2 branches covered.">    boolean isRoot = oddrn == null;</span>
+<span class="fc bfc" id="L75" title="All 2 branches covered.">    if (!isRoot) {</span>
+<span class="fc" id="L76">      sink.add(createDataSetField(name, doc, parentOddr, oddrn, schema, nullable));</span>
+<span class="fc bfc" id="L77" title="All 2 branches covered.">      if (registeredRecords.contains(schema.getFullName())) {</span>
+        // avoiding recursion by checking if record already registered in parsing chain
+<span class="fc" id="L79">        return;</span>
+      }
+    }
+<span class="fc" id="L82">    var newRegisteredRecords = ImmutableSet.&lt;String&gt;builder()</span>
+<span class="fc" id="L83">        .addAll(registeredRecords)</span>
+<span class="fc" id="L84">        .add(schema.getFullName())</span>
+<span class="fc" id="L85">        .build();</span>
+
+<span class="fc" id="L87">    schema.getFields().forEach(f -&gt;</span>
+<span class="fc" id="L88">        extract(</span>
+<span class="fc" id="L89">            f.schema(),</span>
+<span class="fc bfc" id="L90" title="All 2 branches covered.">            isRoot ? parentOddr : oddrn,</span>
+<span class="fc bfc" id="L91" title="All 2 branches covered.">            isRoot</span>
+<span class="fc" id="L92">                ? parentOddr + &quot;/&quot; + f.name()</span>
+<span class="fc" id="L93">                : oddrn + &quot;/fields/&quot; + f.name(),</span>
+<span class="fc" id="L94">            f.name(),</span>
+<span class="fc" id="L95">            f.doc(),</span>
+<span class="fc" id="L96">            false,</span>
+            newRegisteredRecords,
+            sink
+        ));
+<span class="fc" id="L100">  }</span>
+
+  private static void extractUnion(Schema schema,
+                                   String parentOddr,
+                                   String oddrn, //null for root
+                                   String name,
+                                   String doc,
+                                   ImmutableSet&lt;String&gt; registeredRecords,
+                                   List&lt;DataSetField&gt; sink) {
+<span class="pc bpc" id="L109" title="1 of 2 branches missed.">    boolean isRoot = oddrn == null;</span>
+<span class="pc bpc" id="L110" title="1 of 2 branches missed.">    boolean containsNull = schema.getTypes().stream().map(Schema::getType).anyMatch(t -&gt; t == Schema.Type.NULL);</span>
+    // if it is not root and there is only 2 values for union (null and smth else)
+    // we registering this field as optional without mentioning union
+<span class="pc bpc" id="L113" title="3 of 6 branches missed.">    if (!isRoot &amp;&amp; containsNull &amp;&amp; schema.getTypes().size() == 2) {</span>
+<span class="nc" id="L114">      var nonNullSchema = schema.getTypes().stream()</span>
+<span class="nc bnc" id="L115" title="All 2 branches missed.">          .filter(s -&gt; s.getType() != Schema.Type.NULL)</span>
+<span class="nc" id="L116">          .findFirst()</span>
+<span class="nc" id="L117">          .orElseThrow(IllegalStateException::new);</span>
+<span class="nc" id="L118">      extract(</span>
+          nonNullSchema,
+          parentOddr,
+          oddrn,
+          name,
+          doc,
+<span class="nc" id="L124">          true,</span>
+          registeredRecords,
+          sink
+      );
+<span class="nc" id="L128">      return;</span>
+    }
+<span class="pc bpc" id="L130" title="1 of 2 branches missed.">    oddrn = isRoot ? parentOddr + &quot;/union&quot; : oddrn;</span>
+<span class="pc bpc" id="L131" title="1 of 2 branches missed.">    if (isRoot) {</span>
+<span class="nc" id="L132">      sink.add(createDataSetField(&quot;Avro root union&quot;, doc, parentOddr, oddrn, schema, containsNull));</span>
+    } else {
+<span class="fc" id="L134">      sink.add(createDataSetField(name, doc, parentOddr, oddrn, schema, containsNull));</span>
+    }
+<span class="fc bfc" id="L136" title="All 2 branches covered.">    for (Schema t : schema.getTypes()) {</span>
+<span class="fc bfc" id="L137" title="All 2 branches covered.">      if (t.getType() != Schema.Type.NULL) {</span>
+<span class="fc" id="L138">        extract(</span>
+            t,
+            oddrn,
+<span class="fc" id="L141">            oddrn + &quot;/values/&quot; + t.getName(),</span>
+<span class="fc" id="L142">            t.getName(),</span>
+<span class="fc" id="L143">            t.getDoc(),</span>
+<span class="fc" id="L144">            containsNull,</span>
+            registeredRecords,
+            sink
+        );
+      }
+<span class="fc" id="L149">    }</span>
+<span class="fc" id="L150">  }</span>
+
+  private static void extractArray(Schema schema,
+                                   String parentOddr,
+                                   String oddrn, //null for root
+                                   String name,
+                                   String doc,
+                                   Boolean nullable,
+                                   ImmutableSet&lt;String&gt; registeredRecords,
+                                   List&lt;DataSetField&gt; sink) {
+<span class="pc bpc" id="L160" title="1 of 2 branches missed.">    boolean isRoot = oddrn == null;</span>
+<span class="pc bpc" id="L161" title="1 of 2 branches missed.">    oddrn = isRoot ? parentOddr + &quot;/array&quot; : oddrn;</span>
+<span class="pc bpc" id="L162" title="1 of 2 branches missed.">    if (isRoot) {</span>
+<span class="nc" id="L163">      sink.add(createDataSetField(&quot;Avro root Array&quot;, doc, parentOddr, oddrn, schema, nullable));</span>
+    } else {
+<span class="fc" id="L165">      sink.add(createDataSetField(name, doc, parentOddr, oddrn, schema, nullable));</span>
+    }
+<span class="fc" id="L167">    extract(</span>
+<span class="fc" id="L168">        schema.getElementType(),</span>
+        oddrn,
+<span class="fc" id="L170">        oddrn + &quot;/items/&quot; + schema.getElementType().getName(),</span>
+<span class="fc" id="L171">        schema.getElementType().getName(),</span>
+<span class="fc" id="L172">        schema.getElementType().getDoc(),</span>
+<span class="fc" id="L173">        false,</span>
+        registeredRecords,
+        sink
+    );
+<span class="fc" id="L177">  }</span>
+
+  private static void extractMap(Schema schema,
+                                 String parentOddr,
+                                 String oddrn, //null for root
+                                 String name,
+                                 String doc,
+                                 Boolean nullable,
+                                 ImmutableSet&lt;String&gt; registeredRecords,
+                                 List&lt;DataSetField&gt; sink) {
+<span class="pc bpc" id="L187" title="1 of 2 branches missed.">    boolean isRoot = oddrn == null;</span>
+<span class="pc bpc" id="L188" title="1 of 2 branches missed.">    oddrn = isRoot ? parentOddr + &quot;/map&quot; : oddrn;</span>
+<span class="pc bpc" id="L189" title="1 of 2 branches missed.">    if (isRoot) {</span>
+<span class="nc" id="L190">      sink.add(createDataSetField(&quot;Avro root map&quot;, doc, parentOddr, oddrn, schema, nullable));</span>
+    } else {
+<span class="fc" id="L192">      sink.add(createDataSetField(name, doc, parentOddr, oddrn, schema, nullable));</span>
+    }
+<span class="fc" id="L194">    extract(</span>
+<span class="fc" id="L195">        new Schema.Parser().parse(&quot;\&quot;string\&quot;&quot;),</span>
+        oddrn,
+        oddrn + &quot;/key&quot;,
+        &quot;key&quot;,
+        null,
+        nullable,
+        registeredRecords,
+        sink
+    );
+<span class="fc" id="L204">    extract(</span>
+<span class="fc" id="L205">        schema.getValueType(),</span>
+        oddrn,
+        oddrn + &quot;/value&quot;,
+        &quot;value&quot;,
+        null,
+        nullable,
+        registeredRecords,
+        sink
+    );
+<span class="fc" id="L214">  }</span>
+
+
+  private static void extractPrimitive(Schema schema,
+                                       String parentOddr,
+                                       String oddrn, //null for root
+                                       String name,
+                                       String doc,
+                                       Boolean nullable,
+                                       List&lt;DataSetField&gt; sink) {
+<span class="fc bfc" id="L224" title="All 2 branches covered.">    boolean isRoot = oddrn == null;</span>
+<span class="fc bfc" id="L225" title="All 2 branches covered.">    String primOddrn = isRoot ? (parentOddr + &quot;/&quot; + schema.getType()) : oddrn;</span>
+<span class="fc bfc" id="L226" title="All 2 branches covered.">    if (isRoot) {</span>
+<span class="fc" id="L227">      sink.add(createDataSetField(&quot;Root avro &quot; + schema.getType(),</span>
+          doc, parentOddr, primOddrn, schema, nullable));
+    } else {
+<span class="fc" id="L230">      sink.add(createDataSetField(name, doc, parentOddr, primOddrn, schema, nullable));</span>
+    }
+<span class="fc" id="L232">  }</span>
+
+  private static DataSetFieldType.TypeEnum mapType(Schema.Type type) {
+<span class="pc bpc" id="L235" title="5 of 11 branches missed.">    return switch (type) {</span>
+<span class="fc" id="L236">      case INT, LONG -&gt; DataSetFieldType.TypeEnum.INTEGER;</span>
+<span class="nc" id="L237">      case FLOAT, DOUBLE, FIXED -&gt; DataSetFieldType.TypeEnum.NUMBER;</span>
+<span class="fc" id="L238">      case STRING, ENUM -&gt; DataSetFieldType.TypeEnum.STRING;</span>
+<span class="nc" id="L239">      case BOOLEAN -&gt; DataSetFieldType.TypeEnum.BOOLEAN;</span>
+<span class="nc" id="L240">      case BYTES -&gt; DataSetFieldType.TypeEnum.BINARY;</span>
+<span class="fc" id="L241">      case ARRAY -&gt; DataSetFieldType.TypeEnum.LIST;</span>
+<span class="fc" id="L242">      case RECORD -&gt; DataSetFieldType.TypeEnum.STRUCT;</span>
+<span class="fc" id="L243">      case MAP -&gt; DataSetFieldType.TypeEnum.MAP;</span>
+<span class="fc" id="L244">      case UNION -&gt; DataSetFieldType.TypeEnum.UNION;</span>
+<span class="nc" id="L245">      case NULL -&gt; DataSetFieldType.TypeEnum.UNKNOWN;</span>
+    };
+  }
+
+  private static DataSetFieldType mapSchema(Schema schema, Boolean nullable) {
+<span class="fc" id="L250">    return new DataSetFieldType()</span>
+<span class="fc" id="L251">        .logicalType(logicalType(schema))</span>
+<span class="fc" id="L252">        .isNullable(nullable)</span>
+<span class="fc" id="L253">        .type(mapType(schema.getType()));</span>
+  }
+
+  private static String logicalType(Schema schema) {
+<span class="fc bfc" id="L257" title="All 2 branches covered.">    return schema.getType() == Schema.Type.RECORD</span>
+<span class="fc" id="L258">        ? schema.getFullName()</span>
+<span class="fc" id="L259">        : schema.getType().toString().toLowerCase();</span>
+  }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

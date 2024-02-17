@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MessageFilters.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">kafka-ui-api</a> &gt; <a href="index.source.html" class="el_package">com.provectus.kafka.ui.emitter</a> &gt; <span class="el_source">MessageFilters.java</span></div><h1>MessageFilters.java</h1><pre class="source lang-java linenums">package com.provectus.kafka.ui.emitter;
+
+import com.provectus.kafka.ui.exception.ValidationException;
+import com.provectus.kafka.ui.model.MessageFilterTypeDTO;
+import com.provectus.kafka.ui.model.TopicMessageDTO;
+import groovy.json.JsonSlurper;
+import java.util.function.Predicate;
+import javax.annotation.Nullable;
+import javax.script.CompiledScript;
+import javax.script.ScriptEngineManager;
+import javax.script.ScriptException;
+import lombok.SneakyThrows;
+import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
+import org.codehaus.groovy.jsr223.GroovyScriptEngineImpl;
+
+<span class="fc" id="L17">@Slf4j</span>
+public class MessageFilters {
+
+  private static GroovyScriptEngineImpl GROOVY_ENGINE;
+
+  private MessageFilters() {
+  }
+
+  public static Predicate&lt;TopicMessageDTO&gt; createMsgFilter(String query, MessageFilterTypeDTO type) {
+<span class="pc bpc" id="L26" title="1 of 3 branches missed.">    switch (type) {</span>
+      case STRING_CONTAINS:
+<span class="fc" id="L28">        return containsStringFilter(query);</span>
+      case GROOVY_SCRIPT:
+<span class="fc" id="L30">        return groovyScriptFilter(query);</span>
+      default:
+<span class="nc" id="L32">        throw new IllegalStateException(&quot;Unknown query type: &quot; + type);</span>
+    }
+  }
+
+  static Predicate&lt;TopicMessageDTO&gt; containsStringFilter(String string) {
+<span class="fc bfc" id="L37" title="All 2 branches covered.">    return msg -&gt; StringUtils.contains(msg.getKey(), string)</span>
+<span class="fc bfc" id="L38" title="All 2 branches covered.">        || StringUtils.contains(msg.getContent(), string);</span>
+  }
+
+  static Predicate&lt;TopicMessageDTO&gt; groovyScriptFilter(String script) {
+<span class="fc" id="L42">    var engine = getGroovyEngine();</span>
+<span class="fc" id="L43">    var compiledScript = compileScript(engine, script);</span>
+<span class="fc" id="L44">    var jsonSlurper = new JsonSlurper();</span>
+<span class="fc" id="L45">    return new Predicate&lt;TopicMessageDTO&gt;() {</span>
+<span class="fc" id="L46">      @SneakyThrows</span>
+      @Override
+      public boolean test(TopicMessageDTO msg) {
+<span class="fc" id="L49">        var bindings = engine.createBindings();</span>
+<span class="fc" id="L50">        bindings.put(&quot;partition&quot;, msg.getPartition());</span>
+<span class="fc" id="L51">        bindings.put(&quot;offset&quot;, msg.getOffset());</span>
+<span class="fc" id="L52">        bindings.put(&quot;timestampMs&quot;, msg.getTimestamp().toInstant().toEpochMilli());</span>
+<span class="fc" id="L53">        bindings.put(&quot;keyAsText&quot;, msg.getKey());</span>
+<span class="fc" id="L54">        bindings.put(&quot;valueAsText&quot;, msg.getContent());</span>
+<span class="fc" id="L55">        bindings.put(&quot;headers&quot;, msg.getHeaders());</span>
+<span class="fc" id="L56">        bindings.put(&quot;key&quot;, parseToJsonOrReturnAsIs(jsonSlurper, msg.getKey()));</span>
+<span class="fc" id="L57">        bindings.put(&quot;value&quot;, parseToJsonOrReturnAsIs(jsonSlurper, msg.getContent()));</span>
+<span class="fc" id="L58">        var result = compiledScript.eval(bindings);</span>
+<span class="pc bpc" id="L59" title="1 of 2 branches missed.">        if (result instanceof Boolean) {</span>
+<span class="fc" id="L60">          return (Boolean) result;</span>
+        } else {
+<span class="nc" id="L62">          throw new ValidationException(</span>
+<span class="nc" id="L63">              &quot;Unexpected script result: %s, Boolean should be returned instead&quot;.formatted(result));</span>
+        }
+      }
+    };
+  }
+
+  @Nullable
+  private static Object parseToJsonOrReturnAsIs(JsonSlurper parser, @Nullable String str) {
+<span class="fc bfc" id="L71" title="All 2 branches covered.">    if (str == null) {</span>
+<span class="fc" id="L72">      return null;</span>
+    }
+    try {
+<span class="fc" id="L75">      return parser.parseText(str);</span>
+<span class="fc" id="L76">    } catch (Exception e) {</span>
+<span class="fc" id="L77">      return str;</span>
+    }
+  }
+
+  private static synchronized GroovyScriptEngineImpl getGroovyEngine() {
+    // it is pretty heavy object, so initializing it on-demand
+<span class="fc bfc" id="L83" title="All 2 branches covered.">    if (GROOVY_ENGINE == null) {</span>
+<span class="fc" id="L84">      GROOVY_ENGINE = (GroovyScriptEngineImpl)</span>
+<span class="fc" id="L85">          new ScriptEngineManager().getEngineByName(&quot;groovy&quot;);</span>
+    }
+<span class="fc" id="L87">    return GROOVY_ENGINE;</span>
+  }
+
+  private static CompiledScript compileScript(GroovyScriptEngineImpl engine, String script) {
+    try {
+<span class="fc" id="L92">      return engine.compile(script);</span>
+<span class="fc" id="L93">    } catch (ScriptException e) {</span>
+<span class="fc" id="L94">      throw new ValidationException(&quot;Script syntax error: &quot; + e.getMessage());</span>
+    }
+  }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

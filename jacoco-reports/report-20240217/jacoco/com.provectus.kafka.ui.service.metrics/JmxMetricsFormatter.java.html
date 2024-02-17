@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>JmxMetricsFormatter.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">kafka-ui-api</a> &gt; <a href="index.source.html" class="el_package">com.provectus.kafka.ui.service.metrics</a> &gt; <span class="el_source">JmxMetricsFormatter.java</span></div><h1>JmxMetricsFormatter.java</h1><pre class="source lang-java linenums">package com.provectus.kafka.ui.service.metrics;
+
+import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Optional;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import javax.management.MBeanAttributeInfo;
+import javax.management.ObjectName;
+
+/**
+ * Converts JMX metrics into JmxExporter prometheus format: &lt;a href=&quot;https://github.com/prometheus/jmx_exporter#default-format&quot;&gt;format&lt;/a&gt;.
+ */
+<span class="nc" id="L16">class JmxMetricsFormatter {</span>
+
+  // copied from https://github.com/prometheus/jmx_exporter/blob/b6b811b4aae994e812e902b26dd41f29364c0e2b/collector/src/main/java/io/prometheus/jmx/JmxMBeanPropertyCache.java#L15
+<span class="fc" id="L19">  private static final Pattern PROPERTY_PATTERN = Pattern.compile(</span>
+      &quot;([^,=:\\*\\?]+)=(\&quot;(?:[^\\\\\&quot;]*(?:\\\\.)?)*\&quot;|[^,=:\&quot;]*)&quot;);
+
+  static List&lt;RawMetric&gt; constructMetricsList(ObjectName jmxMetric,
+                                              MBeanAttributeInfo[] attributes,
+                                              Object[] attrValues) {
+<span class="fc" id="L25">    String domain = fixIllegalChars(jmxMetric.getDomain());</span>
+<span class="fc" id="L26">    LinkedHashMap&lt;String, String&gt; labels = getLabelsMap(jmxMetric);</span>
+<span class="fc" id="L27">    String firstLabel = labels.keySet().iterator().next();</span>
+<span class="fc" id="L28">    String firstLabelValue = fixIllegalChars(labels.get(firstLabel));</span>
+<span class="fc" id="L29">    labels.remove(firstLabel); //removing first label since it's value will be in name</span>
+
+<span class="fc" id="L31">    List&lt;RawMetric&gt; result = new ArrayList&lt;&gt;(attributes.length);</span>
+<span class="fc bfc" id="L32" title="All 2 branches covered.">    for (int i = 0; i &lt; attributes.length; i++) {</span>
+<span class="fc" id="L33">      String attrName = fixIllegalChars(attributes[i].getName());</span>
+<span class="fc" id="L34">      convertNumericValue(attrValues[i]).ifPresent(convertedValue -&gt; {</span>
+<span class="fc" id="L35">        String name = String.format(&quot;%s_%s_%s&quot;, domain, firstLabelValue, attrName);</span>
+<span class="fc" id="L36">        var metric = RawMetric.create(name, labels, convertedValue);</span>
+<span class="fc" id="L37">        result.add(metric);</span>
+<span class="fc" id="L38">      });</span>
+    }
+<span class="fc" id="L40">    return result;</span>
+  }
+
+  private static String fixIllegalChars(String str) {
+<span class="fc" id="L44">    return str</span>
+<span class="fc" id="L45">        .replace('.', '_')</span>
+<span class="fc" id="L46">        .replace('-', '_');</span>
+  }
+
+  private static Optional&lt;BigDecimal&gt; convertNumericValue(Object value) {
+<span class="fc bfc" id="L50" title="All 2 branches covered.">    if (!(value instanceof Number)) {</span>
+<span class="fc" id="L51">      return Optional.empty();</span>
+    }
+    try {
+<span class="fc bfc" id="L54" title="All 2 branches covered.">      if (value instanceof Long) {</span>
+<span class="fc" id="L55">        return Optional.of(new BigDecimal((Long) value));</span>
+<span class="pc bpc" id="L56" title="1 of 2 branches missed.">      } else if (value instanceof Integer) {</span>
+<span class="nc" id="L57">        return Optional.of(new BigDecimal((Integer) value));</span>
+      }
+<span class="fc" id="L59">      return Optional.of(new BigDecimal(value.toString()));</span>
+<span class="nc" id="L60">    } catch (NumberFormatException nfe) {</span>
+<span class="nc" id="L61">      return Optional.empty();</span>
+    }
+  }
+
+  /**
+   * Converts Mbean properties to map keeping order (copied from jmx_exporter repo).
+   */
+  private static LinkedHashMap&lt;String, String&gt; getLabelsMap(ObjectName mbeanName) {
+<span class="fc" id="L69">    LinkedHashMap&lt;String, String&gt; keyProperties = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L70">    String properties = mbeanName.getKeyPropertyListString();</span>
+<span class="fc" id="L71">    Matcher match = PROPERTY_PATTERN.matcher(properties);</span>
+<span class="fc bfc" id="L72" title="All 2 branches covered.">    while (match.lookingAt()) {</span>
+<span class="fc" id="L73">      String labelName = fixIllegalChars(match.group(1)); // label names should be fixed</span>
+<span class="fc" id="L74">      String labelValue = match.group(2);</span>
+<span class="fc" id="L75">      keyProperties.put(labelName, labelValue);</span>
+<span class="fc" id="L76">      properties = properties.substring(match.end());</span>
+<span class="fc bfc" id="L77" title="All 2 branches covered.">      if (properties.startsWith(&quot;,&quot;)) {</span>
+<span class="fc" id="L78">        properties = properties.substring(1);</span>
+      }
+<span class="fc" id="L80">      match.reset(properties);</span>
+<span class="fc" id="L81">    }</span>
+<span class="fc" id="L82">    return keyProperties;</span>
+  }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

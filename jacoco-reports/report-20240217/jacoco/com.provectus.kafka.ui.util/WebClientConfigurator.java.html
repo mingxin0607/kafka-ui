@@ -1,0 +1,135 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>WebClientConfigurator.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">kafka-ui-api</a> &gt; <a href="index.source.html" class="el_package">com.provectus.kafka.ui.util</a> &gt; <span class="el_source">WebClientConfigurator.java</span></div><h1>WebClientConfigurator.java</h1><pre class="source lang-java linenums">package com.provectus.kafka.ui.util;
+
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import com.provectus.kafka.ui.config.ClustersProperties;
+import com.provectus.kafka.ui.exception.ValidationException;
+import io.netty.handler.ssl.SslContext;
+import io.netty.handler.ssl.SslContextBuilder;
+import java.io.FileInputStream;
+import java.security.KeyStore;
+import java.util.function.Consumer;
+import javax.annotation.Nullable;
+import javax.net.ssl.KeyManagerFactory;
+import javax.net.ssl.TrustManagerFactory;
+import lombok.SneakyThrows;
+import org.openapitools.jackson.nullable.JsonNullableModule;
+import org.springframework.http.MediaType;
+import org.springframework.http.client.reactive.ReactorClientHttpConnector;
+import org.springframework.http.codec.ClientCodecConfigurer;
+import org.springframework.http.codec.json.Jackson2JsonDecoder;
+import org.springframework.http.codec.json.Jackson2JsonEncoder;
+import org.springframework.util.ResourceUtils;
+import org.springframework.util.unit.DataSize;
+import org.springframework.web.reactive.function.client.WebClient;
+import reactor.netty.http.client.HttpClient;
+
+public class WebClientConfigurator {
+
+<span class="fc" id="L30">  private final WebClient.Builder builder = WebClient.builder();</span>
+<span class="fc" id="L31">  private HttpClient httpClient = HttpClient</span>
+<span class="fc" id="L32">      .create()</span>
+<span class="fc" id="L33">      .proxyWithSystemProperties();</span>
+
+<span class="fc" id="L35">  public WebClientConfigurator() {</span>
+<span class="fc" id="L36">    configureObjectMapper(defaultOM());</span>
+<span class="fc" id="L37">  }</span>
+
+  private static ObjectMapper defaultOM() {
+<span class="fc" id="L40">    return new ObjectMapper()</span>
+<span class="fc" id="L41">        .registerModule(new JavaTimeModule())</span>
+<span class="fc" id="L42">        .registerModule(new JsonNullableModule())</span>
+<span class="fc" id="L43">        .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);</span>
+  }
+
+  public WebClientConfigurator configureSsl(@Nullable ClustersProperties.TruststoreConfig truststoreConfig,
+                                            @Nullable ClustersProperties.KeystoreConfig keystoreConfig) {
+<span class="fc" id="L48">    return configureSsl(</span>
+<span class="fc bfc" id="L49" title="All 2 branches covered.">        keystoreConfig != null ? keystoreConfig.getKeystoreLocation() : null,</span>
+<span class="fc bfc" id="L50" title="All 2 branches covered.">        keystoreConfig != null ? keystoreConfig.getKeystorePassword() : null,</span>
+<span class="pc bpc" id="L51" title="1 of 2 branches missed.">        truststoreConfig != null ? truststoreConfig.getTruststoreLocation() : null,</span>
+<span class="pc bpc" id="L52" title="1 of 2 branches missed.">        truststoreConfig != null ? truststoreConfig.getTruststorePassword() : null</span>
+    );
+  }
+
+<span class="nc" id="L56">  @SneakyThrows</span>
+  private WebClientConfigurator configureSsl(
+      @Nullable String keystoreLocation,
+      @Nullable String keystorePassword,
+      @Nullable String truststoreLocation,
+      @Nullable String truststorePassword) {
+<span class="pc bpc" id="L62" title="2 of 4 branches missed.">    if (truststoreLocation == null &amp;&amp; keystoreLocation == null) {</span>
+<span class="fc" id="L63">      return this;</span>
+    }
+
+<span class="nc" id="L66">    SslContextBuilder contextBuilder = SslContextBuilder.forClient();</span>
+<span class="nc bnc" id="L67" title="All 4 branches missed.">    if (truststoreLocation != null &amp;&amp; truststorePassword != null) {</span>
+<span class="nc" id="L68">      KeyStore trustStore = KeyStore.getInstance(KeyStore.getDefaultType());</span>
+<span class="nc" id="L69">      trustStore.load(</span>
+<span class="nc" id="L70">          new FileInputStream((ResourceUtils.getFile(truststoreLocation))),</span>
+<span class="nc" id="L71">          truststorePassword.toCharArray()</span>
+      );
+<span class="nc" id="L73">      TrustManagerFactory trustManagerFactory = TrustManagerFactory.getInstance(</span>
+<span class="nc" id="L74">          TrustManagerFactory.getDefaultAlgorithm()</span>
+      );
+<span class="nc" id="L76">      trustManagerFactory.init(trustStore);</span>
+<span class="nc" id="L77">      contextBuilder.trustManager(trustManagerFactory);</span>
+    }
+
+    // Prepare keystore only if we got a keystore
+<span class="nc bnc" id="L81" title="All 4 branches missed.">    if (keystoreLocation != null &amp;&amp; keystorePassword != null) {</span>
+<span class="nc" id="L82">      KeyStore keyStore = KeyStore.getInstance(KeyStore.getDefaultType());</span>
+<span class="nc" id="L83">      keyStore.load(</span>
+<span class="nc" id="L84">          new FileInputStream(ResourceUtils.getFile(keystoreLocation)),</span>
+<span class="nc" id="L85">          keystorePassword.toCharArray()</span>
+      );
+
+<span class="nc" id="L88">      KeyManagerFactory keyManagerFactory = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());</span>
+<span class="nc" id="L89">      keyManagerFactory.init(keyStore, keystorePassword.toCharArray());</span>
+<span class="nc" id="L90">      contextBuilder.keyManager(keyManagerFactory);</span>
+    }
+
+    // Create webclient
+<span class="nc" id="L94">    SslContext context = contextBuilder.build();</span>
+
+<span class="nc" id="L96">    httpClient = httpClient.secure(t -&gt; t.sslContext(context));</span>
+<span class="nc" id="L97">    return this;</span>
+  }
+
+  public WebClientConfigurator configureBasicAuth(@Nullable String username, @Nullable String password) {
+<span class="pc bpc" id="L101" title="1 of 4 branches missed.">    if (username != null &amp;&amp; password != null) {</span>
+<span class="fc" id="L102">      builder.defaultHeaders(httpHeaders -&gt; httpHeaders.setBasicAuth(username, password));</span>
+<span class="pc bpc" id="L103" title="1 of 2 branches missed.">    } else if (username != null) {</span>
+<span class="nc" id="L104">      throw new ValidationException(&quot;You specified username but did not specify password&quot;);</span>
+<span class="pc bpc" id="L105" title="1 of 2 branches missed.">    } else if (password != null) {</span>
+<span class="nc" id="L106">      throw new ValidationException(&quot;You specified password but did not specify username&quot;);</span>
+    }
+<span class="fc" id="L108">    return this;</span>
+  }
+
+  public WebClientConfigurator configureBufferSize(DataSize maxBuffSize) {
+<span class="fc" id="L112">    builder.codecs(c -&gt; c.defaultCodecs().maxInMemorySize((int) maxBuffSize.toBytes()));</span>
+<span class="fc" id="L113">    return this;</span>
+  }
+
+  public WebClientConfigurator configureObjectMapper(ObjectMapper mapper) {
+<span class="fc" id="L117">    builder.codecs(codecs -&gt; {</span>
+<span class="fc" id="L118">      codecs.defaultCodecs()</span>
+<span class="fc" id="L119">          .jackson2JsonEncoder(new Jackson2JsonEncoder(mapper, MediaType.APPLICATION_JSON));</span>
+<span class="fc" id="L120">      codecs.defaultCodecs()</span>
+<span class="fc" id="L121">          .jackson2JsonDecoder(new Jackson2JsonDecoder(mapper, MediaType.APPLICATION_JSON));</span>
+<span class="fc" id="L122">    });</span>
+<span class="fc" id="L123">    return this;</span>
+  }
+
+  public WebClientConfigurator configureCodecs(Consumer&lt;ClientCodecConfigurer&gt; configurer) {
+<span class="fc" id="L127">    builder.codecs(configurer);</span>
+<span class="fc" id="L128">    return this;</span>
+  }
+
+  public WebClient build() {
+<span class="fc" id="L132">    return builder.clientConnector(new ReactorClientHttpConnector(httpClient)).build();</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

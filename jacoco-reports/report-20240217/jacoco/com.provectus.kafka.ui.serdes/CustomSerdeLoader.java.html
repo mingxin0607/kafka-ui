@@ -1,0 +1,174 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CustomSerdeLoader.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">kafka-ui-api</a> &gt; <a href="index.source.html" class="el_package">com.provectus.kafka.ui.serdes</a> &gt; <span class="el_source">CustomSerdeLoader.java</span></div><h1>CustomSerdeLoader.java</h1><pre class="source lang-java linenums">package com.provectus.kafka.ui.serdes;
+
+import com.provectus.kafka.ui.serde.api.PropertyResolver;
+import com.provectus.kafka.ui.serde.api.Serde;
+import java.io.IOException;
+import java.net.URL;
+import java.net.URLClassLoader;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.security.AccessController;
+import java.security.PrivilegedAction;
+import java.util.ArrayList;
+import java.util.Enumeration;
+import java.util.Iterator;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
+import lombok.SneakyThrows;
+import lombok.Value;
+
+
+<span class="fc" id="L25">class CustomSerdeLoader {</span>
+
+<span class="pc bnc" id="L27" title="All 20 branches missed.">  @Value</span>
+  static class CustomSerde {
+<span class="fc" id="L29">    Serde serde;</span>
+<span class="fc" id="L30">    ClassLoader classLoader;</span>
+  }
+
+  // serde location -&gt; classloader
+<span class="fc" id="L34">  private final Map&lt;Path, ClassLoader&gt; classloaders = new ConcurrentHashMap&lt;&gt;();</span>
+
+<span class="nc" id="L36">  @SneakyThrows</span>
+  CustomSerde loadAndConfigure(String className,
+                               String filePath,
+                               PropertyResolver serdeProps,
+                               PropertyResolver clusterProps,
+                               PropertyResolver globalProps) {
+<span class="nc" id="L42">    Path locationPath = Path.of(filePath);</span>
+<span class="nc" id="L43">    var serdeClassloader = createClassloader(locationPath);</span>
+<span class="nc" id="L44">    var origCL = ClassloaderUtil.compareAndSwapLoaders(serdeClassloader);</span>
+    try {
+<span class="nc" id="L46">      var serdeClass = serdeClassloader.loadClass(className);</span>
+<span class="nc" id="L47">      var serde = (Serde) serdeClass.getDeclaredConstructor().newInstance();</span>
+<span class="nc" id="L48">      serde.configure(serdeProps, clusterProps, globalProps);</span>
+<span class="nc" id="L49">      return new CustomSerde(serde, serdeClassloader);</span>
+    } finally {
+<span class="nc" id="L51">      ClassloaderUtil.compareAndSwapLoaders(origCL);</span>
+    }
+  }
+
+  private static boolean isArchive(Path path) {
+<span class="nc" id="L56">    String archivePath = path.toString().toLowerCase();</span>
+<span class="nc bnc" id="L57" title="All 2 branches missed.">    return Files.isReadable(path)</span>
+<span class="nc bnc" id="L58" title="All 2 branches missed.">        &amp;&amp; Files.isRegularFile(path)</span>
+<span class="nc bnc" id="L59" title="All 4 branches missed.">        &amp;&amp; (archivePath.endsWith(&quot;.jar&quot;) || archivePath.endsWith(&quot;.zip&quot;));</span>
+  }
+
+<span class="nc" id="L62">  @SneakyThrows</span>
+  private static List&lt;URL&gt; findArchiveFiles(Path location) {
+<span class="nc bnc" id="L64" title="All 2 branches missed.">    if (isArchive(location)) {</span>
+<span class="nc" id="L65">      return List.of(location.toUri().toURL());</span>
+    }
+<span class="nc bnc" id="L67" title="All 2 branches missed.">    if (Files.isDirectory(location)) {</span>
+<span class="nc" id="L68">      List&lt;URL&gt; archiveFiles = new ArrayList&lt;&gt;();</span>
+<span class="nc" id="L69">      try (var files = Files.walk(location)) {</span>
+<span class="nc" id="L70">        var paths = files.filter(CustomSerdeLoader::isArchive).collect(Collectors.toList());</span>
+<span class="nc bnc" id="L71" title="All 2 branches missed.">        for (Path path : paths) {</span>
+<span class="nc" id="L72">          archiveFiles.add(path.toUri().toURL());</span>
+<span class="nc" id="L73">        }</span>
+      }
+<span class="nc" id="L75">      return archiveFiles;</span>
+    }
+<span class="nc" id="L77">    return List.of();</span>
+  }
+
+  private ClassLoader createClassloader(Path location) {
+<span class="nc bnc" id="L81" title="All 2 branches missed.">    if (!Files.exists(location)) {</span>
+<span class="nc" id="L82">      throw new IllegalStateException(&quot;Location does not exist&quot;);</span>
+    }
+<span class="nc" id="L84">    var archives = findArchiveFiles(location);</span>
+<span class="nc bnc" id="L85" title="All 2 branches missed.">    if (archives.isEmpty()) {</span>
+<span class="nc" id="L86">      throw new IllegalStateException(&quot;No archive files were found&quot;);</span>
+    }
+    // we assume that location's content does not change during serdes creation
+    // so, we can reuse already created classloaders
+<span class="nc" id="L90">    return classloaders.computeIfAbsent(location, l -&gt;</span>
+<span class="nc" id="L91">        AccessController.doPrivileged(</span>
+            (PrivilegedAction&lt;URLClassLoader&gt;) () -&gt;
+<span class="nc" id="L93">                new ChildFirstClassloader(</span>
+<span class="nc" id="L94">                    archives.toArray(URL[]::new),</span>
+<span class="nc" id="L95">                    CustomSerdeLoader.class.getClassLoader())));</span>
+  }
+
+  //---------------------------------------------------------------------------------
+
+  // This Classloader first tries to load classes by itself. If class not fount
+  // search is propagated to parent (this is opposite to how usual classloaders work)
+  private static class ChildFirstClassloader extends URLClassLoader {
+
+    private static final String JAVA_PACKAGE_PREFIX = &quot;java.&quot;;
+
+    ChildFirstClassloader(URL[] urls, ClassLoader parent) {
+<span class="nc" id="L107">      super(urls, parent);</span>
+<span class="nc" id="L108">    }</span>
+
+    @Override
+    protected synchronized Class&lt;?&gt; loadClass(String name, boolean resolve) throws ClassNotFoundException {
+      // first check whether it's a system class, delegate to the system loader
+<span class="nc bnc" id="L113" title="All 2 branches missed.">      if (name.startsWith(JAVA_PACKAGE_PREFIX)) {</span>
+<span class="nc" id="L114">        return findSystemClass(name);</span>
+      }
+<span class="nc" id="L116">      Class&lt;?&gt; loadedClass = findLoadedClass(name);</span>
+<span class="nc bnc" id="L117" title="All 2 branches missed.">      if (loadedClass == null) {</span>
+        try {
+          // start searching from current classloader
+<span class="nc" id="L120">          loadedClass = findClass(name);</span>
+<span class="nc" id="L121">        } catch (ClassNotFoundException e) {</span>
+          // if not found - going to parent
+<span class="nc" id="L123">          loadedClass = super.loadClass(name, resolve);</span>
+<span class="nc" id="L124">        }</span>
+      }
+<span class="nc bnc" id="L126" title="All 2 branches missed.">      if (resolve) {</span>
+<span class="nc" id="L127">        resolveClass(loadedClass);</span>
+      }
+<span class="nc" id="L129">      return loadedClass;</span>
+    }
+
+    @Override
+    public Enumeration&lt;URL&gt; getResources(String name) throws IOException {
+<span class="nc" id="L134">      List&lt;URL&gt; allRes = new LinkedList&lt;&gt;();</span>
+<span class="nc" id="L135">      Enumeration&lt;URL&gt; thisRes = findResources(name);</span>
+<span class="nc bnc" id="L136" title="All 2 branches missed.">      if (thisRes != null) {</span>
+<span class="nc bnc" id="L137" title="All 2 branches missed.">        while (thisRes.hasMoreElements()) {</span>
+<span class="nc" id="L138">          allRes.add(thisRes.nextElement());</span>
+        }
+      }
+      // then try finding resources from parent classloaders
+<span class="nc" id="L142">      Enumeration&lt;URL&gt; parentRes = super.findResources(name);</span>
+<span class="nc bnc" id="L143" title="All 2 branches missed.">      if (parentRes != null) {</span>
+<span class="nc bnc" id="L144" title="All 2 branches missed.">        while (parentRes.hasMoreElements()) {</span>
+<span class="nc" id="L145">          allRes.add(parentRes.nextElement());</span>
+        }
+      }
+<span class="nc" id="L148">      return new Enumeration&lt;&gt;() {</span>
+<span class="nc" id="L149">        final Iterator&lt;URL&gt; it = allRes.iterator();</span>
+
+        @Override
+        public boolean hasMoreElements() {
+<span class="nc" id="L153">          return it.hasNext();</span>
+        }
+
+        @Override
+        public URL nextElement() {
+<span class="nc" id="L158">          return it.next();</span>
+        }
+      };
+    }
+
+    @Override
+    public URL getResource(String name) {
+<span class="nc" id="L165">      URL res = findResource(name);</span>
+<span class="nc bnc" id="L166" title="All 2 branches missed.">      if (res == null) {</span>
+<span class="nc" id="L167">        res = super.getResource(name);</span>
+      }
+<span class="nc" id="L169">      return res;</span>
+    }
+  }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

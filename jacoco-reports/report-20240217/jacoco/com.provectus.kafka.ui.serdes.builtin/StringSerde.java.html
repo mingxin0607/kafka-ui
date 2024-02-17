@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>StringSerde.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">kafka-ui-api</a> &gt; <a href="index.source.html" class="el_package">com.provectus.kafka.ui.serdes.builtin</a> &gt; <span class="el_source">StringSerde.java</span></div><h1>StringSerde.java</h1><pre class="source lang-java linenums">package com.provectus.kafka.ui.serdes.builtin;
+
+import com.provectus.kafka.ui.serde.api.DeserializeResult;
+import com.provectus.kafka.ui.serde.api.PropertyResolver;
+import com.provectus.kafka.ui.serde.api.SchemaDescription;
+import com.provectus.kafka.ui.serdes.BuiltInSerde;
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
+import java.util.Map;
+import java.util.Optional;
+
+<span class="fc" id="L12">public class StringSerde implements BuiltInSerde {</span>
+
+  public static String name() {
+<span class="fc" id="L15">    return &quot;String&quot;;</span>
+  }
+
+<span class="fc" id="L18">  private Charset encoding = StandardCharsets.UTF_8;</span>
+
+  @Override
+  public void configure(PropertyResolver serdeProperties,
+                        PropertyResolver kafkaClusterProperties,
+                        PropertyResolver globalProperties) {
+<span class="fc" id="L24">    serdeProperties.getProperty(&quot;encoding&quot;, String.class)</span>
+<span class="fc" id="L25">        .map(Charset::forName)</span>
+<span class="pc" id="L26">        .ifPresent(e -&gt; StringSerde.this.encoding = e);</span>
+<span class="fc" id="L27">  }</span>
+
+  @Override
+  public Optional&lt;String&gt; getDescription() {
+<span class="nc" id="L31">    return Optional.empty();</span>
+  }
+
+  @Override
+  public Optional&lt;SchemaDescription&gt; getSchema(String topic, Target type) {
+<span class="nc" id="L36">    return Optional.empty();</span>
+  }
+
+  @Override
+  public boolean canDeserialize(String topic, Target type) {
+<span class="fc" id="L41">    return true;</span>
+  }
+
+  @Override
+  public boolean canSerialize(String topic, Target type) {
+<span class="fc" id="L46">    return true;</span>
+  }
+
+  @Override
+  public Serializer serializer(String topic, Target type) {
+<span class="fc" id="L51">    return input -&gt; input.getBytes(encoding);</span>
+  }
+
+  @Override
+  public Deserializer deserializer(String topic, Target type) {
+<span class="fc" id="L56">    return (headers, data) -&gt;</span>
+<span class="fc" id="L57">        new DeserializeResult(</span>
+            new String(data, encoding),
+            DeserializeResult.Type.STRING,
+<span class="fc" id="L60">            Map.of()</span>
+        );
+  }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

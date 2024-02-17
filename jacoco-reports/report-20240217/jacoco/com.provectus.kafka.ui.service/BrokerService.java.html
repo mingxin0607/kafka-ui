@@ -1,0 +1,147 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>BrokerService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">kafka-ui-api</a> &gt; <a href="index.source.html" class="el_package">com.provectus.kafka.ui.service</a> &gt; <span class="el_source">BrokerService.java</span></div><h1>BrokerService.java</h1><pre class="source lang-java linenums">package com.provectus.kafka.ui.service;
+
+import com.provectus.kafka.ui.exception.InvalidRequestApiException;
+import com.provectus.kafka.ui.exception.LogDirNotFoundApiException;
+import com.provectus.kafka.ui.exception.NotFoundException;
+import com.provectus.kafka.ui.exception.TopicOrPartitionNotFoundException;
+import com.provectus.kafka.ui.mapper.DescribeLogDirsMapper;
+import com.provectus.kafka.ui.model.BrokerLogdirUpdateDTO;
+import com.provectus.kafka.ui.model.BrokersLogdirsDTO;
+import com.provectus.kafka.ui.model.InternalBroker;
+import com.provectus.kafka.ui.model.InternalBrokerConfig;
+import com.provectus.kafka.ui.model.KafkaCluster;
+import com.provectus.kafka.ui.model.PartitionDistributionStats;
+import com.provectus.kafka.ui.service.metrics.RawMetric;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+import javax.annotation.Nullable;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.apache.kafka.clients.admin.ConfigEntry;
+import org.apache.kafka.common.Node;
+import org.apache.kafka.common.TopicPartitionReplica;
+import org.apache.kafka.common.errors.InvalidRequestException;
+import org.apache.kafka.common.errors.LogDirNotFoundException;
+import org.apache.kafka.common.errors.TimeoutException;
+import org.apache.kafka.common.errors.UnknownTopicOrPartitionException;
+import org.apache.kafka.common.requests.DescribeLogDirsResponse;
+import org.springframework.stereotype.Service;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
+
+@Service
+<span class="fc" id="L36">@RequiredArgsConstructor</span>
+<span class="fc" id="L37">@Slf4j</span>
+public class BrokerService {
+
+  private final StatisticsCache statisticsCache;
+  private final AdminClientService adminClientService;
+  private final DescribeLogDirsMapper describeLogDirsMapper;
+
+  private Mono&lt;Map&lt;Integer, List&lt;ConfigEntry&gt;&gt;&gt; loadBrokersConfig(
+      KafkaCluster cluster, List&lt;Integer&gt; brokersIds) {
+<span class="fc" id="L46">    return adminClientService.get(cluster).flatMap(ac -&gt; ac.loadBrokersConfig(brokersIds));</span>
+  }
+
+  private Mono&lt;List&lt;ConfigEntry&gt;&gt; loadBrokersConfig(
+      KafkaCluster cluster, Integer brokerId) {
+<span class="fc" id="L51">    return loadBrokersConfig(cluster, Collections.singletonList(brokerId))</span>
+<span class="fc" id="L52">        .map(map -&gt; map.values().stream().findFirst().orElse(List.of()));</span>
+  }
+
+  private Flux&lt;InternalBrokerConfig&gt; getBrokersConfig(KafkaCluster cluster, Integer brokerId) {
+<span class="fc" id="L56">    if (statisticsCache.get(cluster).getClusterDescription().getNodes()</span>
+<span class="fc bfc" id="L57" title="All 4 branches covered.">        .stream().noneMatch(node -&gt; node.id() == brokerId)) {</span>
+<span class="fc" id="L58">      return Flux.error(</span>
+<span class="fc" id="L59">          new NotFoundException(String.format(&quot;Broker with id %s not found&quot;, brokerId)));</span>
+    }
+<span class="fc" id="L61">    return loadBrokersConfig(cluster, brokerId)</span>
+<span class="fc" id="L62">        .map(list -&gt; list.stream()</span>
+<span class="fc" id="L63">            .map(InternalBrokerConfig::from)</span>
+<span class="fc" id="L64">            .collect(Collectors.toList()))</span>
+<span class="fc" id="L65">        .flatMapMany(Flux::fromIterable);</span>
+  }
+
+  public Flux&lt;InternalBroker&gt; getBrokers(KafkaCluster cluster) {
+<span class="fc" id="L69">    var stats = statisticsCache.get(cluster);</span>
+<span class="fc" id="L70">    var partitionsDistribution = PartitionDistributionStats.create(stats);</span>
+<span class="fc" id="L71">    return adminClientService</span>
+<span class="fc" id="L72">        .get(cluster)</span>
+<span class="fc" id="L73">        .flatMap(ReactiveAdminClient::describeCluster)</span>
+<span class="fc" id="L74">        .map(description -&gt; description.getNodes().stream()</span>
+<span class="fc" id="L75">            .map(node -&gt; new InternalBroker(node, partitionsDistribution, stats))</span>
+<span class="fc" id="L76">            .collect(Collectors.toList()))</span>
+<span class="fc" id="L77">        .flatMapMany(Flux::fromIterable);</span>
+  }
+
+  public Mono&lt;Void&gt; updateBrokerLogDir(KafkaCluster cluster,
+                                       Integer broker,
+                                       BrokerLogdirUpdateDTO brokerLogDir) {
+<span class="fc" id="L83">    return adminClientService.get(cluster)</span>
+<span class="fc" id="L84">        .flatMap(ac -&gt; updateBrokerLogDir(ac, brokerLogDir, broker));</span>
+  }
+
+  private Mono&lt;Void&gt; updateBrokerLogDir(ReactiveAdminClient admin,
+                                        BrokerLogdirUpdateDTO b,
+                                        Integer broker) {
+
+<span class="fc" id="L91">    Map&lt;TopicPartitionReplica, String&gt; req = Map.of(</span>
+<span class="fc" id="L92">        new TopicPartitionReplica(b.getTopic(), b.getPartition(), broker),</span>
+<span class="fc" id="L93">        b.getLogDir());</span>
+<span class="fc" id="L94">    return admin.alterReplicaLogDirs(req)</span>
+<span class="fc" id="L95">        .onErrorResume(UnknownTopicOrPartitionException.class,</span>
+<span class="fc" id="L96">            e -&gt; Mono.error(new TopicOrPartitionNotFoundException()))</span>
+<span class="fc" id="L97">        .onErrorResume(LogDirNotFoundException.class,</span>
+<span class="fc" id="L98">            e -&gt; Mono.error(new LogDirNotFoundApiException()))</span>
+<span class="fc" id="L99">        .doOnError(e -&gt; log.error(&quot;Unexpected error&quot;, e));</span>
+  }
+
+  public Mono&lt;Void&gt; updateBrokerConfigByName(KafkaCluster cluster,
+                                             Integer broker,
+                                             String name,
+                                             String value) {
+<span class="fc" id="L106">    return adminClientService.get(cluster)</span>
+<span class="fc" id="L107">        .flatMap(ac -&gt; ac.updateBrokerConfigByName(broker, name, value))</span>
+<span class="fc" id="L108">        .onErrorResume(InvalidRequestException.class,</span>
+<span class="fc" id="L109">            e -&gt; Mono.error(new InvalidRequestApiException(e.getMessage())))</span>
+<span class="fc" id="L110">        .doOnError(e -&gt; log.error(&quot;Unexpected error&quot;, e));</span>
+  }
+
+  private Mono&lt;Map&lt;Integer, Map&lt;String, DescribeLogDirsResponse.LogDirInfo&gt;&gt;&gt; getClusterLogDirs(
+      KafkaCluster cluster, List&lt;Integer&gt; reqBrokers) {
+<span class="fc" id="L115">    return adminClientService.get(cluster)</span>
+<span class="fc" id="L116">        .flatMap(admin -&gt; {</span>
+<span class="fc" id="L117">          List&lt;Integer&gt; brokers = statisticsCache.get(cluster).getClusterDescription().getNodes()</span>
+<span class="fc" id="L118">              .stream()</span>
+<span class="fc" id="L119">              .map(Node::id)</span>
+<span class="fc" id="L120">              .collect(Collectors.toList());</span>
+<span class="fc bfc" id="L121" title="All 2 branches covered.">          if (!reqBrokers.isEmpty()) {</span>
+<span class="fc" id="L122">            brokers.retainAll(reqBrokers);</span>
+          }
+<span class="fc" id="L124">          return admin.describeLogDirs(brokers);</span>
+        })
+<span class="fc" id="L126">        .onErrorResume(TimeoutException.class, (TimeoutException e) -&gt; {</span>
+<span class="nc" id="L127">          log.error(&quot;Error during fetching log dirs&quot;, e);</span>
+<span class="nc" id="L128">          return Mono.just(new HashMap&lt;&gt;());</span>
+        });
+  }
+
+  public Flux&lt;BrokersLogdirsDTO&gt; getAllBrokersLogdirs(KafkaCluster cluster, List&lt;Integer&gt; brokers) {
+<span class="fc" id="L133">    return getClusterLogDirs(cluster, brokers)</span>
+<span class="fc" id="L134">        .map(describeLogDirsMapper::toBrokerLogDirsList)</span>
+<span class="fc" id="L135">        .flatMapMany(Flux::fromIterable);</span>
+  }
+
+  public Flux&lt;InternalBrokerConfig&gt; getBrokerConfig(KafkaCluster cluster, Integer brokerId) {
+<span class="fc" id="L139">    return getBrokersConfig(cluster, brokerId);</span>
+  }
+
+  public Mono&lt;List&lt;RawMetric&gt;&gt; getBrokerMetrics(KafkaCluster cluster, Integer brokerId) {
+<span class="nc" id="L143">    return Mono.justOrEmpty(statisticsCache.get(cluster).getMetrics().getPerBrokerMetrics().get(brokerId));</span>
+  }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

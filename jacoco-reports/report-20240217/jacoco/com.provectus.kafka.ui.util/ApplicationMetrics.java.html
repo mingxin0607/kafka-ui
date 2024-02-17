@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ApplicationMetrics.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">kafka-ui-api</a> &gt; <a href="index.source.html" class="el_package">com.provectus.kafka.ui.util</a> &gt; <span class="el_source">ApplicationMetrics.java</span></div><h1>ApplicationMetrics.java</h1><pre class="source lang-java linenums">package com.provectus.kafka.ui.util;
+
+import static lombok.AccessLevel.PRIVATE;
+
+import com.google.common.annotations.VisibleForTesting;
+import com.provectus.kafka.ui.emitter.PolledRecords;
+import com.provectus.kafka.ui.model.KafkaCluster;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.DistributionSummary;
+import io.micrometer.core.instrument.Gauge;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Metrics;
+import io.micrometer.core.instrument.Timer;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import java.util.concurrent.atomic.AtomicInteger;
+import lombok.RequiredArgsConstructor;
+
+<span class="fc" id="L18">@RequiredArgsConstructor(access = PRIVATE)</span>
+public class ApplicationMetrics {
+
+  // kafka-ui specific metrics prefix. Added to make it easier to distinguish kui metrics from
+  // other metrics, exposed by spring boot (like http stats, jvm, etc.)
+  private static final String COMMON_PREFIX = &quot;kui_&quot;;
+
+  private final String clusterName;
+  private final MeterRegistry registry;
+
+  public static ApplicationMetrics forCluster(KafkaCluster cluster) {
+<span class="fc" id="L29">    return new ApplicationMetrics(cluster.getName(), Metrics.globalRegistry);</span>
+  }
+
+  @VisibleForTesting
+  public static ApplicationMetrics noop() {
+<span class="fc" id="L34">    return new ApplicationMetrics(&quot;noop&quot;, new SimpleMeterRegistry());</span>
+  }
+
+  public void meterPolledRecords(String topic, PolledRecords polled, boolean throttled) {
+<span class="fc" id="L38">    pollTimer(topic).record(polled.elapsed());</span>
+<span class="fc" id="L39">    polledRecords(topic).increment(polled.count());</span>
+<span class="fc" id="L40">    polledBytes(topic).record(polled.bytes());</span>
+<span class="pc bpc" id="L41" title="1 of 2 branches missed.">    if (throttled) {</span>
+<span class="nc" id="L42">      pollThrottlingActivations().increment();</span>
+    }
+<span class="fc" id="L44">  }</span>
+
+  private Counter polledRecords(String topic) {
+<span class="fc" id="L47">    return Counter.builder(COMMON_PREFIX + &quot;topic_records_polled&quot;)</span>
+<span class="fc" id="L48">        .description(&quot;Number of records polled from topic&quot;)</span>
+<span class="fc" id="L49">        .tag(&quot;cluster&quot;, clusterName)</span>
+<span class="fc" id="L50">        .tag(&quot;topic&quot;, topic)</span>
+<span class="fc" id="L51">        .register(registry);</span>
+  }
+
+  private DistributionSummary polledBytes(String topic) {
+<span class="fc" id="L55">    return DistributionSummary.builder(COMMON_PREFIX + &quot;topic_polled_bytes&quot;)</span>
+<span class="fc" id="L56">        .description(&quot;Bytes polled from kafka topic&quot;)</span>
+<span class="fc" id="L57">        .tag(&quot;cluster&quot;, clusterName)</span>
+<span class="fc" id="L58">        .tag(&quot;topic&quot;, topic)</span>
+<span class="fc" id="L59">        .register(registry);</span>
+  }
+
+  private Timer pollTimer(String topic) {
+<span class="fc" id="L63">    return Timer.builder(COMMON_PREFIX + &quot;topic_poll_time&quot;)</span>
+<span class="fc" id="L64">        .description(&quot;Time spend in polling for topic&quot;)</span>
+<span class="fc" id="L65">        .tag(&quot;cluster&quot;, clusterName)</span>
+<span class="fc" id="L66">        .tag(&quot;topic&quot;, topic)</span>
+<span class="fc" id="L67">        .register(registry);</span>
+  }
+
+  private Counter pollThrottlingActivations() {
+<span class="nc" id="L71">    return Counter.builder(COMMON_PREFIX + &quot;poll_throttling_activations&quot;)</span>
+<span class="nc" id="L72">        .description(&quot;Number of poll throttling activations&quot;)</span>
+<span class="nc" id="L73">        .tag(&quot;cluster&quot;, clusterName)</span>
+<span class="nc" id="L74">        .register(registry);</span>
+  }
+
+  public AtomicInteger activeConsumers() {
+<span class="fc" id="L78">    var count = new AtomicInteger();</span>
+<span class="pc" id="L79">    Gauge.builder(COMMON_PREFIX + &quot;active_consumers&quot;, () -&gt; count)</span>
+<span class="fc" id="L80">        .description(&quot;Number of active consumers&quot;)</span>
+<span class="fc" id="L81">        .tag(&quot;cluster&quot;, clusterName)</span>
+<span class="fc" id="L82">        .register(registry);</span>
+<span class="fc" id="L83">    return count;</span>
+  }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

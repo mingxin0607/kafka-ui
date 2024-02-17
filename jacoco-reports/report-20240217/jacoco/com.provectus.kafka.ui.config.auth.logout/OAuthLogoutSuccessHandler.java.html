@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>OAuthLogoutSuccessHandler.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">kafka-ui-api</a> &gt; <a href="index.source.html" class="el_package">com.provectus.kafka.ui.config.auth.logout</a> &gt; <span class="el_source">OAuthLogoutSuccessHandler.java</span></div><h1>OAuthLogoutSuccessHandler.java</h1><pre class="source lang-java linenums">package com.provectus.kafka.ui.config.auth.logout;
+
+import com.provectus.kafka.ui.config.auth.OAuthProperties;
+import java.util.List;
+import java.util.Optional;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
+import org.springframework.security.web.server.WebFilterExchange;
+import org.springframework.security.web.server.authentication.logout.ServerLogoutSuccessHandler;
+import org.springframework.stereotype.Component;
+import reactor.core.publisher.Mono;
+
+@Component
+@ConditionalOnProperty(value = &quot;auth.type&quot;, havingValue = &quot;OAUTH2&quot;)
+public class OAuthLogoutSuccessHandler implements ServerLogoutSuccessHandler {
+  private final OAuthProperties properties;
+  private final List&lt;LogoutSuccessHandler&gt; logoutSuccessHandlers;
+  private final ServerLogoutSuccessHandler defaultOidcLogoutHandler;
+
+  public OAuthLogoutSuccessHandler(final OAuthProperties properties,
+                                   final List&lt;LogoutSuccessHandler&gt; logoutSuccessHandlers,
+<span class="nc" id="L24">                                   final @Qualifier(&quot;defaultOidcLogoutHandler&quot;) ServerLogoutSuccessHandler handler) {</span>
+<span class="nc" id="L25">    this.properties = properties;</span>
+<span class="nc" id="L26">    this.logoutSuccessHandlers = logoutSuccessHandlers;</span>
+<span class="nc" id="L27">    this.defaultOidcLogoutHandler = handler;</span>
+<span class="nc" id="L28">  }</span>
+
+  @Override
+  public Mono&lt;Void&gt; onLogoutSuccess(final WebFilterExchange exchange,
+                                    final Authentication authentication) {
+<span class="nc" id="L33">    final OAuth2AuthenticationToken oauthToken = (OAuth2AuthenticationToken) authentication;</span>
+<span class="nc" id="L34">    final String providerId = oauthToken.getAuthorizedClientRegistrationId();</span>
+<span class="nc" id="L35">    final OAuthProperties.OAuth2Provider oAuth2Provider = properties.getClient().get(providerId);</span>
+<span class="nc" id="L36">    return getLogoutHandler(oAuth2Provider.getProvider())</span>
+<span class="nc" id="L37">        .map(handler -&gt; handler.handle(exchange, authentication, oAuth2Provider))</span>
+<span class="nc" id="L38">        .orElseGet(() -&gt; defaultOidcLogoutHandler.onLogoutSuccess(exchange, authentication));</span>
+  }
+
+  private Optional&lt;LogoutSuccessHandler&gt; getLogoutHandler(final String provider) {
+<span class="nc" id="L42">    return logoutSuccessHandlers.stream()</span>
+<span class="nc" id="L43">        .filter(h -&gt; h.isApplicable(provider))</span>
+<span class="nc" id="L44">        .findFirst();</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

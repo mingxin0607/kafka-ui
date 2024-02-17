@@ -1,0 +1,208 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>KsqlApiClient.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">kafka-ui-api</a> &gt; <a href="index.source.html" class="el_package">com.provectus.kafka.ui.service.ksql</a> &gt; <span class="el_source">KsqlApiClient.java</span></div><h1>KsqlApiClient.java</h1><pre class="source lang-java linenums">package com.provectus.kafka.ui.service.ksql;
+
+import static ksql.KsqlGrammarParser.DefineVariableContext;
+import static ksql.KsqlGrammarParser.PrintTopicContext;
+import static ksql.KsqlGrammarParser.SingleStatementContext;
+import static ksql.KsqlGrammarParser.UndefineVariableContext;
+import static org.springframework.http.MediaType.APPLICATION_JSON;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.json.JsonMapper;
+import com.fasterxml.jackson.databind.node.TextNode;
+import com.provectus.kafka.ui.config.ClustersProperties;
+import com.provectus.kafka.ui.service.ksql.response.ResponseParser;
+import com.provectus.kafka.ui.util.WebClientConfigurator;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import javax.annotation.Nullable;
+import lombok.Builder;
+import lombok.Value;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.core.codec.DecodingException;
+import org.springframework.http.MediaType;
+import org.springframework.http.codec.json.Jackson2JsonDecoder;
+import org.springframework.http.codec.json.Jackson2JsonEncoder;
+import org.springframework.util.MimeType;
+import org.springframework.util.MimeTypeUtils;
+import org.springframework.util.unit.DataSize;
+import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.reactive.function.client.WebClientResponseException;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
+
+<span class="fc" id="L35">@Slf4j</span>
+public class KsqlApiClient {
+
+<span class="fc" id="L38">  private static final MimeType KQL_API_MIME_TYPE = MimeTypeUtils.parseMimeType(&quot;application/vnd.ksql.v1+json&quot;);</span>
+
+<span class="fc" id="L40">  private static final Set&lt;Class&lt;?&gt;&gt; UNSUPPORTED_STMT_TYPES = Set.of(</span>
+      PrintTopicContext.class,
+      DefineVariableContext.class,
+      UndefineVariableContext.class
+  );
+
+<span class="pc" id="L46">  @Builder(toBuilder = true)</span>
+<span class="nc bnc" id="L47" title="All 32 branches missed.">  @Value</span>
+  public static class KsqlResponseTable {
+<span class="fc" id="L49">    String header;</span>
+<span class="nc" id="L50">    List&lt;String&gt; columnNames;</span>
+<span class="fc" id="L51">    List&lt;List&lt;JsonNode&gt;&gt; values;</span>
+<span class="nc" id="L52">    boolean error;</span>
+
+    public Optional&lt;JsonNode&gt; getColumnValue(List&lt;JsonNode&gt; row, String column) {
+<span class="fc" id="L55">      int colIdx = columnNames.indexOf(column);</span>
+<span class="pc bpc" id="L56" title="1 of 2 branches missed.">      return colIdx &gt;= 0</span>
+<span class="fc" id="L57">          ? Optional.ofNullable(row.get(colIdx))</span>
+<span class="nc" id="L58">          : Optional.empty();</span>
+    }
+  }
+
+<span class="pc bnc" id="L62" title="All 20 branches missed.">  @Value</span>
+  private static class KsqlRequest {
+<span class="fc" id="L64">    String ksql;</span>
+<span class="fc" id="L65">    Map&lt;String, String&gt; streamsProperties;</span>
+  }
+
+  //--------------------------------------------------------------------------------------------
+
+  private final String baseUrl;
+  private final WebClient webClient;
+
+  public KsqlApiClient(String baseUrl,
+                       @Nullable ClustersProperties.KsqldbServerAuth ksqldbServerAuth,
+                       @Nullable ClustersProperties.TruststoreConfig ksqldbServerSsl,
+                       @Nullable ClustersProperties.KeystoreConfig keystoreConfig,
+<span class="fc" id="L77">                       @Nullable DataSize maxBuffSize) {</span>
+<span class="fc" id="L78">    this.baseUrl = baseUrl;</span>
+<span class="fc" id="L79">    this.webClient = webClient(ksqldbServerAuth, ksqldbServerSsl, keystoreConfig, maxBuffSize);</span>
+<span class="fc" id="L80">  }</span>
+
+  private static WebClient webClient(@Nullable ClustersProperties.KsqldbServerAuth ksqldbServerAuth,
+                                     @Nullable ClustersProperties.TruststoreConfig truststoreConfig,
+                                     @Nullable ClustersProperties.KeystoreConfig keystoreConfig,
+                                     @Nullable DataSize maxBuffSize) {
+<span class="fc" id="L86">    ksqldbServerAuth = Optional.ofNullable(ksqldbServerAuth).orElse(new ClustersProperties.KsqldbServerAuth());</span>
+<span class="fc" id="L87">    maxBuffSize = Optional.ofNullable(maxBuffSize).orElse(DataSize.ofMegabytes(20));</span>
+
+<span class="fc" id="L89">    return new WebClientConfigurator()</span>
+<span class="fc" id="L90">        .configureSsl(truststoreConfig, keystoreConfig)</span>
+<span class="fc" id="L91">        .configureBasicAuth(</span>
+<span class="fc" id="L92">            ksqldbServerAuth.getUsername(),</span>
+<span class="fc" id="L93">            ksqldbServerAuth.getPassword()</span>
+        )
+<span class="fc" id="L95">        .configureBufferSize(maxBuffSize)</span>
+<span class="fc" id="L96">        .configureCodecs(codecs -&gt; {</span>
+<span class="fc" id="L97">          var mapper = new JsonMapper();</span>
+<span class="fc" id="L98">          codecs.defaultCodecs()</span>
+<span class="fc" id="L99">              .jackson2JsonEncoder(new Jackson2JsonEncoder(mapper, KQL_API_MIME_TYPE, APPLICATION_JSON));</span>
+          // some ksqldb versions do not set content-type header in response,
+          // but we still need to use JsonDecoder for it
+<span class="fc" id="L102">          codecs.defaultCodecs()</span>
+<span class="fc" id="L103">              .jackson2JsonDecoder(new Jackson2JsonDecoder(mapper, MimeTypeUtils.ALL));</span>
+<span class="fc" id="L104">        })</span>
+<span class="fc" id="L105">        .build();</span>
+  }
+
+  private KsqlRequest ksqlRequest(String ksql, Map&lt;String, String&gt; streamProperties) {
+<span class="fc" id="L109">    return new KsqlRequest(ksql, streamProperties);</span>
+  }
+
+  private Flux&lt;KsqlResponseTable&gt; executeSelect(String ksql, Map&lt;String, String&gt; streamProperties) {
+<span class="nc" id="L113">    return webClient</span>
+<span class="nc" id="L114">        .post()</span>
+<span class="nc" id="L115">        .uri(baseUrl + &quot;/query&quot;)</span>
+<span class="nc" id="L116">        .accept(new MediaType(KQL_API_MIME_TYPE))</span>
+<span class="nc" id="L117">        .contentType(new MediaType(KQL_API_MIME_TYPE))</span>
+<span class="nc" id="L118">        .bodyValue(ksqlRequest(ksql, streamProperties))</span>
+<span class="nc" id="L119">        .retrieve()</span>
+<span class="nc" id="L120">        .bodyToFlux(JsonNode.class)</span>
+<span class="nc" id="L121">        .onErrorResume(this::isUnexpectedJsonArrayEndCharException, th -&gt; Mono.empty())</span>
+<span class="nc" id="L122">        .map(ResponseParser::parseSelectResponse)</span>
+<span class="nc" id="L123">        .filter(Optional::isPresent)</span>
+<span class="nc" id="L124">        .map(Optional::get)</span>
+<span class="nc" id="L125">        .onErrorResume(WebClientResponseException.class,</span>
+<span class="nc" id="L126">            e -&gt; Flux.just(ResponseParser.parseErrorResponse(e)));</span>
+  }
+
+  /**
+   * Some version of ksqldb (?..0.24) can cut off json streaming without respect proper array ending like &lt;p/&gt;
+   * &lt;code&gt;[{&quot;header&quot;:{&quot;queryId&quot;:&quot;...&quot;,&quot;schema&quot;:&quot;...&quot;}}, ]&lt;/code&gt;
+   * which will cause json parsing error and will be propagated to UI.
+   * This is a know issue(https://github.com/confluentinc/ksql/issues/8746), but we don't know when it will be fixed.
+   * To workaround this we need to check DecodingException err msg.
+   */
+  private boolean isUnexpectedJsonArrayEndCharException(Throwable th) {
+<span class="nc bnc" id="L137" title="All 2 branches missed.">    return th instanceof DecodingException</span>
+<span class="nc bnc" id="L138" title="All 2 branches missed.">        &amp;&amp; th.getMessage().contains(&quot;Unexpected character (']'&quot;);</span>
+  }
+
+  private Flux&lt;KsqlResponseTable&gt; executeStatement(String ksql,
+                                                   Map&lt;String, String&gt; streamProperties) {
+<span class="fc" id="L143">    return webClient</span>
+<span class="fc" id="L144">        .post()</span>
+<span class="fc" id="L145">        .uri(baseUrl + &quot;/ksql&quot;)</span>
+<span class="fc" id="L146">        .accept(new MediaType(KQL_API_MIME_TYPE))</span>
+<span class="fc" id="L147">        .contentType(APPLICATION_JSON)</span>
+<span class="fc" id="L148">        .bodyValue(ksqlRequest(ksql, streamProperties))</span>
+<span class="fc" id="L149">        .exchangeToFlux(</span>
+            resp -&gt; {
+<span class="pc bpc" id="L151" title="1 of 2 branches missed.">              if (resp.statusCode().isError()) {</span>
+<span class="nc" id="L152">                return resp.createException().flux().map(ResponseParser::parseErrorResponse);</span>
+              }
+<span class="fc" id="L154">              return resp.bodyToFlux(JsonNode.class)</span>
+<span class="fc" id="L155">                  .flatMap(body -&gt;</span>
+                      // body can be an array or single object
+<span class="pc bpc" id="L157" title="1 of 2 branches missed.">                      (body.isArray() ? Flux.fromIterable(body) : Flux.just(body))</span>
+<span class="fc" id="L158">                          .flatMapIterable(ResponseParser::parseStatementResponse))</span>
+                  // body can be empty for some statements like INSERT
+<span class="fc" id="L160">                  .switchIfEmpty(</span>
+<span class="fc" id="L161">                      Flux.just(KsqlResponseTable.builder()</span>
+<span class="fc" id="L162">                          .header(&quot;Query Result&quot;)</span>
+<span class="fc" id="L163">                          .columnNames(List.of(&quot;Result&quot;))</span>
+<span class="fc" id="L164">                          .values(List.of(List.of(new TextNode(&quot;Success&quot;))))</span>
+<span class="fc" id="L165">                          .build()));</span>
+            }
+        );
+  }
+
+  public Flux&lt;KsqlResponseTable&gt; execute(String ksql, Map&lt;String, String&gt; streamProperties) {
+<span class="fc" id="L171">    var parsedStatements = KsqlGrammar.parse(ksql);</span>
+<span class="pc bpc" id="L172" title="1 of 2 branches missed.">    if (parsedStatements.isEmpty()) {</span>
+<span class="nc" id="L173">      return errorTableFlux(&quot;Sql statement is invalid or unsupported&quot;);</span>
+    }
+<span class="fc" id="L175">    var statements = parsedStatements.get().getStatements();</span>
+<span class="pc bpc" id="L176" title="1 of 2 branches missed.">    if (statements.size() &gt; 1) {</span>
+<span class="nc" id="L177">      return errorTableFlux(&quot;Only single statement supported now&quot;);</span>
+    }
+<span class="pc bpc" id="L179" title="1 of 2 branches missed.">    if (statements.size() == 0) {</span>
+<span class="nc" id="L180">      return errorTableFlux(&quot;No valid ksql statement found&quot;);</span>
+    }
+<span class="pc bpc" id="L182" title="1 of 2 branches missed.">    if (isUnsupportedStatementType(statements.get(0))) {</span>
+<span class="nc" id="L183">      return errorTableFlux(&quot;Unsupported statement type&quot;);</span>
+    }
+    Flux&lt;KsqlResponseTable&gt; outputFlux;
+<span class="pc bpc" id="L186" title="1 of 2 branches missed.">    if (KsqlGrammar.isSelect(statements.get(0))) {</span>
+<span class="nc" id="L187">      outputFlux = executeSelect(ksql, streamProperties);</span>
+    } else {
+<span class="fc" id="L189">      outputFlux = executeStatement(ksql, streamProperties);</span>
+    }
+<span class="fc" id="L191">    return outputFlux.onErrorResume(Exception.class,</span>
+        e -&gt; {
+<span class="nc" id="L193">          log.error(&quot;Unexpected error while execution ksql: {}&quot;, ksql, e);</span>
+<span class="nc" id="L194">          return errorTableFlux(&quot;Unexpected error: &quot; + e.getMessage());</span>
+        });
+  }
+
+  private Flux&lt;KsqlResponseTable&gt; errorTableFlux(String errorText) {
+<span class="nc" id="L199">    return Flux.just(ResponseParser.errorTableWithTextMsg(errorText));</span>
+  }
+
+  private boolean isUnsupportedStatementType(SingleStatementContext context) {
+<span class="fc" id="L203">    var ctxClass = context.statement().getClass();</span>
+<span class="fc" id="L204">    return UNSUPPORTED_STMT_TYPES.contains(ctxClass);</span>
+  }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

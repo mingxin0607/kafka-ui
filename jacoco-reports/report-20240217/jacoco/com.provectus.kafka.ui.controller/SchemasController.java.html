@@ -1,0 +1,291 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SchemasController.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">kafka-ui-api</a> &gt; <a href="index.source.html" class="el_package">com.provectus.kafka.ui.controller</a> &gt; <span class="el_source">SchemasController.java</span></div><h1>SchemasController.java</h1><pre class="source lang-java linenums">package com.provectus.kafka.ui.controller;
+
+import com.provectus.kafka.ui.api.SchemasApi;
+import com.provectus.kafka.ui.exception.ValidationException;
+import com.provectus.kafka.ui.mapper.KafkaSrMapper;
+import com.provectus.kafka.ui.mapper.KafkaSrMapperImpl;
+import com.provectus.kafka.ui.model.CompatibilityCheckResponseDTO;
+import com.provectus.kafka.ui.model.CompatibilityLevelDTO;
+import com.provectus.kafka.ui.model.KafkaCluster;
+import com.provectus.kafka.ui.model.NewSchemaSubjectDTO;
+import com.provectus.kafka.ui.model.SchemaSubjectDTO;
+import com.provectus.kafka.ui.model.SchemaSubjectsResponseDTO;
+import com.provectus.kafka.ui.model.rbac.AccessContext;
+import com.provectus.kafka.ui.model.rbac.permission.SchemaAction;
+import com.provectus.kafka.ui.service.SchemaRegistryService;
+import java.util.List;
+import java.util.Map;
+import javax.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ServerWebExchange;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
+
+@RestController
+<span class="fc" id="L29">@RequiredArgsConstructor</span>
+<span class="fc" id="L30">@Slf4j</span>
+public class SchemasController extends AbstractController implements SchemasApi {
+
+<span class="fc" id="L33">  private static final Integer DEFAULT_PAGE_SIZE = 25;</span>
+
+<span class="fc" id="L35">  private final KafkaSrMapper kafkaSrMapper = new KafkaSrMapperImpl();</span>
+
+  private final SchemaRegistryService schemaRegistryService;
+
+  @Override
+  protected KafkaCluster getCluster(String clusterName) {
+<span class="fc" id="L41">    var c = super.getCluster(clusterName);</span>
+<span class="pc bpc" id="L42" title="1 of 2 branches missed.">    if (c.getSchemaRegistryClient() == null) {</span>
+<span class="nc" id="L43">      throw new ValidationException(&quot;Schema Registry is not set for cluster &quot; + clusterName);</span>
+    }
+<span class="fc" id="L45">    return c;</span>
+  }
+
+  @Override
+  public Mono&lt;ResponseEntity&lt;CompatibilityCheckResponseDTO&gt;&gt; checkSchemaCompatibility(
+      String clusterName, String subject, @Valid Mono&lt;NewSchemaSubjectDTO&gt; newSchemaSubjectMono,
+      ServerWebExchange exchange) {
+<span class="nc" id="L52">    var context = AccessContext.builder()</span>
+<span class="nc" id="L53">        .cluster(clusterName)</span>
+<span class="nc" id="L54">        .schema(subject)</span>
+<span class="nc" id="L55">        .schemaActions(SchemaAction.VIEW)</span>
+<span class="nc" id="L56">        .operationName(&quot;checkSchemaCompatibility&quot;)</span>
+<span class="nc" id="L57">        .build();</span>
+
+<span class="nc" id="L59">    return validateAccess(context).then(</span>
+<span class="nc" id="L60">        newSchemaSubjectMono.flatMap(subjectDTO -&gt;</span>
+<span class="nc" id="L61">                schemaRegistryService.checksSchemaCompatibility(</span>
+<span class="nc" id="L62">                    getCluster(clusterName),</span>
+                    subject,
+<span class="nc" id="L64">                    kafkaSrMapper.fromDto(subjectDTO)</span>
+                ))
+<span class="nc" id="L66">            .map(kafkaSrMapper::toDto)</span>
+<span class="nc" id="L67">            .map(ResponseEntity::ok)</span>
+<span class="nc" id="L68">    ).doOnEach(sig -&gt; audit(context, sig));</span>
+  }
+
+  @Override
+  public Mono&lt;ResponseEntity&lt;SchemaSubjectDTO&gt;&gt; createNewSchema(
+      String clusterName, @Valid Mono&lt;NewSchemaSubjectDTO&gt; newSchemaSubjectMono,
+      ServerWebExchange exchange) {
+<span class="fc" id="L75">    var context = AccessContext.builder()</span>
+<span class="fc" id="L76">        .cluster(clusterName)</span>
+<span class="fc" id="L77">        .schemaActions(SchemaAction.CREATE)</span>
+<span class="fc" id="L78">        .operationName(&quot;createNewSchema&quot;)</span>
+<span class="fc" id="L79">        .build();</span>
+
+<span class="fc" id="L81">    return validateAccess(context).then(</span>
+<span class="fc" id="L82">        newSchemaSubjectMono.flatMap(newSubject -&gt;</span>
+<span class="fc" id="L83">                schemaRegistryService.registerNewSchema(</span>
+<span class="fc" id="L84">                    getCluster(clusterName),</span>
+<span class="fc" id="L85">                    newSubject.getSubject(),</span>
+<span class="fc" id="L86">                    kafkaSrMapper.fromDto(newSubject)</span>
+                )
+<span class="fc" id="L88">            ).map(kafkaSrMapper::toDto)</span>
+<span class="fc" id="L89">            .map(ResponseEntity::ok)</span>
+<span class="fc" id="L90">    ).doOnEach(sig -&gt; audit(context, sig));</span>
+  }
+
+  @Override
+  public Mono&lt;ResponseEntity&lt;Void&gt;&gt; deleteLatestSchema(
+      String clusterName, String subject, ServerWebExchange exchange) {
+<span class="nc" id="L96">    var context = AccessContext.builder()</span>
+<span class="nc" id="L97">        .cluster(clusterName)</span>
+<span class="nc" id="L98">        .schema(subject)</span>
+<span class="nc" id="L99">        .schemaActions(SchemaAction.DELETE)</span>
+<span class="nc" id="L100">        .operationName(&quot;deleteLatestSchema&quot;)</span>
+<span class="nc" id="L101">        .build();</span>
+
+<span class="nc" id="L103">    return validateAccess(context).then(</span>
+<span class="nc" id="L104">        schemaRegistryService.deleteLatestSchemaSubject(getCluster(clusterName), subject)</span>
+<span class="nc" id="L105">            .doOnEach(sig -&gt; audit(context, sig))</span>
+<span class="nc" id="L106">            .thenReturn(ResponseEntity.ok().build())</span>
+    );
+  }
+
+  @Override
+  public Mono&lt;ResponseEntity&lt;Void&gt;&gt; deleteSchema(
+      String clusterName, String subject, ServerWebExchange exchange) {
+<span class="nc" id="L113">    var context = AccessContext.builder()</span>
+<span class="nc" id="L114">        .cluster(clusterName)</span>
+<span class="nc" id="L115">        .schema(subject)</span>
+<span class="nc" id="L116">        .schemaActions(SchemaAction.DELETE)</span>
+<span class="nc" id="L117">        .operationName(&quot;deleteSchema&quot;)</span>
+<span class="nc" id="L118">        .build();</span>
+
+<span class="nc" id="L120">    return validateAccess(context).then(</span>
+<span class="nc" id="L121">        schemaRegistryService.deleteSchemaSubjectEntirely(getCluster(clusterName), subject)</span>
+<span class="nc" id="L122">            .doOnEach(sig -&gt; audit(context, sig))</span>
+<span class="nc" id="L123">            .thenReturn(ResponseEntity.ok().build())</span>
+    );
+  }
+
+  @Override
+  public Mono&lt;ResponseEntity&lt;Void&gt;&gt; deleteSchemaByVersion(
+      String clusterName, String subjectName, Integer version, ServerWebExchange exchange) {
+<span class="nc" id="L130">    var context = AccessContext.builder()</span>
+<span class="nc" id="L131">        .cluster(clusterName)</span>
+<span class="nc" id="L132">        .schema(subjectName)</span>
+<span class="nc" id="L133">        .schemaActions(SchemaAction.DELETE)</span>
+<span class="nc" id="L134">        .operationName(&quot;deleteSchemaByVersion&quot;)</span>
+<span class="nc" id="L135">        .build();</span>
+
+<span class="nc" id="L137">    return validateAccess(context).then(</span>
+<span class="nc" id="L138">        schemaRegistryService.deleteSchemaSubjectByVersion(getCluster(clusterName), subjectName, version)</span>
+<span class="nc" id="L139">            .doOnEach(sig -&gt; audit(context, sig))</span>
+<span class="nc" id="L140">            .thenReturn(ResponseEntity.ok().build())</span>
+    );
+  }
+
+  @Override
+  public Mono&lt;ResponseEntity&lt;Flux&lt;SchemaSubjectDTO&gt;&gt;&gt; getAllVersionsBySubject(
+      String clusterName, String subjectName, ServerWebExchange exchange) {
+<span class="nc" id="L147">    var context = AccessContext.builder()</span>
+<span class="nc" id="L148">        .cluster(clusterName)</span>
+<span class="nc" id="L149">        .schema(subjectName)</span>
+<span class="nc" id="L150">        .schemaActions(SchemaAction.VIEW)</span>
+<span class="nc" id="L151">        .operationName(&quot;getAllVersionsBySubject&quot;)</span>
+<span class="nc" id="L152">        .build();</span>
+
+<span class="nc" id="L154">    Flux&lt;SchemaSubjectDTO&gt; schemas =</span>
+<span class="nc" id="L155">        schemaRegistryService.getAllVersionsBySubject(getCluster(clusterName), subjectName)</span>
+<span class="nc" id="L156">            .map(kafkaSrMapper::toDto);</span>
+
+<span class="nc" id="L158">    return validateAccess(context)</span>
+<span class="nc" id="L159">        .thenReturn(ResponseEntity.ok(schemas))</span>
+<span class="nc" id="L160">        .doOnEach(sig -&gt; audit(context, sig));</span>
+  }
+
+  @Override
+  public Mono&lt;ResponseEntity&lt;CompatibilityLevelDTO&gt;&gt; getGlobalSchemaCompatibilityLevel(
+      String clusterName, ServerWebExchange exchange) {
+<span class="fc" id="L166">    return schemaRegistryService.getGlobalSchemaCompatibilityLevel(getCluster(clusterName))</span>
+<span class="fc" id="L167">        .map(c -&gt; new CompatibilityLevelDTO().compatibility(kafkaSrMapper.toDto(c)))</span>
+<span class="fc" id="L168">        .map(ResponseEntity::ok)</span>
+<span class="fc" id="L169">        .defaultIfEmpty(ResponseEntity.notFound().build());</span>
+  }
+
+  @Override
+  public Mono&lt;ResponseEntity&lt;SchemaSubjectDTO&gt;&gt; getLatestSchema(String clusterName,
+                                                                String subject,
+                                                                ServerWebExchange exchange) {
+<span class="fc" id="L176">    var context = AccessContext.builder()</span>
+<span class="fc" id="L177">        .cluster(clusterName)</span>
+<span class="fc" id="L178">        .schema(subject)</span>
+<span class="fc" id="L179">        .schemaActions(SchemaAction.VIEW)</span>
+<span class="fc" id="L180">        .operationName(&quot;getLatestSchema&quot;)</span>
+<span class="fc" id="L181">        .build();</span>
+
+<span class="fc" id="L183">    return validateAccess(context).then(</span>
+<span class="fc" id="L184">        schemaRegistryService.getLatestSchemaVersionBySubject(getCluster(clusterName), subject)</span>
+<span class="fc" id="L185">            .map(kafkaSrMapper::toDto)</span>
+<span class="fc" id="L186">            .map(ResponseEntity::ok)</span>
+<span class="fc" id="L187">    ).doOnEach(sig -&gt; audit(context, sig));</span>
+  }
+
+  @Override
+  public Mono&lt;ResponseEntity&lt;SchemaSubjectDTO&gt;&gt; getSchemaByVersion(
+      String clusterName, String subject, Integer version, ServerWebExchange exchange) {
+<span class="nc" id="L193">    var context = AccessContext.builder()</span>
+<span class="nc" id="L194">        .cluster(clusterName)</span>
+<span class="nc" id="L195">        .schema(subject)</span>
+<span class="nc" id="L196">        .schemaActions(SchemaAction.VIEW)</span>
+<span class="nc" id="L197">        .operationName(&quot;getSchemaByVersion&quot;)</span>
+<span class="nc" id="L198">        .operationParams(Map.of(&quot;subject&quot;, subject, &quot;version&quot;, version))</span>
+<span class="nc" id="L199">        .build();</span>
+
+<span class="nc" id="L201">    return validateAccess(context).then(</span>
+<span class="nc" id="L202">        schemaRegistryService.getSchemaSubjectByVersion(</span>
+<span class="nc" id="L203">                getCluster(clusterName), subject, version)</span>
+<span class="nc" id="L204">            .map(kafkaSrMapper::toDto)</span>
+<span class="nc" id="L205">            .map(ResponseEntity::ok)</span>
+<span class="nc" id="L206">    ).doOnEach(sig -&gt; audit(context, sig));</span>
+  }
+
+  @Override
+  public Mono&lt;ResponseEntity&lt;SchemaSubjectsResponseDTO&gt;&gt; getSchemas(String clusterName,
+                                                                    @Valid Integer pageNum,
+                                                                    @Valid Integer perPage,
+                                                                    @Valid String search,
+                                                                    ServerWebExchange serverWebExchange) {
+<span class="fc" id="L215">    var context = AccessContext.builder()</span>
+<span class="fc" id="L216">        .cluster(clusterName)</span>
+<span class="fc" id="L217">        .operationName(&quot;getSchemas&quot;)</span>
+<span class="fc" id="L218">        .build();</span>
+
+<span class="fc" id="L220">    return schemaRegistryService</span>
+<span class="fc" id="L221">        .getAllSubjectNames(getCluster(clusterName))</span>
+<span class="fc" id="L222">        .flatMapIterable(l -&gt; l)</span>
+<span class="fc" id="L223">        .filterWhen(schema -&gt; accessControlService.isSchemaAccessible(schema, clusterName))</span>
+<span class="fc" id="L224">        .collectList()</span>
+<span class="fc" id="L225">        .flatMap(subjects -&gt; {</span>
+<span class="fc bfc" id="L226" title="All 4 branches covered.">          int pageSize = perPage != null &amp;&amp; perPage &gt; 0 ? perPage : DEFAULT_PAGE_SIZE;</span>
+<span class="fc bfc" id="L227" title="All 4 branches covered.">          int subjectToSkip = ((pageNum != null &amp;&amp; pageNum &gt; 0 ? pageNum : 1) - 1) * pageSize;</span>
+<span class="fc" id="L228">          List&lt;String&gt; filteredSubjects = subjects</span>
+<span class="fc" id="L229">              .stream()</span>
+<span class="fc bfc" id="L230" title="All 4 branches covered.">              .filter(subj -&gt; search == null || StringUtils.containsIgnoreCase(subj, search))</span>
+<span class="fc" id="L231">              .sorted().toList();</span>
+<span class="fc" id="L232">          var totalPages = (filteredSubjects.size() / pageSize)</span>
+<span class="fc bfc" id="L233" title="All 2 branches covered.">              + (filteredSubjects.size() % pageSize == 0 ? 0 : 1);</span>
+<span class="fc" id="L234">          List&lt;String&gt; subjectsToRender = filteredSubjects.stream()</span>
+<span class="fc" id="L235">              .skip(subjectToSkip)</span>
+<span class="fc" id="L236">              .limit(pageSize)</span>
+<span class="fc" id="L237">              .toList();</span>
+<span class="fc" id="L238">          return schemaRegistryService.getAllLatestVersionSchemas(getCluster(clusterName), subjectsToRender)</span>
+<span class="fc" id="L239">              .map(subjs -&gt; subjs.stream().map(kafkaSrMapper::toDto).toList())</span>
+<span class="fc" id="L240">              .map(subjs -&gt; new SchemaSubjectsResponseDTO().pageCount(totalPages).schemas(subjs));</span>
+<span class="fc" id="L241">        }).map(ResponseEntity::ok)</span>
+<span class="fc" id="L242">        .doOnEach(sig -&gt; audit(context, sig));</span>
+  }
+
+  @Override
+  public Mono&lt;ResponseEntity&lt;Void&gt;&gt; updateGlobalSchemaCompatibilityLevel(
+      String clusterName, @Valid Mono&lt;CompatibilityLevelDTO&gt; compatibilityLevelMono,
+      ServerWebExchange exchange) {
+<span class="nc" id="L249">    var context = AccessContext.builder()</span>
+<span class="nc" id="L250">        .cluster(clusterName)</span>
+<span class="nc" id="L251">        .schemaActions(SchemaAction.MODIFY_GLOBAL_COMPATIBILITY)</span>
+<span class="nc" id="L252">        .operationName(&quot;updateGlobalSchemaCompatibilityLevel&quot;)</span>
+<span class="nc" id="L253">        .build();</span>
+
+<span class="nc" id="L255">    return validateAccess(context).then(</span>
+        compatibilityLevelMono
+<span class="nc" id="L257">            .flatMap(compatibilityLevelDTO -&gt;</span>
+<span class="nc" id="L258">                schemaRegistryService.updateGlobalSchemaCompatibility(</span>
+<span class="nc" id="L259">                    getCluster(clusterName),</span>
+<span class="nc" id="L260">                    kafkaSrMapper.fromDto(compatibilityLevelDTO.getCompatibility())</span>
+                ))
+<span class="nc" id="L262">            .doOnEach(sig -&gt; audit(context, sig))</span>
+<span class="nc" id="L263">            .thenReturn(ResponseEntity.ok().build())</span>
+    );
+  }
+
+  @Override
+  public Mono&lt;ResponseEntity&lt;Void&gt;&gt; updateSchemaCompatibilityLevel(
+      String clusterName, String subject, @Valid Mono&lt;CompatibilityLevelDTO&gt; compatibilityLevelMono,
+      ServerWebExchange exchange) {
+<span class="fc" id="L271">    var context = AccessContext.builder()</span>
+<span class="fc" id="L272">        .cluster(clusterName)</span>
+<span class="fc" id="L273">        .schemaActions(SchemaAction.EDIT)</span>
+<span class="fc" id="L274">        .operationName(&quot;updateSchemaCompatibilityLevel&quot;)</span>
+<span class="fc" id="L275">        .operationParams(Map.of(&quot;subject&quot;, subject))</span>
+<span class="fc" id="L276">        .build();</span>
+
+<span class="fc" id="L278">    return validateAccess(context).then(</span>
+        compatibilityLevelMono
+<span class="fc" id="L280">            .flatMap(compatibilityLevelDTO -&gt;</span>
+<span class="fc" id="L281">                schemaRegistryService.updateSchemaCompatibility(</span>
+<span class="fc" id="L282">                    getCluster(clusterName),</span>
+                    subject,
+<span class="fc" id="L284">                    kafkaSrMapper.fromDto(compatibilityLevelDTO.getCompatibility())</span>
+                ))
+<span class="fc" id="L286">            .doOnEach(sig -&gt; audit(context, sig))</span>
+<span class="fc" id="L287">            .thenReturn(ResponseEntity.ok().build())</span>
+    );
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

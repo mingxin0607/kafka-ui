@@ -1,0 +1,302 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>KafkaConnectController.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">kafka-ui-api</a> &gt; <a href="index.source.html" class="el_package">com.provectus.kafka.ui.controller</a> &gt; <span class="el_source">KafkaConnectController.java</span></div><h1>KafkaConnectController.java</h1><pre class="source lang-java linenums">package com.provectus.kafka.ui.controller;
+
+import static com.provectus.kafka.ui.model.ConnectorActionDTO.RESTART;
+import static com.provectus.kafka.ui.model.ConnectorActionDTO.RESTART_ALL_TASKS;
+import static com.provectus.kafka.ui.model.ConnectorActionDTO.RESTART_FAILED_TASKS;
+
+import com.provectus.kafka.ui.api.KafkaConnectApi;
+import com.provectus.kafka.ui.model.ConnectDTO;
+import com.provectus.kafka.ui.model.ConnectorActionDTO;
+import com.provectus.kafka.ui.model.ConnectorColumnsToSortDTO;
+import com.provectus.kafka.ui.model.ConnectorDTO;
+import com.provectus.kafka.ui.model.ConnectorPluginConfigValidationResponseDTO;
+import com.provectus.kafka.ui.model.ConnectorPluginDTO;
+import com.provectus.kafka.ui.model.FullConnectorInfoDTO;
+import com.provectus.kafka.ui.model.NewConnectorDTO;
+import com.provectus.kafka.ui.model.SortOrderDTO;
+import com.provectus.kafka.ui.model.TaskDTO;
+import com.provectus.kafka.ui.model.rbac.AccessContext;
+import com.provectus.kafka.ui.model.rbac.permission.ConnectAction;
+import com.provectus.kafka.ui.service.KafkaConnectService;
+import java.util.Comparator;
+import java.util.Map;
+import java.util.Set;
+import javax.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ServerWebExchange;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
+
+@RestController
+<span class="fc" id="L34">@RequiredArgsConstructor</span>
+<span class="fc" id="L35">@Slf4j</span>
+public class KafkaConnectController extends AbstractController implements KafkaConnectApi {
+<span class="fc" id="L37">  private static final Set&lt;ConnectorActionDTO&gt; RESTART_ACTIONS</span>
+<span class="fc" id="L38">      = Set.of(RESTART, RESTART_FAILED_TASKS, RESTART_ALL_TASKS);</span>
+  private static final String CONNECTOR_NAME = &quot;connectorName&quot;;
+
+  private final KafkaConnectService kafkaConnectService;
+
+  @Override
+  public Mono&lt;ResponseEntity&lt;Flux&lt;ConnectDTO&gt;&gt;&gt; getConnects(String clusterName,
+                                                            ServerWebExchange exchange) {
+
+<span class="nc" id="L47">    Flux&lt;ConnectDTO&gt; availableConnects = kafkaConnectService.getConnects(getCluster(clusterName))</span>
+<span class="nc" id="L48">        .filterWhen(dto -&gt; accessControlService.isConnectAccessible(dto, clusterName));</span>
+
+<span class="nc" id="L50">    return Mono.just(ResponseEntity.ok(availableConnects));</span>
+  }
+
+  @Override
+  public Mono&lt;ResponseEntity&lt;Flux&lt;String&gt;&gt;&gt; getConnectors(String clusterName, String connectName,
+                                                          ServerWebExchange exchange) {
+
+<span class="fc" id="L57">    var context = AccessContext.builder()</span>
+<span class="fc" id="L58">        .cluster(clusterName)</span>
+<span class="fc" id="L59">        .connect(connectName)</span>
+<span class="fc" id="L60">        .connectActions(ConnectAction.VIEW)</span>
+<span class="fc" id="L61">        .operationName(&quot;getConnectors&quot;)</span>
+<span class="fc" id="L62">        .build();</span>
+
+<span class="fc" id="L64">    return validateAccess(context)</span>
+<span class="fc" id="L65">        .thenReturn(ResponseEntity.ok(kafkaConnectService.getConnectorNames(getCluster(clusterName), connectName)))</span>
+<span class="fc" id="L66">        .doOnEach(sig -&gt; audit(context, sig));</span>
+  }
+
+  @Override
+  public Mono&lt;ResponseEntity&lt;ConnectorDTO&gt;&gt; createConnector(String clusterName, String connectName,
+                                                            @Valid Mono&lt;NewConnectorDTO&gt; connector,
+                                                            ServerWebExchange exchange) {
+
+<span class="fc" id="L74">    var context = AccessContext.builder()</span>
+<span class="fc" id="L75">        .cluster(clusterName)</span>
+<span class="fc" id="L76">        .connect(connectName)</span>
+<span class="fc" id="L77">        .connectActions(ConnectAction.VIEW, ConnectAction.CREATE)</span>
+<span class="fc" id="L78">        .operationName(&quot;createConnector&quot;)</span>
+<span class="fc" id="L79">        .build();</span>
+
+<span class="fc" id="L81">    return validateAccess(context).then(</span>
+<span class="fc" id="L82">        kafkaConnectService.createConnector(getCluster(clusterName), connectName, connector)</span>
+<span class="fc" id="L83">            .map(ResponseEntity::ok)</span>
+<span class="fc" id="L84">    ).doOnEach(sig -&gt; audit(context, sig));</span>
+  }
+
+  @Override
+  public Mono&lt;ResponseEntity&lt;ConnectorDTO&gt;&gt; getConnector(String clusterName, String connectName,
+                                                         String connectorName,
+                                                         ServerWebExchange exchange) {
+
+<span class="fc" id="L92">    var context = AccessContext.builder()</span>
+<span class="fc" id="L93">        .cluster(clusterName)</span>
+<span class="fc" id="L94">        .connect(connectName)</span>
+<span class="fc" id="L95">        .connectActions(ConnectAction.VIEW)</span>
+<span class="fc" id="L96">        .connector(connectorName)</span>
+<span class="fc" id="L97">        .operationName(&quot;getConnector&quot;)</span>
+<span class="fc" id="L98">        .build();</span>
+
+<span class="fc" id="L100">    return validateAccess(context).then(</span>
+<span class="fc" id="L101">        kafkaConnectService.getConnector(getCluster(clusterName), connectName, connectorName)</span>
+<span class="fc" id="L102">            .map(ResponseEntity::ok)</span>
+<span class="fc" id="L103">    ).doOnEach(sig -&gt; audit(context, sig));</span>
+  }
+
+  @Override
+  public Mono&lt;ResponseEntity&lt;Void&gt;&gt; deleteConnector(String clusterName, String connectName,
+                                                    String connectorName,
+                                                    ServerWebExchange exchange) {
+
+<span class="fc" id="L111">    var context = AccessContext.builder()</span>
+<span class="fc" id="L112">        .cluster(clusterName)</span>
+<span class="fc" id="L113">        .connect(connectName)</span>
+<span class="fc" id="L114">        .connectActions(ConnectAction.VIEW, ConnectAction.EDIT)</span>
+<span class="fc" id="L115">        .operationName(&quot;deleteConnector&quot;)</span>
+<span class="fc" id="L116">        .operationParams(Map.of(CONNECTOR_NAME, connectName))</span>
+<span class="fc" id="L117">        .build();</span>
+
+<span class="fc" id="L119">    return validateAccess(context).then(</span>
+<span class="fc" id="L120">        kafkaConnectService.deleteConnector(getCluster(clusterName), connectName, connectorName)</span>
+<span class="fc" id="L121">            .map(ResponseEntity::ok)</span>
+<span class="fc" id="L122">    ).doOnEach(sig -&gt; audit(context, sig));</span>
+  }
+
+
+  @Override
+  public Mono&lt;ResponseEntity&lt;Flux&lt;FullConnectorInfoDTO&gt;&gt;&gt; getAllConnectors(
+      String clusterName,
+      String search,
+      ConnectorColumnsToSortDTO orderBy,
+      SortOrderDTO sortOrder,
+      ServerWebExchange exchange
+  ) {
+<span class="fc" id="L134">    var context = AccessContext.builder()</span>
+<span class="fc" id="L135">        .cluster(clusterName)</span>
+<span class="fc" id="L136">        .connectActions(ConnectAction.VIEW, ConnectAction.EDIT)</span>
+<span class="fc" id="L137">        .operationName(&quot;getAllConnectors&quot;)</span>
+<span class="fc" id="L138">        .build();</span>
+
+<span class="pc bpc" id="L140" title="3 of 4 branches missed.">    var comparator = sortOrder == null || sortOrder.equals(SortOrderDTO.ASC)</span>
+<span class="fc" id="L141">        ? getConnectorsComparator(orderBy)</span>
+<span class="pc" id="L142">        : getConnectorsComparator(orderBy).reversed();</span>
+
+<span class="fc" id="L144">    Flux&lt;FullConnectorInfoDTO&gt; job = kafkaConnectService.getAllConnectors(getCluster(clusterName), search)</span>
+<span class="fc" id="L145">        .filterWhen(dto -&gt; accessControlService.isConnectAccessible(dto.getConnect(), clusterName))</span>
+<span class="fc" id="L146">        .filterWhen(dto -&gt; accessControlService.isConnectorAccessible(dto.getConnect(), dto.getName(), clusterName))</span>
+<span class="fc" id="L147">        .sort(comparator);</span>
+
+<span class="fc" id="L149">    return Mono.just(ResponseEntity.ok(job))</span>
+<span class="fc" id="L150">        .doOnEach(sig -&gt; audit(context, sig));</span>
+  }
+
+  @Override
+  public Mono&lt;ResponseEntity&lt;Map&lt;String, Object&gt;&gt;&gt; getConnectorConfig(String clusterName,
+                                                                      String connectName,
+                                                                      String connectorName,
+                                                                      ServerWebExchange exchange) {
+
+<span class="fc" id="L159">    var context = AccessContext.builder()</span>
+<span class="fc" id="L160">        .cluster(clusterName)</span>
+<span class="fc" id="L161">        .connect(connectName)</span>
+<span class="fc" id="L162">        .connectActions(ConnectAction.VIEW)</span>
+<span class="fc" id="L163">        .operationName(&quot;getConnectorConfig&quot;)</span>
+<span class="fc" id="L164">        .build();</span>
+
+<span class="fc" id="L166">    return validateAccess(context).then(</span>
+        kafkaConnectService
+<span class="fc" id="L168">            .getConnectorConfig(getCluster(clusterName), connectName, connectorName)</span>
+<span class="fc" id="L169">            .map(ResponseEntity::ok)</span>
+<span class="fc" id="L170">    ).doOnEach(sig -&gt; audit(context, sig));</span>
+  }
+
+  @Override
+  public Mono&lt;ResponseEntity&lt;ConnectorDTO&gt;&gt; setConnectorConfig(String clusterName, String connectName,
+                                                               String connectorName,
+                                                               Mono&lt;Map&lt;String, Object&gt;&gt; requestBody,
+                                                               ServerWebExchange exchange) {
+
+<span class="fc" id="L179">    var context = AccessContext.builder()</span>
+<span class="fc" id="L180">        .cluster(clusterName)</span>
+<span class="fc" id="L181">        .connect(connectName)</span>
+<span class="fc" id="L182">        .connectActions(ConnectAction.VIEW, ConnectAction.EDIT)</span>
+<span class="fc" id="L183">        .operationName(&quot;setConnectorConfig&quot;)</span>
+<span class="fc" id="L184">        .operationParams(Map.of(CONNECTOR_NAME, connectorName))</span>
+<span class="fc" id="L185">        .build();</span>
+
+<span class="fc" id="L187">    return validateAccess(context).then(</span>
+            kafkaConnectService
+<span class="fc" id="L189">                .setConnectorConfig(getCluster(clusterName), connectName, connectorName, requestBody)</span>
+<span class="fc" id="L190">                .map(ResponseEntity::ok))</span>
+<span class="fc" id="L191">        .doOnEach(sig -&gt; audit(context, sig));</span>
+  }
+
+  @Override
+  public Mono&lt;ResponseEntity&lt;Void&gt;&gt; updateConnectorState(String clusterName, String connectName,
+                                                         String connectorName,
+                                                         ConnectorActionDTO action,
+                                                         ServerWebExchange exchange) {
+    ConnectAction[] connectActions;
+<span class="nc bnc" id="L200" title="All 2 branches missed.">    if (RESTART_ACTIONS.contains(action)) {</span>
+<span class="nc" id="L201">      connectActions = new ConnectAction[] {ConnectAction.VIEW, ConnectAction.RESTART};</span>
+    } else {
+<span class="nc" id="L203">      connectActions = new ConnectAction[] {ConnectAction.VIEW, ConnectAction.EDIT};</span>
+    }
+
+<span class="nc" id="L206">    var context = AccessContext.builder()</span>
+<span class="nc" id="L207">        .cluster(clusterName)</span>
+<span class="nc" id="L208">        .connect(connectName)</span>
+<span class="nc" id="L209">        .connectActions(connectActions)</span>
+<span class="nc" id="L210">        .operationName(&quot;updateConnectorState&quot;)</span>
+<span class="nc" id="L211">        .operationParams(Map.of(CONNECTOR_NAME, connectorName))</span>
+<span class="nc" id="L212">        .build();</span>
+
+<span class="nc" id="L214">    return validateAccess(context).then(</span>
+        kafkaConnectService
+<span class="nc" id="L216">            .updateConnectorState(getCluster(clusterName), connectName, connectorName, action)</span>
+<span class="nc" id="L217">            .map(ResponseEntity::ok)</span>
+<span class="nc" id="L218">    ).doOnEach(sig -&gt; audit(context, sig));</span>
+  }
+
+  @Override
+  public Mono&lt;ResponseEntity&lt;Flux&lt;TaskDTO&gt;&gt;&gt; getConnectorTasks(String clusterName,
+                                                               String connectName,
+                                                               String connectorName,
+                                                               ServerWebExchange exchange) {
+<span class="nc" id="L226">    var context = AccessContext.builder()</span>
+<span class="nc" id="L227">        .cluster(clusterName)</span>
+<span class="nc" id="L228">        .connect(connectName)</span>
+<span class="nc" id="L229">        .connectActions(ConnectAction.VIEW)</span>
+<span class="nc" id="L230">        .operationName(&quot;getConnectorTasks&quot;)</span>
+<span class="nc" id="L231">        .operationParams(Map.of(CONNECTOR_NAME, connectorName))</span>
+<span class="nc" id="L232">        .build();</span>
+
+<span class="nc" id="L234">    return validateAccess(context).thenReturn(</span>
+        ResponseEntity
+<span class="nc" id="L236">            .ok(kafkaConnectService</span>
+<span class="nc" id="L237">                .getConnectorTasks(getCluster(clusterName), connectName, connectorName))</span>
+<span class="nc" id="L238">    ).doOnEach(sig -&gt; audit(context, sig));</span>
+  }
+
+  @Override
+  public Mono&lt;ResponseEntity&lt;Void&gt;&gt; restartConnectorTask(String clusterName, String connectName,
+                                                         String connectorName, Integer taskId,
+                                                         ServerWebExchange exchange) {
+
+<span class="nc" id="L246">    var context = AccessContext.builder()</span>
+<span class="nc" id="L247">        .cluster(clusterName)</span>
+<span class="nc" id="L248">        .connect(connectName)</span>
+<span class="nc" id="L249">        .connectActions(ConnectAction.VIEW, ConnectAction.RESTART)</span>
+<span class="nc" id="L250">        .operationName(&quot;restartConnectorTask&quot;)</span>
+<span class="nc" id="L251">        .operationParams(Map.of(CONNECTOR_NAME, connectorName))</span>
+<span class="nc" id="L252">        .build();</span>
+
+<span class="nc" id="L254">    return validateAccess(context).then(</span>
+        kafkaConnectService
+<span class="nc" id="L256">            .restartConnectorTask(getCluster(clusterName), connectName, connectorName, taskId)</span>
+<span class="nc" id="L257">            .map(ResponseEntity::ok)</span>
+<span class="nc" id="L258">    ).doOnEach(sig -&gt; audit(context, sig));</span>
+  }
+
+  @Override
+  public Mono&lt;ResponseEntity&lt;Flux&lt;ConnectorPluginDTO&gt;&gt;&gt; getConnectorPlugins(
+      String clusterName, String connectName, ServerWebExchange exchange) {
+
+<span class="fc" id="L265">    var context = AccessContext.builder()</span>
+<span class="fc" id="L266">        .cluster(clusterName)</span>
+<span class="fc" id="L267">        .connect(connectName)</span>
+<span class="fc" id="L268">        .connectActions(ConnectAction.VIEW)</span>
+<span class="fc" id="L269">        .operationName(&quot;getConnectorPlugins&quot;)</span>
+<span class="fc" id="L270">        .build();</span>
+
+<span class="fc" id="L272">    return validateAccess(context).then(</span>
+<span class="fc" id="L273">        Mono.just(</span>
+<span class="fc" id="L274">            ResponseEntity.ok(</span>
+<span class="fc" id="L275">                kafkaConnectService.getConnectorPlugins(getCluster(clusterName), connectName)))</span>
+<span class="fc" id="L276">    ).doOnEach(sig -&gt; audit(context, sig));</span>
+  }
+
+  @Override
+  public Mono&lt;ResponseEntity&lt;ConnectorPluginConfigValidationResponseDTO&gt;&gt; validateConnectorPluginConfig(
+      String clusterName, String connectName, String pluginName, @Valid Mono&lt;Map&lt;String, Object&gt;&gt; requestBody,
+      ServerWebExchange exchange) {
+<span class="fc" id="L283">    return kafkaConnectService</span>
+<span class="fc" id="L284">        .validateConnectorPluginConfig(</span>
+<span class="fc" id="L285">            getCluster(clusterName), connectName, pluginName, requestBody)</span>
+<span class="fc" id="L286">        .map(ResponseEntity::ok);</span>
+  }
+
+  private Comparator&lt;FullConnectorInfoDTO&gt; getConnectorsComparator(ConnectorColumnsToSortDTO orderBy) {
+<span class="fc" id="L290">    var defaultComparator = Comparator.comparing(FullConnectorInfoDTO::getName);</span>
+<span class="pc bpc" id="L291" title="1 of 2 branches missed.">    if (orderBy == null) {</span>
+<span class="fc" id="L292">      return defaultComparator;</span>
+    }
+<span class="nc bnc" id="L294" title="All 4 branches missed.">    return switch (orderBy) {</span>
+<span class="nc" id="L295">      case CONNECT -&gt; Comparator.comparing(FullConnectorInfoDTO::getConnect);</span>
+<span class="nc" id="L296">      case TYPE -&gt; Comparator.comparing(FullConnectorInfoDTO::getType);</span>
+<span class="nc" id="L297">      case STATUS -&gt; Comparator.comparing(fullConnectorInfoDTO -&gt; fullConnectorInfoDTO.getStatus().getState());</span>
+<span class="nc" id="L298">      default -&gt; defaultComparator;</span>
+    };
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

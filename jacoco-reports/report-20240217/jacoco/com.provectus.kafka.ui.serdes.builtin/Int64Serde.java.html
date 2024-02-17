@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Int64Serde.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">kafka-ui-api</a> &gt; <a href="index.source.html" class="el_package">com.provectus.kafka.ui.serdes.builtin</a> &gt; <span class="el_source">Int64Serde.java</span></div><h1>Int64Serde.java</h1><pre class="source lang-java linenums">package com.provectus.kafka.ui.serdes.builtin;
+
+import com.google.common.primitives.Longs;
+import com.provectus.kafka.ui.serde.api.DeserializeResult;
+import com.provectus.kafka.ui.serde.api.PropertyResolver;
+import com.provectus.kafka.ui.serde.api.RecordHeaders;
+import com.provectus.kafka.ui.serde.api.SchemaDescription;
+import com.provectus.kafka.ui.serdes.BuiltInSerde;
+import java.util.Map;
+import java.util.Optional;
+
+<span class="fc" id="L12">public class Int64Serde implements BuiltInSerde {</span>
+
+  public static String name() {
+<span class="fc" id="L15">    return &quot;Int64&quot;;</span>
+  }
+
+  @Override
+  public Optional&lt;String&gt; getDescription() {
+<span class="nc" id="L20">    return Optional.empty();</span>
+  }
+
+  @Override
+  public Optional&lt;SchemaDescription&gt; getSchema(String topic, Target type) {
+<span class="nc" id="L25">    return Optional.of(</span>
+        new SchemaDescription(
+<span class="nc" id="L27">            String.format(</span>
+                &quot;{ &quot;
+                    + &quot;  \&quot;type\&quot; : \&quot;integer\&quot;, &quot;
+                    + &quot;  \&quot;minimum\&quot; : %s, &quot;
+                    + &quot;  \&quot;maximum\&quot; : %s &quot;
+                    + &quot;}&quot;,
+<span class="nc" id="L33">                Long.MIN_VALUE,</span>
+<span class="nc" id="L34">                Long.MAX_VALUE</span>
+            ),
+<span class="nc" id="L36">            Map.of()</span>
+        )
+    );
+  }
+
+  @Override
+  public boolean canDeserialize(String topic, Target type) {
+<span class="fc" id="L43">    return true;</span>
+  }
+
+  @Override
+  public boolean canSerialize(String topic, Target type) {
+<span class="fc" id="L48">    return true;</span>
+  }
+
+  @Override
+  public Serializer serializer(String topic, Target type) {
+<span class="fc" id="L53">    return input -&gt; Longs.toByteArray(Long.parseLong(input));</span>
+  }
+
+  @Override
+  public Deserializer deserializer(String topic, Target type) {
+<span class="fc" id="L58">    return (headers, data) -&gt;</span>
+<span class="fc" id="L59">        new DeserializeResult(</span>
+<span class="fc" id="L60">            String.valueOf(Longs.fromByteArray(data)),</span>
+            DeserializeResult.Type.JSON,
+<span class="fc" id="L62">            Map.of()</span>
+        );
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

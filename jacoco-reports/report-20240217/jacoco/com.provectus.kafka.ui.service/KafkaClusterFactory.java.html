@@ -1,0 +1,222 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>KafkaClusterFactory.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">kafka-ui-api</a> &gt; <a href="index.source.html" class="el_package">com.provectus.kafka.ui.service</a> &gt; <span class="el_source">KafkaClusterFactory.java</span></div><h1>KafkaClusterFactory.java</h1><pre class="source lang-java linenums">package com.provectus.kafka.ui.service;
+
+import com.provectus.kafka.ui.client.RetryingKafkaConnectClient;
+import com.provectus.kafka.ui.config.ClustersProperties;
+import com.provectus.kafka.ui.config.WebclientProperties;
+import com.provectus.kafka.ui.connect.api.KafkaConnectClientApi;
+import com.provectus.kafka.ui.emitter.PollingSettings;
+import com.provectus.kafka.ui.model.ApplicationPropertyValidationDTO;
+import com.provectus.kafka.ui.model.ClusterConfigValidationDTO;
+import com.provectus.kafka.ui.model.KafkaCluster;
+import com.provectus.kafka.ui.model.MetricsConfig;
+import com.provectus.kafka.ui.service.ksql.KsqlApiClient;
+import com.provectus.kafka.ui.service.masking.DataMasking;
+import com.provectus.kafka.ui.sr.ApiClient;
+import com.provectus.kafka.ui.sr.api.KafkaSrClientApi;
+import com.provectus.kafka.ui.util.KafkaServicesValidation;
+import com.provectus.kafka.ui.util.ReactiveFailover;
+import com.provectus.kafka.ui.util.WebClientConfigurator;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Properties;
+import java.util.stream.Stream;
+import javax.annotation.Nullable;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+import org.springframework.util.unit.DataSize;
+import org.springframework.web.reactive.function.client.WebClient;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
+import reactor.util.function.Tuple2;
+import reactor.util.function.Tuples;
+
+@Service
+<span class="fc" id="L36">@Slf4j</span>
+public class KafkaClusterFactory {
+
+<span class="fc" id="L39">  private static final DataSize DEFAULT_WEBCLIENT_BUFFER = DataSize.parse(&quot;20MB&quot;);</span>
+
+  private final DataSize webClientMaxBuffSize;
+
+<span class="fc" id="L43">  public KafkaClusterFactory(WebclientProperties webclientProperties) {</span>
+<span class="fc" id="L44">    this.webClientMaxBuffSize = Optional.ofNullable(webclientProperties.getMaxInMemoryBufferSize())</span>
+<span class="fc" id="L45">        .map(DataSize::parse)</span>
+<span class="fc" id="L46">        .orElse(DEFAULT_WEBCLIENT_BUFFER);</span>
+<span class="fc" id="L47">  }</span>
+
+  public KafkaCluster create(ClustersProperties properties,
+                             ClustersProperties.Cluster clusterProperties) {
+<span class="fc" id="L51">    KafkaCluster.KafkaClusterBuilder builder = KafkaCluster.builder();</span>
+
+<span class="fc" id="L53">    builder.name(clusterProperties.getName());</span>
+<span class="fc" id="L54">    builder.bootstrapServers(clusterProperties.getBootstrapServers());</span>
+<span class="fc" id="L55">    builder.properties(convertProperties(clusterProperties.getProperties()));</span>
+<span class="fc" id="L56">    builder.readOnly(clusterProperties.isReadOnly());</span>
+<span class="fc" id="L57">    builder.masking(DataMasking.create(clusterProperties.getMasking()));</span>
+<span class="fc" id="L58">    builder.pollingSettings(PollingSettings.create(clusterProperties, properties));</span>
+
+<span class="pc bpc" id="L60" title="1 of 2 branches missed.">    if (schemaRegistryConfigured(clusterProperties)) {</span>
+<span class="fc" id="L61">      builder.schemaRegistryClient(schemaRegistryClient(clusterProperties));</span>
+    }
+<span class="pc bpc" id="L63" title="1 of 2 branches missed.">    if (connectClientsConfigured(clusterProperties)) {</span>
+<span class="fc" id="L64">      builder.connectsClients(connectClients(clusterProperties));</span>
+    }
+<span class="pc bpc" id="L66" title="1 of 2 branches missed.">    if (ksqlConfigured(clusterProperties)) {</span>
+<span class="nc" id="L67">      builder.ksqlClient(ksqlClient(clusterProperties));</span>
+    }
+<span class="pc bpc" id="L69" title="1 of 2 branches missed.">    if (metricsConfigured(clusterProperties)) {</span>
+<span class="nc" id="L70">      builder.metricsConfig(metricsConfigDataToMetricsConfig(clusterProperties.getMetrics()));</span>
+    }
+<span class="fc" id="L72">    builder.originalProperties(clusterProperties);</span>
+<span class="fc" id="L73">    return builder.build();</span>
+  }
+
+  public Mono&lt;ClusterConfigValidationDTO&gt; validate(ClustersProperties.Cluster clusterProperties) {
+<span class="nc bnc" id="L77" title="All 2 branches missed.">    if (clusterProperties.getSsl() != null) {</span>
+<span class="nc" id="L78">      Optional&lt;String&gt; errMsg = KafkaServicesValidation.validateTruststore(clusterProperties.getSsl());</span>
+<span class="nc bnc" id="L79" title="All 2 branches missed.">      if (errMsg.isPresent()) {</span>
+<span class="nc" id="L80">        return Mono.just(new ClusterConfigValidationDTO()</span>
+<span class="nc" id="L81">            .kafka(new ApplicationPropertyValidationDTO()</span>
+<span class="nc" id="L82">                .error(true)</span>
+<span class="nc" id="L83">                .errorMessage(&quot;Truststore not valid: &quot; + errMsg.get())));</span>
+      }
+    }
+
+<span class="nc" id="L87">    return Mono.zip(</span>
+<span class="nc" id="L88">        KafkaServicesValidation.validateClusterConnection(</span>
+<span class="nc" id="L89">            clusterProperties.getBootstrapServers(),</span>
+<span class="nc" id="L90">            convertProperties(clusterProperties.getProperties()),</span>
+<span class="nc" id="L91">            clusterProperties.getSsl()</span>
+        ),
+<span class="nc bnc" id="L93" title="All 2 branches missed.">        schemaRegistryConfigured(clusterProperties)</span>
+<span class="nc" id="L94">            ? KafkaServicesValidation.validateSchemaRegistry(</span>
+<span class="nc" id="L95">                () -&gt; schemaRegistryClient(clusterProperties)).map(Optional::of)</span>
+<span class="nc" id="L96">            : Mono.&lt;Optional&lt;ApplicationPropertyValidationDTO&gt;&gt;just(Optional.empty()),</span>
+
+<span class="nc bnc" id="L98" title="All 2 branches missed.">        ksqlConfigured(clusterProperties)</span>
+<span class="nc" id="L99">            ? KafkaServicesValidation.validateKsql(() -&gt; ksqlClient(clusterProperties)).map(Optional::of)</span>
+<span class="nc" id="L100">            : Mono.&lt;Optional&lt;ApplicationPropertyValidationDTO&gt;&gt;just(Optional.empty()),</span>
+
+<span class="nc bnc" id="L102" title="All 2 branches missed.">        connectClientsConfigured(clusterProperties)</span>
+            ?
+<span class="nc" id="L104">            Flux.fromIterable(clusterProperties.getKafkaConnect())</span>
+<span class="nc" id="L105">                .flatMap(c -&gt;</span>
+<span class="nc" id="L106">                    KafkaServicesValidation.validateConnect(() -&gt; connectClient(clusterProperties, c))</span>
+<span class="nc" id="L107">                        .map(r -&gt; Tuples.of(c.getName(), r)))</span>
+<span class="nc" id="L108">                .collectMap(Tuple2::getT1, Tuple2::getT2)</span>
+<span class="nc" id="L109">                .map(Optional::of)</span>
+            :
+<span class="nc" id="L111">            Mono.&lt;Optional&lt;Map&lt;String, ApplicationPropertyValidationDTO&gt;&gt;&gt;just(Optional.empty())</span>
+<span class="nc" id="L112">    ).map(tuple -&gt; {</span>
+<span class="nc" id="L113">      var validation = new ClusterConfigValidationDTO();</span>
+<span class="nc" id="L114">      validation.kafka(tuple.getT1());</span>
+<span class="nc" id="L115">      tuple.getT2().ifPresent(validation::schemaRegistry);</span>
+<span class="nc" id="L116">      tuple.getT3().ifPresent(validation::ksqldb);</span>
+<span class="nc" id="L117">      tuple.getT4().ifPresent(validation::kafkaConnects);</span>
+<span class="nc" id="L118">      return validation;</span>
+    });
+  }
+
+  private Properties convertProperties(Map&lt;String, Object&gt; propertiesMap) {
+<span class="fc" id="L123">    Properties properties = new Properties();</span>
+<span class="pc bpc" id="L124" title="1 of 2 branches missed.">    if (propertiesMap != null) {</span>
+<span class="fc" id="L125">      properties.putAll(propertiesMap);</span>
+    }
+<span class="fc" id="L127">    return properties;</span>
+  }
+
+  private boolean connectClientsConfigured(ClustersProperties.Cluster clusterProperties) {
+<span class="pc bpc" id="L131" title="1 of 2 branches missed.">    return clusterProperties.getKafkaConnect() != null;</span>
+  }
+
+  private Map&lt;String, ReactiveFailover&lt;KafkaConnectClientApi&gt;&gt; connectClients(
+      ClustersProperties.Cluster clusterProperties) {
+<span class="fc" id="L136">    Map&lt;String, ReactiveFailover&lt;KafkaConnectClientApi&gt;&gt; connects = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L137">    clusterProperties.getKafkaConnect().forEach(c -&gt; connects.put(c.getName(), connectClient(clusterProperties, c)));</span>
+<span class="fc" id="L138">    return connects;</span>
+  }
+
+  private ReactiveFailover&lt;KafkaConnectClientApi&gt; connectClient(ClustersProperties.Cluster cluster,
+                                                                ClustersProperties.ConnectCluster connectCluster) {
+<span class="fc" id="L143">    return ReactiveFailover.create(</span>
+<span class="fc" id="L144">        parseUrlList(connectCluster.getAddress()),</span>
+<span class="fc" id="L145">        url -&gt; new RetryingKafkaConnectClient(</span>
+<span class="fc" id="L146">            connectCluster.toBuilder().address(url).build(),</span>
+<span class="fc" id="L147">            cluster.getSsl(),</span>
+            webClientMaxBuffSize
+        ),
+        ReactiveFailover.CONNECTION_REFUSED_EXCEPTION_FILTER,
+        &quot;No alive connect instances available&quot;,
+        ReactiveFailover.DEFAULT_RETRY_GRACE_PERIOD_MS
+    );
+  }
+
+  private boolean schemaRegistryConfigured(ClustersProperties.Cluster clusterProperties) {
+<span class="pc bpc" id="L157" title="1 of 2 branches missed.">    return clusterProperties.getSchemaRegistry() != null;</span>
+  }
+
+  private ReactiveFailover&lt;KafkaSrClientApi&gt; schemaRegistryClient(ClustersProperties.Cluster clusterProperties) {
+<span class="fc" id="L161">    var auth = Optional.ofNullable(clusterProperties.getSchemaRegistryAuth())</span>
+<span class="fc" id="L162">        .orElse(new ClustersProperties.SchemaRegistryAuth());</span>
+<span class="fc" id="L163">    WebClient webClient = new WebClientConfigurator()</span>
+<span class="fc" id="L164">        .configureSsl(clusterProperties.getSsl(), clusterProperties.getSchemaRegistrySsl())</span>
+<span class="fc" id="L165">        .configureBasicAuth(auth.getUsername(), auth.getPassword())</span>
+<span class="fc" id="L166">        .configureBufferSize(webClientMaxBuffSize)</span>
+<span class="fc" id="L167">        .build();</span>
+<span class="fc" id="L168">    return ReactiveFailover.create(</span>
+<span class="fc" id="L169">        parseUrlList(clusterProperties.getSchemaRegistry()),</span>
+<span class="fc" id="L170">        url -&gt; new KafkaSrClientApi(new ApiClient(webClient, null, null).setBasePath(url)),</span>
+        ReactiveFailover.CONNECTION_REFUSED_EXCEPTION_FILTER,
+        &quot;No live schemaRegistry instances available&quot;,
+        ReactiveFailover.DEFAULT_RETRY_GRACE_PERIOD_MS
+    );
+  }
+
+  private boolean ksqlConfigured(ClustersProperties.Cluster clusterProperties) {
+<span class="pc bpc" id="L178" title="1 of 2 branches missed.">    return clusterProperties.getKsqldbServer() != null;</span>
+  }
+
+  private ReactiveFailover&lt;KsqlApiClient&gt; ksqlClient(ClustersProperties.Cluster clusterProperties) {
+<span class="nc" id="L182">    return ReactiveFailover.create(</span>
+<span class="nc" id="L183">        parseUrlList(clusterProperties.getKsqldbServer()),</span>
+<span class="nc" id="L184">        url -&gt; new KsqlApiClient(</span>
+            url,
+<span class="nc" id="L186">            clusterProperties.getKsqldbServerAuth(),</span>
+<span class="nc" id="L187">            clusterProperties.getSsl(),</span>
+<span class="nc" id="L188">            clusterProperties.getKsqldbServerSsl(),</span>
+            webClientMaxBuffSize
+        ),
+        ReactiveFailover.CONNECTION_REFUSED_EXCEPTION_FILTER,
+        &quot;No live ksqldb instances available&quot;,
+        ReactiveFailover.DEFAULT_RETRY_GRACE_PERIOD_MS
+    );
+  }
+
+  private List&lt;String&gt; parseUrlList(String url) {
+<span class="pc bpc" id="L198" title="1 of 2 branches missed.">    return Stream.of(url.split(&quot;,&quot;)).map(String::trim).filter(s -&gt; !s.isBlank()).toList();</span>
+  }
+
+  private boolean metricsConfigured(ClustersProperties.Cluster clusterProperties) {
+<span class="pc bpc" id="L202" title="1 of 2 branches missed.">    return clusterProperties.getMetrics() != null;</span>
+  }
+
+  @Nullable
+  private MetricsConfig metricsConfigDataToMetricsConfig(ClustersProperties.MetricsConfigData metricsConfigData) {
+<span class="nc bnc" id="L207" title="All 2 branches missed.">    if (metricsConfigData == null) {</span>
+<span class="nc" id="L208">      return null;</span>
+    }
+<span class="nc" id="L210">    MetricsConfig.MetricsConfigBuilder builder = MetricsConfig.builder();</span>
+<span class="nc" id="L211">    builder.type(metricsConfigData.getType());</span>
+<span class="nc" id="L212">    builder.port(metricsConfigData.getPort());</span>
+<span class="nc" id="L213">    builder.ssl(Optional.ofNullable(metricsConfigData.getSsl()).orElse(false));</span>
+<span class="nc" id="L214">    builder.username(metricsConfigData.getUsername());</span>
+<span class="nc" id="L215">    builder.password(metricsConfigData.getPassword());</span>
+<span class="nc" id="L216">    builder.keystoreLocation(metricsConfigData.getKeystoreLocation());</span>
+<span class="nc" id="L217">    builder.keystorePassword(metricsConfigData.getKeystorePassword());</span>
+<span class="nc" id="L218">    return builder.build();</span>
+  }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

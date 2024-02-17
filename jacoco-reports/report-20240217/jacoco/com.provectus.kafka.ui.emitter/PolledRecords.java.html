@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PolledRecords.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">kafka-ui-api</a> &gt; <a href="index.source.html" class="el_package">com.provectus.kafka.ui.emitter</a> &gt; <span class="el_source">PolledRecords.java</span></div><h1>PolledRecords.java</h1><pre class="source lang-java linenums">package com.provectus.kafka.ui.emitter;
+
+import java.time.Duration;
+import java.util.Iterator;
+import java.util.List;
+import org.apache.kafka.clients.consumer.ConsumerRecord;
+import org.apache.kafka.clients.consumer.ConsumerRecords;
+import org.apache.kafka.common.TopicPartition;
+import org.apache.kafka.common.header.Header;
+import org.apache.kafka.common.utils.Bytes;
+
+<span class="fc" id="L12">public record PolledRecords(int count,</span>
+                            int bytes,
+                            Duration elapsed,
+                            ConsumerRecords&lt;Bytes, Bytes&gt; records) implements Iterable&lt;ConsumerRecord&lt;Bytes, Bytes&gt;&gt; {
+
+  static PolledRecords create(ConsumerRecords&lt;Bytes, Bytes&gt; polled, Duration pollDuration) {
+<span class="fc" id="L18">    return new PolledRecords(</span>
+<span class="fc" id="L19">        polled.count(),</span>
+<span class="fc" id="L20">        calculatePolledRecSize(polled),</span>
+        pollDuration,
+        polled
+    );
+  }
+
+  public List&lt;ConsumerRecord&lt;Bytes, Bytes&gt;&gt; records(TopicPartition tp) {
+<span class="fc" id="L27">    return records.records(tp);</span>
+  }
+
+  @Override
+  public Iterator&lt;ConsumerRecord&lt;Bytes, Bytes&gt;&gt; iterator() {
+<span class="fc" id="L32">    return records.iterator();</span>
+  }
+
+  private static int calculatePolledRecSize(Iterable&lt;ConsumerRecord&lt;Bytes, Bytes&gt;&gt; recs) {
+<span class="fc" id="L36">    int polledBytes = 0;</span>
+<span class="fc bfc" id="L37" title="All 2 branches covered.">    for (ConsumerRecord&lt;Bytes, Bytes&gt; rec : recs) {</span>
+<span class="fc bfc" id="L38" title="All 2 branches covered.">      for (Header header : rec.headers()) {</span>
+<span class="fc" id="L39">        polledBytes +=</span>
+<span class="pc bpc" id="L40" title="1 of 2 branches missed.">            (header.key() != null ? header.key().getBytes().length : 0)</span>
+<span class="fc bfc" id="L41" title="All 2 branches covered.">                + (header.value() != null ? header.value().length : 0);</span>
+<span class="fc" id="L42">      }</span>
+<span class="fc bfc" id="L43" title="All 2 branches covered.">      polledBytes += rec.key() == null ? 0 : rec.serializedKeySize();</span>
+<span class="fc bfc" id="L44" title="All 2 branches covered.">      polledBytes += rec.value() == null ? 0 : rec.serializedValueSize();</span>
+<span class="fc" id="L45">    }</span>
+<span class="fc" id="L46">    return polledBytes;</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

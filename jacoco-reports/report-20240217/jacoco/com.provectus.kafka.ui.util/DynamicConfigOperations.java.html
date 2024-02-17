@@ -1,0 +1,241 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DynamicConfigOperations.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">kafka-ui-api</a> &gt; <a href="index.source.html" class="el_package">com.provectus.kafka.ui.util</a> &gt; <span class="el_source">DynamicConfigOperations.java</span></div><h1>DynamicConfigOperations.java</h1><pre class="source lang-java linenums">package com.provectus.kafka.ui.util;
+
+
+import com.provectus.kafka.ui.config.ClustersProperties;
+import com.provectus.kafka.ui.config.WebclientProperties;
+import com.provectus.kafka.ui.config.auth.OAuthProperties;
+import com.provectus.kafka.ui.config.auth.RoleBasedAccessControlProperties;
+import com.provectus.kafka.ui.exception.FileUploadException;
+import com.provectus.kafka.ui.exception.ValidationException;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardOpenOption;
+import java.time.Instant;
+import java.util.Optional;
+import javax.annotation.Nullable;
+import lombok.Builder;
+import lombok.Data;
+import lombok.RequiredArgsConstructor;
+import lombok.SneakyThrows;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.NoSuchBeanDefinitionException;
+import org.springframework.boot.env.YamlPropertySourceLoader;
+import org.springframework.context.ApplicationContextInitializer;
+import org.springframework.context.ConfigurableApplicationContext;
+import org.springframework.core.env.CompositePropertySource;
+import org.springframework.core.env.PropertySource;
+import org.springframework.core.io.FileSystemResource;
+import org.springframework.http.codec.multipart.FilePart;
+import org.springframework.stereotype.Component;
+import org.yaml.snakeyaml.DumperOptions;
+import org.yaml.snakeyaml.Yaml;
+import org.yaml.snakeyaml.introspector.BeanAccess;
+import org.yaml.snakeyaml.introspector.Property;
+import org.yaml.snakeyaml.introspector.PropertyUtils;
+import org.yaml.snakeyaml.nodes.NodeTuple;
+import org.yaml.snakeyaml.nodes.Tag;
+import org.yaml.snakeyaml.representer.Representer;
+import reactor.core.publisher.Mono;
+
+<span class="fc" id="L42">@Slf4j</span>
+<span class="fc" id="L43">@RequiredArgsConstructor</span>
+@Component
+public class DynamicConfigOperations {
+
+  static final String DYNAMIC_CONFIG_ENABLED_ENV_PROPERTY = &quot;dynamic.config.enabled&quot;;
+  static final String DYNAMIC_CONFIG_PATH_ENV_PROPERTY = &quot;dynamic.config.path&quot;;
+  static final String DYNAMIC_CONFIG_PATH_ENV_PROPERTY_DEFAULT = &quot;/etc/kafkaui/dynamic_config.yaml&quot;;
+
+  static final String CONFIG_RELATED_UPLOADS_DIR_PROPERTY = &quot;config.related.uploads.dir&quot;;
+  static final String CONFIG_RELATED_UPLOADS_DIR_DEFAULT = &quot;/etc/kafkaui/uploads&quot;;
+
+  public static ApplicationContextInitializer&lt;ConfigurableApplicationContext&gt; dynamicConfigPropertiesInitializer() {
+<span class="fc" id="L55">    return appCtx -&gt;</span>
+<span class="fc" id="L56">        new DynamicConfigOperations(appCtx)</span>
+<span class="fc" id="L57">            .loadDynamicPropertySource()</span>
+<span class="fc" id="L58">            .ifPresent(source -&gt; appCtx.getEnvironment().getPropertySources().addFirst(source));</span>
+  }
+
+  private final ConfigurableApplicationContext ctx;
+
+  public boolean dynamicConfigEnabled() {
+<span class="fc" id="L64">    return &quot;true&quot;.equalsIgnoreCase(ctx.getEnvironment().getProperty(DYNAMIC_CONFIG_ENABLED_ENV_PROPERTY));</span>
+  }
+
+  private Path dynamicConfigFilePath() {
+<span class="fc" id="L68">    return Paths.get(</span>
+<span class="fc" id="L69">        Optional.ofNullable(ctx.getEnvironment().getProperty(DYNAMIC_CONFIG_PATH_ENV_PROPERTY))</span>
+<span class="fc" id="L70">            .orElse(DYNAMIC_CONFIG_PATH_ENV_PROPERTY_DEFAULT)</span>
+    );
+  }
+
+<span class="nc" id="L74">  @SneakyThrows</span>
+  public Optional&lt;PropertySource&lt;?&gt;&gt; loadDynamicPropertySource() {
+<span class="fc bfc" id="L76" title="All 2 branches covered.">    if (dynamicConfigEnabled()) {</span>
+<span class="fc" id="L77">      Path configPath = dynamicConfigFilePath();</span>
+<span class="pc bpc" id="L78" title="1 of 4 branches missed.">      if (!Files.exists(configPath) || !Files.isReadable(configPath)) {</span>
+<span class="fc" id="L79">        log.warn(&quot;Dynamic config file {} doesnt exist or not readable&quot;, configPath);</span>
+<span class="fc" id="L80">        return Optional.empty();</span>
+      }
+<span class="fc" id="L82">      var propertySource = new CompositePropertySource(&quot;dynamicProperties&quot;);</span>
+<span class="fc" id="L83">      new YamlPropertySourceLoader()</span>
+<span class="fc" id="L84">          .load(&quot;dynamicProperties&quot;, new FileSystemResource(configPath))</span>
+<span class="fc" id="L85">          .forEach(propertySource::addPropertySource);</span>
+<span class="fc" id="L86">      log.info(&quot;Dynamic config loaded from {}&quot;, configPath);</span>
+<span class="fc" id="L87">      return Optional.of(propertySource);</span>
+    }
+<span class="fc" id="L89">    return Optional.empty();</span>
+  }
+
+  public PropertiesStructure getCurrentProperties() {
+<span class="nc" id="L93">    checkIfDynamicConfigEnabled();</span>
+<span class="nc" id="L94">    return PropertiesStructure.builder()</span>
+<span class="nc" id="L95">        .kafka(getNullableBean(ClustersProperties.class))</span>
+<span class="nc" id="L96">        .rbac(getNullableBean(RoleBasedAccessControlProperties.class))</span>
+<span class="nc" id="L97">        .auth(</span>
+<span class="nc" id="L98">            PropertiesStructure.Auth.builder()</span>
+<span class="nc" id="L99">                .type(ctx.getEnvironment().getProperty(&quot;auth.type&quot;))</span>
+<span class="nc" id="L100">                .oauth2(getNullableBean(OAuthProperties.class))</span>
+<span class="nc" id="L101">                .build())</span>
+<span class="nc" id="L102">        .webclient(getNullableBean(WebclientProperties.class))</span>
+<span class="nc" id="L103">        .build();</span>
+  }
+
+  @Nullable
+  private &lt;T&gt; T getNullableBean(Class&lt;T&gt; clazz) {
+    try {
+<span class="nc" id="L109">      return ctx.getBean(clazz);</span>
+<span class="nc" id="L110">    } catch (NoSuchBeanDefinitionException nsbde) {</span>
+<span class="nc" id="L111">      return null;</span>
+    }
+  }
+
+  public void persist(PropertiesStructure properties) {
+<span class="fc" id="L116">    checkIfDynamicConfigEnabled();</span>
+<span class="fc" id="L117">    properties.initAndValidate();</span>
+
+<span class="fc" id="L119">    String yaml = serializeToYaml(properties);</span>
+<span class="fc" id="L120">    writeYamlToFile(yaml, dynamicConfigFilePath());</span>
+<span class="fc" id="L121">  }</span>
+
+  public Mono&lt;Path&gt; uploadConfigRelatedFile(FilePart file) {
+<span class="fc" id="L124">    checkIfDynamicConfigEnabled();</span>
+<span class="fc" id="L125">    String targetDirStr = ctx.getEnvironment()</span>
+<span class="fc" id="L126">        .getProperty(CONFIG_RELATED_UPLOADS_DIR_PROPERTY, CONFIG_RELATED_UPLOADS_DIR_DEFAULT);</span>
+
+<span class="fc" id="L128">    Path targetDir = Path.of(targetDirStr);</span>
+<span class="pc bpc" id="L129" title="1 of 2 branches missed.">    if (!Files.exists(targetDir)) {</span>
+      try {
+<span class="fc" id="L131">        Files.createDirectories(targetDir);</span>
+<span class="nc" id="L132">      } catch (IOException e) {</span>
+<span class="nc" id="L133">        return Mono.error(</span>
+<span class="nc" id="L134">            new FileUploadException(&quot;Error creating directory for uploads %s&quot;.formatted(targetDir), e));</span>
+<span class="fc" id="L135">      }</span>
+    }
+
+<span class="fc" id="L138">    Path targetFilePath = targetDir.resolve(file.filename() + &quot;-&quot; + Instant.now().getEpochSecond());</span>
+<span class="fc" id="L139">    log.info(&quot;Uploading config-related file {}&quot;, targetFilePath);</span>
+<span class="pc bpc" id="L140" title="1 of 2 branches missed.">    if (Files.exists(targetFilePath)) {</span>
+<span class="nc" id="L141">      log.info(&quot;File {} already exists, it will be overwritten&quot;, targetFilePath);</span>
+    }
+
+<span class="fc" id="L144">    return file.transferTo(targetFilePath)</span>
+<span class="fc" id="L145">        .thenReturn(targetFilePath)</span>
+<span class="pc" id="L146">        .doOnError(th -&gt; log.error(&quot;Error uploading file {}&quot;, targetFilePath, th))</span>
+<span class="pc" id="L147">        .onErrorMap(th -&gt; new FileUploadException(targetFilePath, th));</span>
+  }
+
+  private void checkIfDynamicConfigEnabled() {
+<span class="pc bpc" id="L151" title="1 of 2 branches missed.">    if (!dynamicConfigEnabled()) {</span>
+<span class="nc" id="L152">      throw new ValidationException(</span>
+          &quot;Dynamic config change is not allowed. &quot;
+              + &quot;Set dynamic.config.enabled property to 'true' to enabled it.&quot;);
+    }
+<span class="fc" id="L156">  }</span>
+
+<span class="pc" id="L158">  @SneakyThrows</span>
+  private void writeYamlToFile(String yaml, Path path) {
+<span class="pc bpc" id="L160" title="1 of 2 branches missed.">    if (Files.isDirectory(path)) {</span>
+<span class="nc" id="L161">      throw new ValidationException(&quot;Dynamic file path is a directory, but should be a file path&quot;);</span>
+    }
+<span class="pc bpc" id="L163" title="1 of 2 branches missed.">    if (!Files.exists(path.getParent())) {</span>
+<span class="nc" id="L164">      Files.createDirectories(path.getParent());</span>
+    }
+<span class="pc bpc" id="L166" title="1 of 4 branches missed.">    if (Files.exists(path) &amp;&amp; !Files.isWritable(path)) {</span>
+<span class="nc" id="L167">      throw new ValidationException(&quot;File already exists and is not writable&quot;);</span>
+    }
+    try {
+<span class="fc" id="L170">      Files.writeString(</span>
+          path,
+          yaml,
+          StandardOpenOption.CREATE,
+          StandardOpenOption.WRITE,
+          StandardOpenOption.TRUNCATE_EXISTING // to override existing file
+      );
+<span class="nc" id="L177">    } catch (IOException e) {</span>
+<span class="nc" id="L178">      throw new ValidationException(&quot;Error writing to &quot; + path, e);</span>
+<span class="fc" id="L179">    }</span>
+<span class="fc" id="L180">  }</span>
+
+  private String serializeToYaml(PropertiesStructure props) {
+    //representer, that skips fields with null values
+<span class="fc" id="L184">    Representer representer = new Representer(new DumperOptions()) {</span>
+      @Override
+      protected NodeTuple representJavaBeanProperty(Object javaBean,
+                                                    Property property,
+                                                    Object propertyValue,
+                                                    Tag customTag) {
+<span class="fc bfc" id="L190" title="All 2 branches covered.">        if (propertyValue == null) {</span>
+<span class="fc" id="L191">          return null; // if value of property is null, ignore it.</span>
+        } else {
+<span class="fc" id="L193">          return super.representJavaBeanProperty(javaBean, property, propertyValue, customTag);</span>
+        }
+      }
+    };
+<span class="fc" id="L197">    var propertyUtils = new PropertyUtils();</span>
+<span class="fc" id="L198">    propertyUtils.setBeanAccess(BeanAccess.FIELD);</span>
+<span class="fc" id="L199">    representer.setPropertyUtils(propertyUtils);</span>
+<span class="fc" id="L200">    representer.addClassTag(PropertiesStructure.class, Tag.MAP); //to avoid adding class tag</span>
+<span class="fc" id="L201">    representer.setDefaultFlowStyle(DumperOptions.FlowStyle.BLOCK); //use indent instead of {}</span>
+<span class="fc" id="L202">    return new Yaml(representer).dump(props);</span>
+  }
+
+  ///---------------------------------------------------------------------
+
+<span class="nc bnc" id="L207" title="All 38 branches missed.">  @Data</span>
+<span class="pc" id="L208">  @Builder</span>
+  // field name should be in sync with @ConfigurationProperties annotation
+  public static class PropertiesStructure {
+
+<span class="nc" id="L212">    private ClustersProperties kafka;</span>
+<span class="nc" id="L213">    private RoleBasedAccessControlProperties rbac;</span>
+<span class="nc" id="L214">    private Auth auth;</span>
+<span class="nc" id="L215">    private WebclientProperties webclient;</span>
+
+<span class="nc bnc" id="L217" title="All 22 branches missed.">    @Data</span>
+<span class="nc" id="L218">    @Builder</span>
+    public static class Auth {
+<span class="nc" id="L220">      String type;</span>
+<span class="nc" id="L221">      OAuthProperties oauth2;</span>
+    }
+
+    public void initAndValidate() {
+<span class="fc" id="L225">      Optional.ofNullable(kafka)</span>
+<span class="fc" id="L226">          .ifPresent(ClustersProperties::validateAndSetDefaults);</span>
+
+<span class="fc" id="L228">      Optional.ofNullable(rbac)</span>
+<span class="fc" id="L229">          .ifPresent(RoleBasedAccessControlProperties::init);</span>
+
+<span class="fc" id="L231">      Optional.ofNullable(auth)</span>
+<span class="pc" id="L232">          .flatMap(a -&gt; Optional.ofNullable(a.oauth2))</span>
+<span class="fc" id="L233">          .ifPresent(OAuthProperties::init);</span>
+
+<span class="fc" id="L235">      Optional.ofNullable(webclient)</span>
+<span class="fc" id="L236">          .ifPresent(WebclientProperties::validate);</span>
+<span class="fc" id="L237">    }</span>
+  }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

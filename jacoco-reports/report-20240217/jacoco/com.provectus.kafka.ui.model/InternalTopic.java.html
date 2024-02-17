@@ -1,0 +1,136 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>InternalTopic.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">kafka-ui-api</a> &gt; <a href="index.source.html" class="el_package">com.provectus.kafka.ui.model</a> &gt; <span class="el_source">InternalTopic.java</span></div><h1>InternalTopic.java</h1><pre class="source lang-java linenums">package com.provectus.kafka.ui.model;
+
+import com.provectus.kafka.ui.config.ClustersProperties;
+import java.math.BigDecimal;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+import javax.annotation.Nullable;
+import lombok.Builder;
+import lombok.Data;
+import org.apache.kafka.clients.admin.ConfigEntry;
+import org.apache.kafka.clients.admin.TopicDescription;
+import org.apache.kafka.common.TopicPartition;
+
+<span class="nc bnc" id="L15" title="All 80 branches missed.">@Data</span>
+<span class="pc" id="L16">@Builder(toBuilder = true)</span>
+public class InternalTopic {
+
+<span class="nc" id="L19">  ClustersProperties clustersProperties;</span>
+
+  // from TopicDescription
+<span class="fc" id="L22">  private final String name;</span>
+<span class="fc" id="L23">  private final boolean internal;</span>
+<span class="fc" id="L24">  private final int replicas;</span>
+<span class="fc" id="L25">  private final int partitionCount;</span>
+<span class="fc" id="L26">  private final int inSyncReplicas;</span>
+<span class="fc" id="L27">  private final int replicationFactor;</span>
+<span class="fc" id="L28">  private final int underReplicatedPartitions;</span>
+<span class="fc" id="L29">  private final Map&lt;Integer, InternalPartition&gt; partitions;</span>
+
+  // topic configs
+<span class="fc" id="L32">  private final List&lt;InternalTopicConfig&gt; topicConfigs;</span>
+<span class="fc" id="L33">  private final CleanupPolicy cleanUpPolicy;</span>
+
+  // rates from metrics
+<span class="fc" id="L36">  private final BigDecimal bytesInPerSec;</span>
+<span class="fc" id="L37">  private final BigDecimal bytesOutPerSec;</span>
+
+  // from log dir data
+<span class="fc" id="L40">  private final long segmentSize;</span>
+<span class="fc" id="L41">  private final long segmentCount;</span>
+
+  public static InternalTopic from(TopicDescription topicDescription,
+                                   List&lt;ConfigEntry&gt; configs,
+                                   InternalPartitionsOffsets partitionsOffsets,
+                                   Metrics metrics,
+                                   InternalLogDirStats logDirInfo,
+                                   @Nullable String internalTopicPrefix) {
+<span class="fc" id="L49">    var topic = InternalTopic.builder();</span>
+
+<span class="pc bpc" id="L51" title="1 of 4 branches missed.">    internalTopicPrefix = internalTopicPrefix == null || internalTopicPrefix.isEmpty()</span>
+<span class="fc" id="L52">        ? &quot;_&quot;</span>
+<span class="fc" id="L53">        : internalTopicPrefix;</span>
+
+<span class="fc" id="L55">    topic.internal(</span>
+<span class="pc bpc" id="L56" title="1 of 4 branches missed.">        topicDescription.isInternal() || topicDescription.name().startsWith(internalTopicPrefix)</span>
+    );
+<span class="fc" id="L58">    topic.name(topicDescription.name());</span>
+
+<span class="fc" id="L60">    List&lt;InternalPartition&gt; partitions = topicDescription.partitions().stream()</span>
+<span class="fc" id="L61">        .map(partition -&gt; {</span>
+<span class="fc" id="L62">          var partitionDto = InternalPartition.builder();</span>
+
+<span class="fc bfc" id="L64" title="All 2 branches covered.">          partitionDto.leader(partition.leader() != null ? partition.leader().id() : null);</span>
+<span class="fc" id="L65">          partitionDto.partition(partition.partition());</span>
+<span class="fc" id="L66">          partitionDto.inSyncReplicasCount(partition.isr().size());</span>
+<span class="fc" id="L67">          partitionDto.replicasCount(partition.replicas().size());</span>
+<span class="fc" id="L68">          List&lt;InternalReplica&gt; replicas = partition.replicas().stream()</span>
+<span class="fc" id="L69">              .map(r -&gt;</span>
+<span class="fc" id="L70">                  InternalReplica.builder()</span>
+<span class="fc" id="L71">                      .broker(r.id())</span>
+<span class="fc" id="L72">                      .inSync(partition.isr().contains(r))</span>
+<span class="pc bpc" id="L73" title="2 of 4 branches missed.">                      .leader(partition.leader() != null &amp;&amp; partition.leader().id() == r.id())</span>
+<span class="fc" id="L74">                      .build())</span>
+<span class="fc" id="L75">              .collect(Collectors.toList());</span>
+<span class="fc" id="L76">          partitionDto.replicas(replicas);</span>
+
+<span class="fc" id="L78">          partitionsOffsets.get(topicDescription.name(), partition.partition())</span>
+<span class="fc" id="L79">              .ifPresent(offsets -&gt; {</span>
+<span class="fc" id="L80">                partitionDto.offsetMin(offsets.getEarliest());</span>
+<span class="fc" id="L81">                partitionDto.offsetMax(offsets.getLatest());</span>
+<span class="fc" id="L82">              });</span>
+
+<span class="fc" id="L84">          var segmentStats =</span>
+<span class="fc" id="L85">              logDirInfo.getPartitionsStats().get(</span>
+<span class="fc" id="L86">                  new TopicPartition(topicDescription.name(), partition.partition()));</span>
+<span class="pc bpc" id="L87" title="1 of 2 branches missed.">          if (segmentStats != null) {</span>
+<span class="nc" id="L88">            partitionDto.segmentCount(segmentStats.getSegmentsCount());</span>
+<span class="nc" id="L89">            partitionDto.segmentSize(segmentStats.getSegmentSize());</span>
+          }
+
+<span class="fc" id="L92">          return partitionDto.build();</span>
+        })
+<span class="fc" id="L94">        .toList();</span>
+
+<span class="fc" id="L96">    topic.partitions(partitions.stream().collect(</span>
+<span class="fc" id="L97">        Collectors.toMap(InternalPartition::getPartition, t -&gt; t)));</span>
+
+<span class="fc" id="L99">    var partitionsStats = new PartitionsStats(topicDescription);</span>
+<span class="fc" id="L100">    topic.replicas(partitionsStats.getReplicasCount());</span>
+<span class="fc" id="L101">    topic.partitionCount(partitionsStats.getPartitionsCount());</span>
+<span class="fc" id="L102">    topic.inSyncReplicas(partitionsStats.getInSyncReplicasCount());</span>
+<span class="fc" id="L103">    topic.underReplicatedPartitions(partitionsStats.getUnderReplicatedPartitionCount());</span>
+
+<span class="fc" id="L105">    topic.replicationFactor(</span>
+<span class="fc bfc" id="L106" title="All 2 branches covered.">        topicDescription.partitions().isEmpty()</span>
+<span class="fc" id="L107">            ? 0</span>
+<span class="fc" id="L108">            : topicDescription.partitions().get(0).replicas().size()</span>
+    );
+
+<span class="fc" id="L111">    var segmentStats = logDirInfo.getTopicStats().get(topicDescription.name());</span>
+<span class="pc bpc" id="L112" title="1 of 2 branches missed.">    if (segmentStats != null) {</span>
+<span class="nc" id="L113">      topic.segmentCount(segmentStats.getSegmentsCount());</span>
+<span class="nc" id="L114">      topic.segmentSize(segmentStats.getSegmentSize());</span>
+    }
+
+<span class="fc" id="L117">    topic.bytesInPerSec(metrics.getTopicBytesInPerSec().get(topicDescription.name()));</span>
+<span class="fc" id="L118">    topic.bytesOutPerSec(metrics.getTopicBytesOutPerSec().get(topicDescription.name()));</span>
+
+<span class="fc" id="L120">    topic.topicConfigs(</span>
+<span class="fc" id="L121">        configs.stream().map(InternalTopicConfig::from).collect(Collectors.toList()));</span>
+
+<span class="fc" id="L123">    topic.cleanUpPolicy(</span>
+<span class="fc" id="L124">        configs.stream()</span>
+<span class="fc" id="L125">            .filter(config -&gt; config.name().equals(&quot;cleanup.policy&quot;))</span>
+<span class="fc" id="L126">            .findFirst()</span>
+<span class="fc" id="L127">            .map(ConfigEntry::value)</span>
+<span class="fc" id="L128">            .map(CleanupPolicy::fromString)</span>
+<span class="fc" id="L129">            .orElse(CleanupPolicy.UNKNOWN)</span>
+    );
+
+<span class="fc" id="L132">    return topic.build();</span>
+  }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AuthController.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">kafka-ui-api</a> &gt; <a href="index.source.html" class="el_package">com.provectus.kafka.ui.controller</a> &gt; <span class="el_source">AuthController.java</span></div><h1>AuthController.java</h1><pre class="source lang-java linenums">package com.provectus.kafka.ui.controller;
+
+import java.nio.charset.Charset;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.web.server.csrf.CsrfToken;
+import org.springframework.util.MultiValueMap;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ServerWebExchange;
+import reactor.core.publisher.Mono;
+
+@RestController
+<span class="fc" id="L14">@RequiredArgsConstructor</span>
+<span class="fc" id="L15">@Slf4j</span>
+public class AuthController {
+
+  @GetMapping(value = &quot;/auth&quot;, produces = {&quot;text/html&quot;})
+  public Mono&lt;byte[]&gt; getAuth(ServerWebExchange exchange) {
+<span class="nc" id="L20">    Mono&lt;CsrfToken&gt; token = exchange.getAttributeOrDefault(CsrfToken.class.getName(), Mono.empty());</span>
+<span class="nc" id="L21">    return token</span>
+<span class="nc" id="L22">        .map(AuthController::csrfToken)</span>
+<span class="nc" id="L23">        .defaultIfEmpty(&quot;&quot;)</span>
+<span class="nc" id="L24">        .map(csrfTokenHtmlInput -&gt; createPage(exchange, csrfTokenHtmlInput));</span>
+  }
+
+  private byte[] createPage(ServerWebExchange exchange, String csrfTokenHtmlInput) {
+<span class="nc" id="L28">    MultiValueMap&lt;String, String&gt; queryParams = exchange.getRequest()</span>
+<span class="nc" id="L29">        .getQueryParams();</span>
+<span class="nc" id="L30">    String contextPath = exchange.getRequest().getPath().contextPath().value();</span>
+<span class="nc" id="L31">    String page =</span>
+        &quot;&lt;!DOCTYPE html&gt;\n&quot; + &quot;&lt;html lang=\&quot;en\&quot;&gt;\n&quot; + &quot;  &lt;head&gt;\n&quot;
+        + &quot;    &lt;meta charset=\&quot;utf-8\&quot;&gt;\n&quot;
+        + &quot;    &lt;meta name=\&quot;viewport\&quot; content=\&quot;width=device-width, initial-scale=1, &quot;
+        + &quot;shrink-to-fit=no\&quot;&gt;\n&quot;
+        + &quot;    &lt;meta name=\&quot;description\&quot; content=\&quot;\&quot;&gt;\n&quot;
+        + &quot;    &lt;meta name=\&quot;author\&quot; content=\&quot;\&quot;&gt;\n&quot;
+        + &quot;    &lt;title&gt;Please sign in&lt;/title&gt;\n&quot;
+        + &quot;    &lt;link href=\&quot;&quot; + contextPath + &quot;/static/css/bootstrap.min.css\&quot; rel=\&quot;stylesheet\&quot; &quot;
+        + &quot;integrity=\&quot;sha384-/Y6pD6FV/Vv2HJnA6t+vslU6fwYXjCFtcEpHbNJ0lyAFsXTsjBbfaDjzALeQsN6M\&quot; &quot;
+        + &quot;crossorigin=\&quot;anonymous\&quot;&gt;\n&quot;
+        + &quot;    &lt;link href=\&quot;&quot; + contextPath + &quot;/static/css/signin.css\&quot; &quot;
+        + &quot;rel=\&quot;stylesheet\&quot; crossorigin=\&quot;anonymous\&quot;/&gt;\n&quot;
+        + &quot;  &lt;/head&gt;\n&quot;
+        + &quot;  &lt;body&gt;\n&quot;
+        + &quot;     &lt;div class=\&quot;container\&quot;&gt;\n&quot;
+<span class="nc" id="L47">        + formLogin(queryParams, contextPath, csrfTokenHtmlInput)</span>
+        + &quot;    &lt;/div&gt;\n&quot;
+        + &quot;  &lt;/body&gt;\n&quot;
+        + &quot;&lt;/html&gt;&quot;;
+
+<span class="nc" id="L52">    return page.getBytes(Charset.defaultCharset());</span>
+  }
+
+  private String formLogin(
+      MultiValueMap&lt;String, String&gt; queryParams,
+      String contextPath, String csrfTokenHtmlInput) {
+
+<span class="nc" id="L59">    boolean isError = queryParams.containsKey(&quot;error&quot;);</span>
+<span class="nc" id="L60">    boolean isLogoutSuccess = queryParams.containsKey(&quot;logout&quot;);</span>
+<span class="nc" id="L61">    return</span>
+        &quot;      &lt;form class=\&quot;form-signin\&quot; method=\&quot;post\&quot; action=\&quot;&quot; + contextPath + &quot;/auth\&quot;&gt;\n&quot;
+        + &quot;        &lt;h2 class=\&quot;form-signin-heading\&quot;&gt;Please sign in&lt;/h2&gt;\n&quot;
+<span class="nc" id="L64">        + createError(isError)</span>
+<span class="nc" id="L65">        + createLogoutSuccess(isLogoutSuccess)</span>
+        + &quot;        &lt;p&gt;\n&quot;
+        + &quot;          &lt;label for=\&quot;username\&quot; class=\&quot;sr-only\&quot;&gt;Username&lt;/label&gt;\n&quot;
+        + &quot;          &lt;input type=\&quot;text\&quot; id=\&quot;username\&quot; name=\&quot;username\&quot; class=\&quot;form-control\&quot; &quot;
+        + &quot;placeholder=\&quot;Username\&quot; required autofocus&gt;\n&quot;
+        + &quot;        &lt;/p&gt;\n&quot; + &quot;        &lt;p&gt;\n&quot;
+        + &quot;          &lt;label for=\&quot;password\&quot; class=\&quot;sr-only\&quot;&gt;Password&lt;/label&gt;\n&quot;
+        + &quot;          &lt;input type=\&quot;password\&quot; id=\&quot;password\&quot; name=\&quot;password\&quot; &quot;
+        + &quot;class=\&quot;form-control\&quot; placeholder=\&quot;Password\&quot; required&gt;\n&quot;
+        + &quot;        &lt;/p&gt;\n&quot; + csrfTokenHtmlInput
+        + &quot;        &lt;button class=\&quot;btn btn-lg btn-primary btn-block\&quot; &quot;
+        + &quot;type=\&quot;submit\&quot;&gt;Sign in&lt;/button&gt;\n&quot;
+        + &quot;      &lt;/form&gt;\n&quot;;
+  }
+
+  private static String csrfToken(CsrfToken token) {
+<span class="nc" id="L81">    return &quot;          &lt;input type=\&quot;hidden\&quot; name=\&quot;&quot;</span>
+<span class="nc" id="L82">        + token.getParameterName()</span>
+        + &quot;\&quot; value=\&quot;&quot;
+<span class="nc" id="L84">        + token.getToken()</span>
+        + &quot;\&quot;&gt;\n&quot;;
+  }
+
+  private static String createError(boolean isError) {
+<span class="nc bnc" id="L89" title="All 2 branches missed.">    return isError</span>
+<span class="nc" id="L90">        ? &quot;&lt;div class=\&quot;alert alert-danger\&quot; role=\&quot;alert\&quot;&gt;Invalid credentials&lt;/div&gt;&quot;</span>
+<span class="nc" id="L91">        : &quot;&quot;;</span>
+  }
+
+  private static String createLogoutSuccess(boolean isLogoutSuccess) {
+<span class="nc bnc" id="L95" title="All 2 branches missed.">    return isLogoutSuccess</span>
+<span class="nc" id="L96">        ? &quot;&lt;div class=\&quot;alert alert-success\&quot; role=\&quot;alert\&quot;&gt;You have been signed out&lt;/div&gt;&quot;</span>
+<span class="nc" id="L97">        : &quot;&quot;;</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>
