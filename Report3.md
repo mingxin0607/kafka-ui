@@ -10,7 +10,7 @@
 
 ### 2.1 Use `Jacoco` in maven project
 #### 2.1.1 Setup
-To use `Jacoco` coverage tool in a maven project, we could add the following dependency in each "pom.xml" (We already done so).
+To use `Jacoco` coverage tool in a maven project, we could add the following dependency in each "pom.xml" (We have already done so to our project).
 ```xml
 <build>
     <plugins>
