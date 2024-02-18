@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>HexSerde.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">kafka-ui-api</a> &gt; <a href="index.source.html" class="el_package">com.provectus.kafka.ui.serdes.builtin</a> &gt; <span class="el_source">HexSerde.java</span></div><h1>HexSerde.java</h1><pre class="source lang-java linenums">package com.provectus.kafka.ui.serdes.builtin;
+
+import com.provectus.kafka.ui.serde.api.DeserializeResult;
+import com.provectus.kafka.ui.serde.api.PropertyResolver;
+import com.provectus.kafka.ui.serde.api.SchemaDescription;
+import com.provectus.kafka.ui.serdes.BuiltInSerde;
+import java.util.HexFormat;
+import java.util.Map;
+import java.util.Optional;
+
+<span class="fc" id="L11">public class HexSerde implements BuiltInSerde {</span>
+
+  private HexFormat deserializeHexFormat;
+
+  public static String name() {
+<span class="fc" id="L16">    return &quot;Hex&quot;;</span>
+  }
+
+  @Override
+  public void autoConfigure(PropertyResolver kafkaClusterProperties, PropertyResolver globalProperties) {
+<span class="fc" id="L21">    configure(&quot; &quot;, true);</span>
+<span class="fc" id="L22">  }</span>
+
+  @Override
+  public void configure(PropertyResolver serdeProperties,
+                        PropertyResolver kafkaClusterProperties,
+                        PropertyResolver globalProperties) {
+<span class="nc" id="L28">    String delim = serdeProperties.getProperty(&quot;delimiter&quot;, String.class).orElse(&quot; &quot;);</span>
+<span class="nc" id="L29">    boolean uppercase = serdeProperties.getProperty(&quot;uppercase&quot;, Boolean.class).orElse(true);</span>
+<span class="nc" id="L30">    configure(delim, uppercase);</span>
+<span class="nc" id="L31">  }</span>
+
+  private void configure(String delim, boolean uppercase) {
+<span class="fc" id="L34">    deserializeHexFormat = HexFormat.ofDelimiter(delim);</span>
+<span class="pc bpc" id="L35" title="1 of 2 branches missed.">    if (uppercase) {</span>
+<span class="fc" id="L36">      deserializeHexFormat = deserializeHexFormat.withUpperCase();</span>
+    }
+<span class="fc" id="L38">  }</span>
+
+  @Override
+  public Optional&lt;String&gt; getDescription() {
+<span class="nc" id="L42">    return Optional.empty();</span>
+  }
+
+  @Override
+  public Optional&lt;SchemaDescription&gt; getSchema(String topic, Target type) {
+<span class="fc" id="L47">    return Optional.empty();</span>
+  }
+
+  @Override
+  public boolean canDeserialize(String topic, Target type) {
+<span class="fc" id="L52">    return true;</span>
+  }
+
+  @Override
+  public boolean canSerialize(String topic, Target type) {
+<span class="fc" id="L57">    return true;</span>
+  }
+
+  @Override
+  public Serializer serializer(String topic, Target type) {
+<span class="fc" id="L62">    return input -&gt; {</span>
+<span class="fc" id="L63">      input = input.trim();</span>
+      // it is a hack to provide ability to sent empty array as a key/value
+<span class="fc bfc" id="L65" title="All 2 branches covered.">      if (input.length() == 0) {</span>
+<span class="fc" id="L66">        return new byte[] {};</span>
+      }
+<span class="fc" id="L68">      return HexFormat.of().parseHex(prepareInputForParse(input));</span>
+    };
+  }
+
+  // removing most-common delimiters and prefixes
+  private static String prepareInputForParse(String input) {
+<span class="fc" id="L74">    return input</span>
+<span class="fc" id="L75">        .replaceAll(&quot; &quot;, &quot;&quot;)</span>
+<span class="fc" id="L76">        .replaceAll(&quot;#&quot;, &quot;&quot;)</span>
+<span class="fc" id="L77">        .replaceAll(&quot;:&quot;, &quot;&quot;);</span>
+  }
+
+  @Override
+  public Deserializer deserializer(String topic, Target type) {
+<span class="fc" id="L82">    return (headers, data) -&gt;</span>
+<span class="fc" id="L83">        new DeserializeResult(</span>
+<span class="fc" id="L84">            deserializeHexFormat.formatHex(data),</span>
+            DeserializeResult.Type.STRING,
+<span class="fc" id="L86">            Map.of()</span>
+        );
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

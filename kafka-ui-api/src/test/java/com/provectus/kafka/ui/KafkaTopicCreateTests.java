@@ -104,4 +104,33 @@ public class KafkaTopicCreateTests extends AbstractIntegrationTest {
         .jsonPath("name").isEqualTo(clonedTopicName);
   }
 
+  @Test
+  void shouldReturn400IfInvalidReplicationFactor() {
+    TopicCreationDTO topicCreation = new TopicCreationDTO()
+            .replicationFactor(0)  // Invalid replication factor
+            .partitions(3)
+            .name(UUID.randomUUID().toString());
+
+    webTestClient.post()
+            .uri("/api/clusters/{clusterName}/topics", LOCAL)
+            .bodyValue(topicCreation)
+            .exchange()
+            .expectStatus()
+            .isBadRequest();
+  }
+
+  @Test
+  void shouldReturn400IfInvalidPartitions() {
+    TopicCreationDTO topicCreation = new TopicCreationDTO()
+            .replicationFactor(1)
+            .partitions(0)  // Invalid number of partitions
+            .name(UUID.randomUUID().toString());
+
+    webTestClient.post()
+            .uri("/api/clusters/{clusterName}/topics", LOCAL)
+            .bodyValue(topicCreation)
+            .exchange()
+            .expectStatus()
+            .isBadRequest();
+  }
 }

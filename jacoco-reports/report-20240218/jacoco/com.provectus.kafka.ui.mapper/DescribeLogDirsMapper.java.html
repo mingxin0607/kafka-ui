@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DescribeLogDirsMapper.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">kafka-ui-api</a> &gt; <a href="index.source.html" class="el_package">com.provectus.kafka.ui.mapper</a> &gt; <span class="el_source">DescribeLogDirsMapper.java</span></div><h1>DescribeLogDirsMapper.java</h1><pre class="source lang-java linenums">package com.provectus.kafka.ui.mapper;
+
+import com.provectus.kafka.ui.model.BrokerTopicLogdirsDTO;
+import com.provectus.kafka.ui.model.BrokerTopicPartitionLogdirDTO;
+import com.provectus.kafka.ui.model.BrokersLogdirsDTO;
+import java.util.Collection;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+import org.apache.kafka.common.TopicPartition;
+import org.apache.kafka.common.protocol.Errors;
+import org.apache.kafka.common.requests.DescribeLogDirsResponse;
+import org.springframework.stereotype.Component;
+
+@Component
+<span class="fc" id="L16">public class DescribeLogDirsMapper {</span>
+
+  public List&lt;BrokersLogdirsDTO&gt; toBrokerLogDirsList(
+      Map&lt;Integer, Map&lt;String, DescribeLogDirsResponse.LogDirInfo&gt;&gt; logDirsInfo) {
+
+<span class="fc" id="L21">    return logDirsInfo.entrySet().stream().map(</span>
+<span class="fc" id="L22">        mapEntry -&gt; mapEntry.getValue().entrySet().stream()</span>
+<span class="fc" id="L23">            .map(e -&gt; toBrokerLogDirs(mapEntry.getKey(), e.getKey(), e.getValue()))</span>
+<span class="fc" id="L24">            .toList()</span>
+<span class="fc" id="L25">    ).flatMap(Collection::stream).collect(Collectors.toList());</span>
+  }
+
+  private BrokersLogdirsDTO toBrokerLogDirs(Integer broker, String dirName,
+                                            DescribeLogDirsResponse.LogDirInfo logDirInfo) {
+<span class="fc" id="L30">    BrokersLogdirsDTO result = new BrokersLogdirsDTO();</span>
+<span class="fc" id="L31">    result.setName(dirName);</span>
+<span class="pc bpc" id="L32" title="2 of 4 branches missed.">    if (logDirInfo.error != null &amp;&amp; logDirInfo.error != Errors.NONE) {</span>
+<span class="nc" id="L33">      result.setError(logDirInfo.error.message());</span>
+    }
+<span class="fc" id="L35">    var topics = logDirInfo.replicaInfos.entrySet().stream()</span>
+<span class="fc" id="L36">        .collect(Collectors.groupingBy(e -&gt; e.getKey().topic())).entrySet().stream()</span>
+<span class="fc" id="L37">        .map(e -&gt; toTopicLogDirs(broker, e.getKey(), e.getValue()))</span>
+<span class="fc" id="L38">        .toList();</span>
+<span class="fc" id="L39">    result.setTopics(topics);</span>
+<span class="fc" id="L40">    return result;</span>
+  }
+
+  private BrokerTopicLogdirsDTO toTopicLogDirs(Integer broker, String name,
+                                               List&lt;Map.Entry&lt;TopicPartition,
+                                                   DescribeLogDirsResponse.ReplicaInfo&gt;&gt; partitions) {
+<span class="fc" id="L46">    BrokerTopicLogdirsDTO topic = new BrokerTopicLogdirsDTO();</span>
+<span class="fc" id="L47">    topic.setName(name);</span>
+<span class="fc" id="L48">    topic.setPartitions(</span>
+<span class="fc" id="L49">        partitions.stream().map(</span>
+<span class="fc" id="L50">            e -&gt; topicPartitionLogDir(</span>
+<span class="fc" id="L51">                broker, e.getKey().partition(), e.getValue())).toList()</span>
+    );
+<span class="fc" id="L53">    return topic;</span>
+  }
+
+  private BrokerTopicPartitionLogdirDTO topicPartitionLogDir(Integer broker, Integer partition,
+                                                             DescribeLogDirsResponse.ReplicaInfo
+                                                                 replicaInfo) {
+<span class="fc" id="L59">    BrokerTopicPartitionLogdirDTO logDir = new BrokerTopicPartitionLogdirDTO();</span>
+<span class="fc" id="L60">    logDir.setBroker(broker);</span>
+<span class="fc" id="L61">    logDir.setPartition(partition);</span>
+<span class="fc" id="L62">    logDir.setSize(replicaInfo.size);</span>
+<span class="fc" id="L63">    logDir.setOffsetLag(replicaInfo.offsetLag);</span>
+<span class="fc" id="L64">    return logDir;</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

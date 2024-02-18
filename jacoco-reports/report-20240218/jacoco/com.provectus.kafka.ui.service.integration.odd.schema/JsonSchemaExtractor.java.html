@@ -1,0 +1,312 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>JsonSchemaExtractor.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">kafka-ui-api</a> &gt; <a href="index.source.html" class="el_package">com.provectus.kafka.ui.service.integration.odd.schema</a> &gt; <span class="el_source">JsonSchemaExtractor.java</span></div><h1>JsonSchemaExtractor.java</h1><pre class="source lang-java linenums">package com.provectus.kafka.ui.service.integration.odd.schema;
+
+import com.google.common.collect.ImmutableSet;
+import com.provectus.kafka.ui.sr.model.SchemaSubject;
+import io.confluent.kafka.schemaregistry.json.JsonSchema;
+import java.net.URI;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import javax.annotation.Nullable;
+import org.everit.json.schema.ArraySchema;
+import org.everit.json.schema.BooleanSchema;
+import org.everit.json.schema.CombinedSchema;
+import org.everit.json.schema.FalseSchema;
+import org.everit.json.schema.NullSchema;
+import org.everit.json.schema.NumberSchema;
+import org.everit.json.schema.ObjectSchema;
+import org.everit.json.schema.ReferenceSchema;
+import org.everit.json.schema.Schema;
+import org.everit.json.schema.StringSchema;
+import org.everit.json.schema.TrueSchema;
+import org.opendatadiscovery.client.model.DataSetField;
+import org.opendatadiscovery.client.model.DataSetFieldType;
+import org.opendatadiscovery.client.model.MetadataExtension;
+import org.opendatadiscovery.oddrn.model.KafkaPath;
+
+final class JsonSchemaExtractor {
+
+  private JsonSchemaExtractor() {
+  }
+
+  static List&lt;DataSetField&gt; extract(JsonSchema jsonSchema, KafkaPath topicOddrn, boolean isKey) {
+<span class="fc" id="L34">    Schema schema = jsonSchema.rawSchema();</span>
+<span class="fc" id="L35">    List&lt;DataSetField&gt; result = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L36">    result.add(DataSetFieldsExtractors.rootField(topicOddrn, isKey));</span>
+<span class="fc" id="L37">    extract(</span>
+        schema,
+<span class="fc bfc" id="L39" title="All 2 branches covered.">        topicOddrn.oddrn() + &quot;/columns/&quot; + (isKey ? &quot;key&quot; : &quot;value&quot;),</span>
+        null,
+        null,
+        null,
+<span class="fc" id="L43">        ImmutableSet.of(),</span>
+        result
+    );
+<span class="fc" id="L46">    return result;</span>
+  }
+
+  private static void extract(Schema schema,
+                              String parentOddr,
+                              String oddrn, //null for root
+                              String name,
+                              Boolean nullable,
+                              ImmutableSet&lt;String&gt; registeredRecords,
+                              List&lt;DataSetField&gt; sink) {
+<span class="pc bpc" id="L56" title="1 of 2 branches missed.">    if (schema instanceof ReferenceSchema s) {</span>
+<span class="nc" id="L57">      Optional.ofNullable(s.getReferredSchema())</span>
+<span class="nc" id="L58">          .ifPresent(refSchema -&gt; extract(refSchema, parentOddr, oddrn, name, nullable, registeredRecords, sink));</span>
+<span class="fc bfc" id="L59" title="All 2 branches covered.">    } else if (schema instanceof ObjectSchema s) {</span>
+<span class="fc" id="L60">      extractObject(s, parentOddr, oddrn, name, nullable, registeredRecords, sink);</span>
+<span class="fc bfc" id="L61" title="All 2 branches covered.">    } else if (schema instanceof ArraySchema s) {</span>
+<span class="fc" id="L62">      extractArray(s, parentOddr, oddrn, name, nullable, registeredRecords, sink);</span>
+<span class="fc bfc" id="L63" title="All 2 branches covered.">    } else if (schema instanceof CombinedSchema cs) {</span>
+<span class="fc" id="L64">      extractCombined(cs, parentOddr, oddrn, name, nullable, registeredRecords, sink);</span>
+<span class="pc bpc" id="L65" title="1 of 8 branches missed.">    } else if (schema instanceof BooleanSchema</span>
+        || schema instanceof NumberSchema
+        || schema instanceof StringSchema
+        || schema instanceof NullSchema
+    ) {
+<span class="fc" id="L70">      extractPrimitive(schema, parentOddr, oddrn, name, nullable, sink);</span>
+    } else {
+<span class="nc" id="L72">      extractUnknown(schema, parentOddr, oddrn, name, nullable, sink);</span>
+    }
+<span class="fc" id="L74">  }</span>
+
+  private static void extractPrimitive(Schema schema,
+                                       String parentOddr,
+                                       String oddrn, //null for root
+                                       String name,
+                                       Boolean nullable,
+                                       List&lt;DataSetField&gt; sink) {
+<span class="pc bpc" id="L82" title="1 of 2 branches missed.">    boolean isRoot = oddrn == null;</span>
+<span class="fc" id="L83">    sink.add(</span>
+<span class="fc" id="L84">        createDataSetField(</span>
+            schema,
+<span class="pc bpc" id="L86" title="1 of 2 branches missed.">            isRoot ? &quot;Root JSON primitive&quot; : name,</span>
+            parentOddr,
+<span class="pc bpc" id="L88" title="1 of 2 branches missed.">            isRoot ? (parentOddr + &quot;/&quot; + logicalTypeName(schema)) : oddrn,</span>
+<span class="fc" id="L89">            mapType(schema),</span>
+<span class="fc" id="L90">            logicalTypeName(schema),</span>
+            nullable
+        )
+    );
+<span class="fc" id="L94">  }</span>
+
+  private static void extractUnknown(Schema schema,
+                                     String parentOddr,
+                                     String oddrn, //null for root
+                                     String name,
+                                     Boolean nullable,
+                                     List&lt;DataSetField&gt; sink) {
+<span class="nc bnc" id="L102" title="All 2 branches missed.">    boolean isRoot = oddrn == null;</span>
+<span class="nc" id="L103">    sink.add(</span>
+<span class="nc" id="L104">        createDataSetField(</span>
+            schema,
+<span class="nc bnc" id="L106" title="All 2 branches missed.">            isRoot ? &quot;Root type &quot; + logicalTypeName(schema) : name,</span>
+            parentOddr,
+<span class="nc bnc" id="L108" title="All 2 branches missed.">            isRoot ? (parentOddr + &quot;/&quot; + logicalTypeName(schema)) : oddrn,</span>
+            DataSetFieldType.TypeEnum.UNKNOWN,
+<span class="nc" id="L110">            logicalTypeName(schema),</span>
+            nullable
+        )
+    );
+<span class="nc" id="L114">  }</span>
+
+  private static void extractObject(ObjectSchema schema,
+                                    String parentOddr,
+                                    String oddrn, //null for root
+                                    String name,
+                                    Boolean nullable,
+                                    ImmutableSet&lt;String&gt; registeredRecords,
+                                    List&lt;DataSetField&gt; sink) {
+<span class="fc bfc" id="L123" title="All 2 branches covered.">    boolean isRoot = oddrn == null;</span>
+    // schemaLocation can be null for empty object schemas (like if it used in anyOf)
+<span class="fc" id="L125">    @Nullable var schemaLocation = schema.getSchemaLocation();</span>
+<span class="fc bfc" id="L126" title="All 2 branches covered.">    if (!isRoot) {</span>
+<span class="fc" id="L127">      sink.add(createDataSetField(</span>
+          schema,
+          name,
+          parentOddr,
+          oddrn,
+          DataSetFieldType.TypeEnum.STRUCT,
+<span class="fc" id="L133">          logicalTypeName(schema),</span>
+          nullable
+      ));
+<span class="pc bpc" id="L136" title="1 of 4 branches missed.">      if (schemaLocation != null &amp;&amp; registeredRecords.contains(schemaLocation)) {</span>
+        // avoiding recursion by checking if record already registered in parsing chain
+<span class="nc" id="L138">        return;</span>
+      }
+    }
+
+<span class="fc bfc" id="L142" title="All 2 branches covered.">    var newRegisteredRecords = schemaLocation == null</span>
+<span class="fc" id="L143">        ? registeredRecords</span>
+<span class="fc" id="L144">        : ImmutableSet.&lt;String&gt;builder()</span>
+<span class="fc" id="L145">        .addAll(registeredRecords)</span>
+<span class="fc" id="L146">        .add(schemaLocation)</span>
+<span class="fc" id="L147">        .build();</span>
+
+<span class="fc" id="L149">    schema.getPropertySchemas().forEach((propertyName, propertySchema) -&gt; {</span>
+<span class="fc" id="L150">      boolean required = schema.getRequiredProperties().contains(propertyName);</span>
+<span class="fc" id="L151">      extract(</span>
+          propertySchema,
+<span class="fc bfc" id="L153" title="All 2 branches covered.">          isRoot ? parentOddr : oddrn,</span>
+<span class="fc bfc" id="L154" title="All 2 branches covered.">          isRoot</span>
+<span class="fc" id="L155">              ? parentOddr + &quot;/&quot; + propertyName</span>
+<span class="fc bfc" id="L156" title="All 2 branches covered.">              : oddrn + &quot;/fields/&quot; + propertyName,</span>
+          propertyName,
+<span class="fc" id="L158">          !required,</span>
+          newRegisteredRecords,
+          sink
+      );
+<span class="fc" id="L162">    });</span>
+<span class="fc" id="L163">  }</span>
+
+  private static void extractArray(ArraySchema schema,
+                                   String parentOddr,
+                                   String oddrn, //null for root
+                                   String name,
+                                   Boolean nullable,
+                                   ImmutableSet&lt;String&gt; registeredRecords,
+                                   List&lt;DataSetField&gt; sink) {
+<span class="pc bpc" id="L172" title="1 of 2 branches missed.">    boolean isRoot = oddrn == null;</span>
+<span class="pc bpc" id="L173" title="1 of 2 branches missed.">    oddrn = isRoot ? parentOddr + &quot;/array&quot; : oddrn;</span>
+<span class="pc bpc" id="L174" title="1 of 2 branches missed.">    if (isRoot) {</span>
+<span class="nc" id="L175">      sink.add(</span>
+<span class="nc" id="L176">          createDataSetField(</span>
+              schema,
+              &quot;Json array root&quot;,
+              parentOddr,
+              oddrn,
+              DataSetFieldType.TypeEnum.LIST,
+              &quot;array&quot;,
+              nullable
+          ));
+    } else {
+<span class="fc" id="L186">      sink.add(</span>
+<span class="fc" id="L187">          createDataSetField(</span>
+              schema,
+              name,
+              parentOddr,
+              oddrn,
+              DataSetFieldType.TypeEnum.LIST,
+              &quot;array&quot;,
+              nullable
+          ));
+    }
+<span class="fc" id="L197">    @Nullable var itemsSchema = schema.getAllItemSchema();</span>
+<span class="pc bpc" id="L198" title="1 of 2 branches missed.">    if (itemsSchema != null) {</span>
+<span class="fc" id="L199">      extract(</span>
+          itemsSchema,
+          oddrn,
+<span class="fc" id="L202">          oddrn + &quot;/items/&quot; + logicalTypeName(itemsSchema),</span>
+<span class="fc" id="L203">          logicalTypeName(itemsSchema),</span>
+<span class="fc" id="L204">          false,</span>
+          registeredRecords,
+          sink
+      );
+    }
+<span class="fc" id="L209">  }</span>
+
+  private static void extractCombined(CombinedSchema schema,
+                                      String parentOddr,
+                                      String oddrn, //null for root
+                                      String name,
+                                      Boolean nullable,
+                                      ImmutableSet&lt;String&gt; registeredRecords,
+                                      List&lt;DataSetField&gt; sink) {
+<span class="fc" id="L218">    String combineType = &quot;unknown&quot;;</span>
+<span class="pc bpc" id="L219" title="1 of 2 branches missed.">    if (schema.getCriterion() == CombinedSchema.ALL_CRITERION) {</span>
+<span class="nc" id="L220">      combineType = &quot;allOf&quot;;</span>
+    }
+<span class="pc bpc" id="L222" title="1 of 2 branches missed.">    if (schema.getCriterion() == CombinedSchema.ANY_CRITERION) {</span>
+<span class="fc" id="L223">      combineType = &quot;anyOf&quot;;</span>
+    }
+<span class="pc bpc" id="L225" title="1 of 2 branches missed.">    if (schema.getCriterion() == CombinedSchema.ONE_CRITERION) {</span>
+<span class="nc" id="L226">      combineType = &quot;oneOf&quot;;</span>
+    }
+
+<span class="pc bpc" id="L229" title="1 of 2 branches missed.">    boolean isRoot = oddrn == null;</span>
+<span class="pc bpc" id="L230" title="1 of 2 branches missed.">    oddrn = isRoot ? (parentOddr + &quot;/&quot; + combineType) : (oddrn + &quot;/&quot; + combineType);</span>
+<span class="fc" id="L231">    sink.add(</span>
+<span class="fc" id="L232">        createDataSetField(</span>
+            schema,
+<span class="pc bpc" id="L234" title="1 of 2 branches missed.">            isRoot ? &quot;Root %s&quot;.formatted(combineType) : name,</span>
+            parentOddr,
+            oddrn,
+            DataSetFieldType.TypeEnum.UNION,
+            combineType,
+            nullable
+<span class="fc" id="L240">        ).addMetadataItem(new MetadataExtension()</span>
+<span class="fc" id="L241">            .schemaUrl(URI.create(&quot;wontbeused.oops&quot;))</span>
+<span class="fc" id="L242">            .metadata(Map.of(&quot;criterion&quot;, combineType)))</span>
+    );
+
+<span class="fc bfc" id="L245" title="All 2 branches covered.">    for (Schema subschema : schema.getSubschemas()) {</span>
+<span class="fc" id="L246">      extract(</span>
+          subschema,
+          oddrn,
+<span class="fc" id="L249">          oddrn + &quot;/values/&quot; + logicalTypeName(subschema),</span>
+<span class="fc" id="L250">          logicalTypeName(subschema),</span>
+          nullable,
+          registeredRecords,
+          sink
+      );
+<span class="fc" id="L255">    }</span>
+<span class="fc" id="L256">  }</span>
+
+  private static String getDescription(Schema schema) {
+<span class="fc" id="L259">    return Optional.ofNullable(schema.getTitle())</span>
+<span class="fc" id="L260">        .orElse(schema.getDescription());</span>
+  }
+
+  private static String logicalTypeName(Schema schema) {
+<span class="fc" id="L264">    return schema.getClass()</span>
+<span class="fc" id="L265">        .getSimpleName()</span>
+<span class="fc" id="L266">        .replace(&quot;Schema&quot;, &quot;&quot;);</span>
+  }
+
+  private static DataSetField createDataSetField(Schema schema,
+                                                 String name,
+                                                 String parentOddrn,
+                                                 String oddrn,
+                                                 DataSetFieldType.TypeEnum type,
+                                                 String logicalType,
+                                                 Boolean nullable) {
+<span class="fc" id="L276">    return new DataSetField()</span>
+<span class="fc" id="L277">        .name(name)</span>
+<span class="fc" id="L278">        .parentFieldOddrn(parentOddrn)</span>
+<span class="fc" id="L279">        .oddrn(oddrn)</span>
+<span class="fc" id="L280">        .description(getDescription(schema))</span>
+<span class="fc" id="L281">        .type(</span>
+            new DataSetFieldType()
+<span class="fc" id="L283">                .isNullable(nullable)</span>
+<span class="fc" id="L284">                .logicalType(logicalType)</span>
+<span class="fc" id="L285">                .type(type)</span>
+        );
+  }
+
+  private static DataSetFieldType.TypeEnum mapType(Schema type) {
+<span class="fc bfc" id="L290" title="All 2 branches covered.">    if (type instanceof NumberSchema) {</span>
+<span class="fc" id="L291">      return DataSetFieldType.TypeEnum.NUMBER;</span>
+    }
+<span class="fc bfc" id="L293" title="All 2 branches covered.">    if (type instanceof StringSchema) {</span>
+<span class="fc" id="L294">      return DataSetFieldType.TypeEnum.STRING;</span>
+    }
+<span class="pc bpc" id="L296" title="2 of 6 branches missed.">    if (type instanceof BooleanSchema || type instanceof TrueSchema || type instanceof FalseSchema) {</span>
+<span class="fc" id="L297">      return DataSetFieldType.TypeEnum.BOOLEAN;</span>
+    }
+<span class="pc bpc" id="L299" title="1 of 2 branches missed.">    if (type instanceof ObjectSchema) {</span>
+<span class="nc" id="L300">      return DataSetFieldType.TypeEnum.STRUCT;</span>
+    }
+<span class="pc bpc" id="L302" title="1 of 2 branches missed.">    if (type instanceof ReferenceSchema s) {</span>
+<span class="nc" id="L303">      return mapType(s.getReferredSchema());</span>
+    }
+<span class="pc bpc" id="L305" title="1 of 2 branches missed.">    if (type instanceof CombinedSchema) {</span>
+<span class="nc" id="L306">      return DataSetFieldType.TypeEnum.UNION;</span>
+    }
+<span class="fc" id="L308">    return DataSetFieldType.TypeEnum.UNKNOWN;</span>
+  }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>OauthAuthorityExtractor.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">kafka-ui-api</a> &gt; <a href="index.source.html" class="el_package">com.provectus.kafka.ui.service.rbac.extractor</a> &gt; <span class="el_source">OauthAuthorityExtractor.java</span></div><h1>OauthAuthorityExtractor.java</h1><pre class="source lang-java linenums">package com.provectus.kafka.ui.service.rbac.extractor;
+
+import static com.provectus.kafka.ui.model.rbac.provider.Provider.Name.OAUTH;
+
+import com.google.common.collect.Sets;
+import com.provectus.kafka.ui.config.auth.OAuthProperties;
+import com.provectus.kafka.ui.model.rbac.Role;
+import com.provectus.kafka.ui.model.rbac.provider.Provider;
+import com.provectus.kafka.ui.service.rbac.AccessControlService;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.oauth2.core.user.DefaultOAuth2User;
+import org.springframework.util.Assert;
+import reactor.core.publisher.Mono;
+
+<span class="nc" id="L22">@Slf4j</span>
+<span class="nc" id="L23">public class OauthAuthorityExtractor implements ProviderAuthorityExtractor {</span>
+
+  public static final String ROLES_FIELD_PARAM_NAME = &quot;roles-field&quot;;
+
+  @Override
+  public boolean isApplicable(String provider, Map&lt;String, String&gt; customParams) {
+<span class="nc" id="L29">    var containsRolesFieldNameParam = customParams.containsKey(ROLES_FIELD_PARAM_NAME);</span>
+<span class="nc bnc" id="L30" title="All 2 branches missed.">    if (!containsRolesFieldNameParam) {</span>
+<span class="nc" id="L31">      log.debug(&quot;Provider [{}] doesn't contain a roles field param name, mapping won't be performed&quot;, provider);</span>
+<span class="nc" id="L32">      return false;</span>
+    }
+
+<span class="nc bnc" id="L35" title="All 4 branches missed.">    return OAUTH.equalsIgnoreCase(provider) || OAUTH.equalsIgnoreCase(customParams.get(TYPE));</span>
+  }
+
+  @Override
+  public Mono&lt;Set&lt;String&gt;&gt; extract(AccessControlService acs, Object value, Map&lt;String, Object&gt; additionalParams) {
+<span class="nc" id="L40">    log.trace(&quot;Extracting OAuth2 user authorities&quot;);</span>
+
+    DefaultOAuth2User principal;
+    try {
+<span class="nc" id="L44">      principal = (DefaultOAuth2User) value;</span>
+<span class="nc" id="L45">    } catch (ClassCastException e) {</span>
+<span class="nc" id="L46">      log.error(&quot;Can't cast value to DefaultOAuth2User&quot;, e);</span>
+<span class="nc" id="L47">      throw new RuntimeException();</span>
+<span class="nc" id="L48">    }</span>
+
+<span class="nc" id="L50">    var provider = (OAuthProperties.OAuth2Provider) additionalParams.get(&quot;provider&quot;);</span>
+<span class="nc" id="L51">    Assert.notNull(provider, &quot;provider is null&quot;);</span>
+<span class="nc" id="L52">    var rolesFieldName = provider.getCustomParams().get(ROLES_FIELD_PARAM_NAME);</span>
+
+<span class="nc" id="L54">    Set&lt;String&gt; rolesByUsername = acs.getRoles()</span>
+<span class="nc" id="L55">        .stream()</span>
+<span class="nc" id="L56">        .filter(r -&gt; r.getSubjects()</span>
+<span class="nc" id="L57">            .stream()</span>
+<span class="nc" id="L58">            .filter(s -&gt; s.getProvider().equals(Provider.OAUTH))</span>
+<span class="nc" id="L59">            .filter(s -&gt; s.getType().equals(&quot;user&quot;))</span>
+<span class="nc" id="L60">            .anyMatch(s -&gt; s.getValue().equals(principal.getName())))</span>
+<span class="nc" id="L61">        .map(Role::getName)</span>
+<span class="nc" id="L62">        .collect(Collectors.toSet());</span>
+
+<span class="nc" id="L64">    Set&lt;String&gt; rolesByRolesField = acs.getRoles()</span>
+<span class="nc" id="L65">        .stream()</span>
+<span class="nc" id="L66">        .filter(role -&gt; role.getSubjects()</span>
+<span class="nc" id="L67">            .stream()</span>
+<span class="nc" id="L68">            .filter(s -&gt; s.getProvider().equals(Provider.OAUTH))</span>
+<span class="nc" id="L69">            .filter(s -&gt; s.getType().equals(&quot;role&quot;))</span>
+<span class="nc" id="L70">            .anyMatch(subject -&gt; {</span>
+<span class="nc" id="L71">              var roleName = subject.getValue();</span>
+<span class="nc" id="L72">              var principalRoles = convertRoles(principal.getAttribute(rolesFieldName));</span>
+<span class="nc" id="L73">              var roleMatched = principalRoles.contains(roleName);</span>
+
+<span class="nc bnc" id="L75" title="All 2 branches missed.">              if (roleMatched) {</span>
+<span class="nc" id="L76">                log.debug(&quot;Assigning role [{}] to user [{}]&quot;, roleName, principal.getName());</span>
+              } else {
+<span class="nc" id="L78">                log.trace(&quot;Role [{}] not found in user [{}] roles&quot;, roleName, principal.getName());</span>
+              }
+
+<span class="nc" id="L81">              return roleMatched;</span>
+            })
+        )
+<span class="nc" id="L84">        .map(Role::getName)</span>
+<span class="nc" id="L85">        .collect(Collectors.toSet());</span>
+
+<span class="nc" id="L87">    return Mono.just(Sets.union(rolesByUsername, rolesByRolesField));</span>
+  }
+
+  @SuppressWarnings(&quot;unchecked&quot;)
+  private Collection&lt;String&gt; convertRoles(Object roles) {
+<span class="nc bnc" id="L92" title="All 2 branches missed.">    if (roles == null) {</span>
+<span class="nc" id="L93">      log.debug(&quot;Param missing from attributes, skipping&quot;);</span>
+<span class="nc" id="L94">      return Collections.emptySet();</span>
+    }
+
+<span class="nc bnc" id="L97" title="All 4 branches missed.">    if ((roles instanceof List&lt;?&gt;) || (roles instanceof Set&lt;?&gt;)) {</span>
+<span class="nc" id="L98">      log.trace(&quot;The field is either a set or a list, returning as is&quot;);</span>
+<span class="nc" id="L99">      return (Collection&lt;String&gt;) roles;</span>
+    }
+
+<span class="nc bnc" id="L102" title="All 2 branches missed.">    if (!(roles instanceof String)) {</span>
+<span class="nc" id="L103">      log.debug(&quot;The field is not a string, skipping&quot;);</span>
+<span class="nc" id="L104">      return Collections.emptySet();</span>
+    }
+
+<span class="nc" id="L107">    log.trace(&quot;Trying to deserialize the field value [{}] as a string&quot;, roles);</span>
+
+<span class="nc" id="L109">    return Arrays.stream(((String) roles).split(&quot;,&quot;))</span>
+<span class="nc" id="L110">        .collect(Collectors.toSet());</span>
+  }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

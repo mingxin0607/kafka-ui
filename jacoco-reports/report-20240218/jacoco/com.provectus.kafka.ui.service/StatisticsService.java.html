@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>StatisticsService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">kafka-ui-api</a> &gt; <a href="index.source.html" class="el_package">com.provectus.kafka.ui.service</a> &gt; <span class="el_source">StatisticsService.java</span></div><h1>StatisticsService.java</h1><pre class="source lang-java linenums">package com.provectus.kafka.ui.service;
+
+import static com.provectus.kafka.ui.service.ReactiveAdminClient.ClusterDescription;
+
+import com.provectus.kafka.ui.model.ClusterFeature;
+import com.provectus.kafka.ui.model.InternalLogDirStats;
+import com.provectus.kafka.ui.model.KafkaCluster;
+import com.provectus.kafka.ui.model.Metrics;
+import com.provectus.kafka.ui.model.ServerStatusDTO;
+import com.provectus.kafka.ui.model.Statistics;
+import com.provectus.kafka.ui.service.metrics.MetricsCollector;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.apache.kafka.clients.admin.ConfigEntry;
+import org.apache.kafka.clients.admin.TopicDescription;
+import org.apache.kafka.common.Node;
+import org.springframework.stereotype.Service;
+import reactor.core.publisher.Mono;
+
+@Service
+<span class="fc" id="L24">@RequiredArgsConstructor</span>
+<span class="fc" id="L25">@Slf4j</span>
+public class StatisticsService {
+
+  private final MetricsCollector metricsCollector;
+  private final AdminClientService adminClientService;
+  private final FeatureService featureService;
+  private final StatisticsCache cache;
+
+  public Mono&lt;Statistics&gt; updateCache(KafkaCluster c) {
+<span class="fc" id="L34">    return getStatistics(c).doOnSuccess(m -&gt; cache.replace(c, m));</span>
+  }
+
+  private Mono&lt;Statistics&gt; getStatistics(KafkaCluster cluster) {
+<span class="fc" id="L38">    return adminClientService.get(cluster).flatMap(ac -&gt;</span>
+<span class="fc" id="L39">            ac.describeCluster().flatMap(description -&gt;</span>
+<span class="fc" id="L40">                ac.updateInternalStats(description.getController()).then(</span>
+<span class="fc" id="L41">                    Mono.zip(</span>
+<span class="fc" id="L42">                        List.of(</span>
+<span class="fc" id="L43">                            metricsCollector.getBrokerMetrics(cluster, description.getNodes()),</span>
+<span class="fc" id="L44">                            getLogDirInfo(description, ac),</span>
+<span class="fc" id="L45">                            featureService.getAvailableFeatures(ac, cluster, description),</span>
+<span class="fc" id="L46">                            loadTopicConfigs(cluster),</span>
+<span class="fc" id="L47">                            describeTopics(cluster)),</span>
+                        results -&gt;
+<span class="fc" id="L49">                            Statistics.builder()</span>
+<span class="fc" id="L50">                                .status(ServerStatusDTO.ONLINE)</span>
+<span class="fc" id="L51">                                .clusterDescription(description)</span>
+<span class="fc" id="L52">                                .version(ac.getVersion())</span>
+<span class="fc" id="L53">                                .metrics((Metrics) results[0])</span>
+<span class="fc" id="L54">                                .logDirInfo((InternalLogDirStats) results[1])</span>
+<span class="fc" id="L55">                                .features((List&lt;ClusterFeature&gt;) results[2])</span>
+<span class="fc" id="L56">                                .topicConfigs((Map&lt;String, List&lt;ConfigEntry&gt;&gt;) results[3])</span>
+<span class="fc" id="L57">                                .topicDescriptions((Map&lt;String, TopicDescription&gt;) results[4])</span>
+<span class="fc" id="L58">                                .build()</span>
+                    ))))
+<span class="fc" id="L60">        .doOnError(e -&gt;</span>
+<span class="nc" id="L61">            log.error(&quot;Failed to collect cluster {} info&quot;, cluster.getName(), e))</span>
+<span class="fc" id="L62">        .onErrorResume(</span>
+<span class="nc" id="L63">            e -&gt; Mono.just(Statistics.empty().toBuilder().lastKafkaException(e).build()));</span>
+  }
+
+  private Mono&lt;InternalLogDirStats&gt; getLogDirInfo(ClusterDescription desc, ReactiveAdminClient ac) {
+<span class="fc" id="L67">    var brokerIds = desc.getNodes().stream().map(Node::id).collect(Collectors.toSet());</span>
+<span class="fc" id="L68">    return ac.describeLogDirs(brokerIds).map(InternalLogDirStats::new);</span>
+  }
+
+  private Mono&lt;Map&lt;String, TopicDescription&gt;&gt; describeTopics(KafkaCluster c) {
+<span class="fc" id="L72">    return adminClientService.get(c).flatMap(ReactiveAdminClient::describeTopics);</span>
+  }
+
+  private Mono&lt;Map&lt;String, List&lt;ConfigEntry&gt;&gt;&gt; loadTopicConfigs(KafkaCluster c) {
+<span class="fc" id="L76">    return adminClientService.get(c).flatMap(ReactiveAdminClient::getTopicsConfig);</span>
+  }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

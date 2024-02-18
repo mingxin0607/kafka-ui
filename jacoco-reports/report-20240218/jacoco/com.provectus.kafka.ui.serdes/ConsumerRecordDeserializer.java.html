@@ -1,0 +1,139 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ConsumerRecordDeserializer.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">kafka-ui-api</a> &gt; <a href="index.source.html" class="el_package">com.provectus.kafka.ui.serdes</a> &gt; <span class="el_source">ConsumerRecordDeserializer.java</span></div><h1>ConsumerRecordDeserializer.java</h1><pre class="source lang-java linenums">package com.provectus.kafka.ui.serdes;
+
+import com.provectus.kafka.ui.model.TopicMessageDTO;
+import com.provectus.kafka.ui.model.TopicMessageDTO.TimestampTypeEnum;
+import com.provectus.kafka.ui.serde.api.Serde;
+import java.time.Instant;
+import java.time.OffsetDateTime;
+import java.time.ZoneId;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.function.UnaryOperator;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.apache.kafka.clients.consumer.ConsumerRecord;
+import org.apache.kafka.common.header.Header;
+import org.apache.kafka.common.header.Headers;
+import org.apache.kafka.common.record.TimestampType;
+import org.apache.kafka.common.utils.Bytes;
+
+<span class="fc" id="L21">@Slf4j</span>
+<span class="fc" id="L22">@RequiredArgsConstructor</span>
+public class ConsumerRecordDeserializer {
+
+<span class="fc" id="L25">  private static final ZoneId UTC_ZONE_ID = ZoneId.of(&quot;UTC&quot;);</span>
+
+  private final String keySerdeName;
+  private final Serde.Deserializer keyDeserializer;
+
+  private final String valueSerdeName;
+  private final Serde.Deserializer valueDeserializer;
+
+  private final String fallbackSerdeName;
+  private final Serde.Deserializer fallbackKeyDeserializer;
+  private final Serde.Deserializer fallbackValueDeserializer;
+
+  private final UnaryOperator&lt;TopicMessageDTO&gt; masker;
+
+  public TopicMessageDTO deserialize(ConsumerRecord&lt;Bytes, Bytes&gt; rec) {
+<span class="fc" id="L40">    var message = new TopicMessageDTO();</span>
+<span class="fc" id="L41">    fillKey(message, rec);</span>
+<span class="fc" id="L42">    fillValue(message, rec);</span>
+<span class="fc" id="L43">    fillHeaders(message, rec);</span>
+
+<span class="fc" id="L45">    message.setPartition(rec.partition());</span>
+<span class="fc" id="L46">    message.setOffset(rec.offset());</span>
+<span class="fc" id="L47">    message.setTimestampType(mapToTimestampType(rec.timestampType()));</span>
+<span class="fc" id="L48">    message.setTimestamp(OffsetDateTime.ofInstant(Instant.ofEpochMilli(rec.timestamp()), UTC_ZONE_ID));</span>
+
+<span class="fc" id="L50">    message.setKeySize(getKeySize(rec));</span>
+<span class="fc" id="L51">    message.setValueSize(getValueSize(rec));</span>
+<span class="fc" id="L52">    message.setHeadersSize(getHeadersSize(rec));</span>
+
+<span class="fc" id="L54">    return masker.apply(message);</span>
+  }
+
+  private static TimestampTypeEnum mapToTimestampType(TimestampType timestampType) {
+<span class="pc bpc" id="L58" title="2 of 4 branches missed.">    return switch (timestampType) {</span>
+<span class="fc" id="L59">      case CREATE_TIME -&gt; TimestampTypeEnum.CREATE_TIME;</span>
+<span class="nc" id="L60">      case LOG_APPEND_TIME -&gt; TimestampTypeEnum.LOG_APPEND_TIME;</span>
+<span class="fc" id="L61">      case NO_TIMESTAMP_TYPE -&gt; TimestampTypeEnum.NO_TIMESTAMP_TYPE;</span>
+    };
+  }
+
+  private void fillHeaders(TopicMessageDTO message, ConsumerRecord&lt;Bytes, Bytes&gt; rec) {
+<span class="fc" id="L66">    Map&lt;String, String&gt; headers = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L67">    rec.headers().iterator()</span>
+<span class="fc" id="L68">        .forEachRemaining(header -&gt;</span>
+<span class="fc" id="L69">            headers.put(</span>
+<span class="fc" id="L70">                header.key(),</span>
+<span class="fc bfc" id="L71" title="All 2 branches covered.">                header.value() != null ? new String(header.value()) : null</span>
+            ));
+<span class="fc" id="L73">    message.setHeaders(headers);</span>
+<span class="fc" id="L74">  }</span>
+
+  private void fillKey(TopicMessageDTO message, ConsumerRecord&lt;Bytes, Bytes&gt; rec) {
+<span class="fc bfc" id="L77" title="All 2 branches covered.">    if (rec.key() == null) {</span>
+<span class="fc" id="L78">      return;</span>
+    }
+    try {
+<span class="fc" id="L81">      var deserResult = keyDeserializer.deserialize(new RecordHeadersImpl(), rec.key().get());</span>
+<span class="fc" id="L82">      message.setKey(deserResult.getResult());</span>
+<span class="fc" id="L83">      message.setKeySerde(keySerdeName);</span>
+<span class="fc" id="L84">      message.setKeyDeserializeProperties(deserResult.getAdditionalProperties());</span>
+<span class="nc" id="L85">    } catch (Exception e) {</span>
+<span class="nc" id="L86">      log.trace(&quot;Error deserializing key for key topic: {}, partition {}, offset {}, with serde {}&quot;,</span>
+<span class="nc" id="L87">          rec.topic(), rec.partition(), rec.offset(), keySerdeName, e);</span>
+<span class="nc" id="L88">      var deserResult = fallbackKeyDeserializer.deserialize(new RecordHeadersImpl(), rec.key().get());</span>
+<span class="nc" id="L89">      message.setKey(deserResult.getResult());</span>
+<span class="nc" id="L90">      message.setKeySerde(fallbackSerdeName);</span>
+<span class="fc" id="L91">    }</span>
+<span class="fc" id="L92">  }</span>
+
+  private void fillValue(TopicMessageDTO message, ConsumerRecord&lt;Bytes, Bytes&gt; rec) {
+<span class="fc bfc" id="L95" title="All 2 branches covered.">    if (rec.value() == null) {</span>
+<span class="fc" id="L96">      return;</span>
+    }
+    try {
+<span class="fc" id="L99">      var deserResult = valueDeserializer.deserialize(</span>
+<span class="fc" id="L100">          new RecordHeadersImpl(rec.headers()), rec.value().get());</span>
+<span class="fc" id="L101">      message.setContent(deserResult.getResult());</span>
+<span class="fc" id="L102">      message.setValueSerde(valueSerdeName);</span>
+<span class="fc" id="L103">      message.setValueDeserializeProperties(deserResult.getAdditionalProperties());</span>
+<span class="fc" id="L104">    } catch (Exception e) {</span>
+<span class="fc" id="L105">      log.trace(&quot;Error deserializing key for value topic: {}, partition {}, offset {}, with serde {}&quot;,</span>
+<span class="fc" id="L106">          rec.topic(), rec.partition(), rec.offset(), valueSerdeName, e);</span>
+<span class="fc" id="L107">      var deserResult = fallbackValueDeserializer.deserialize(</span>
+<span class="fc" id="L108">          new RecordHeadersImpl(rec.headers()), rec.value().get());</span>
+<span class="fc" id="L109">      message.setContent(deserResult.getResult());</span>
+<span class="fc" id="L110">      message.setValueSerde(fallbackSerdeName);</span>
+<span class="fc" id="L111">    }</span>
+<span class="fc" id="L112">  }</span>
+
+  private static Long getHeadersSize(ConsumerRecord&lt;Bytes, Bytes&gt; consumerRecord) {
+<span class="fc" id="L115">    Headers headers = consumerRecord.headers();</span>
+<span class="pc bpc" id="L116" title="1 of 2 branches missed.">    if (headers != null) {</span>
+<span class="fc" id="L117">      return Arrays.stream(headers.toArray())</span>
+<span class="fc" id="L118">          .mapToLong(ConsumerRecordDeserializer::headerSize)</span>
+<span class="fc" id="L119">          .sum();</span>
+    }
+<span class="nc" id="L121">    return 0L;</span>
+  }
+
+  private static Long getKeySize(ConsumerRecord&lt;Bytes, Bytes&gt; consumerRecord) {
+<span class="fc bfc" id="L125" title="All 2 branches covered.">    return consumerRecord.key() != null ? (long) consumerRecord.serializedKeySize() : null;</span>
+  }
+
+  private static Long getValueSize(ConsumerRecord&lt;Bytes, Bytes&gt; consumerRecord) {
+<span class="fc bfc" id="L129" title="All 2 branches covered.">    return consumerRecord.value() != null ? (long) consumerRecord.serializedValueSize() : null;</span>
+  }
+
+  private static int headerSize(Header header) {
+<span class="pc bpc" id="L133" title="1 of 2 branches missed.">    int key = header.key() != null ? header.key().getBytes().length : 0;</span>
+<span class="fc bfc" id="L134" title="All 2 branches covered.">    int val = header.value() != null ? header.value().length : 0;</span>
+<span class="fc" id="L135">    return key + val;</span>
+  }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

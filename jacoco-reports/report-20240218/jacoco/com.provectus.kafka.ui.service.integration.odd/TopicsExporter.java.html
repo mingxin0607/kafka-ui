@@ -1,0 +1,123 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TopicsExporter.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">kafka-ui-api</a> &gt; <a href="index.source.html" class="el_package">com.provectus.kafka.ui.service.integration.odd</a> &gt; <span class="el_source">TopicsExporter.java</span></div><h1>TopicsExporter.java</h1><pre class="source lang-java linenums">package com.provectus.kafka.ui.service.integration.odd;
+
+import com.google.common.collect.ImmutableMap;
+import com.provectus.kafka.ui.model.KafkaCluster;
+import com.provectus.kafka.ui.model.Statistics;
+import com.provectus.kafka.ui.service.StatisticsCache;
+import com.provectus.kafka.ui.service.integration.odd.schema.DataSetFieldsExtractors;
+import com.provectus.kafka.ui.sr.model.SchemaSubject;
+import java.net.URI;
+import java.util.List;
+import java.util.Map;
+import java.util.function.Predicate;
+import java.util.stream.Collectors;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.apache.kafka.clients.admin.ConfigEntry;
+import org.apache.kafka.clients.admin.TopicDescription;
+import org.opendatadiscovery.client.model.DataEntity;
+import org.opendatadiscovery.client.model.DataEntityList;
+import org.opendatadiscovery.client.model.DataEntityType;
+import org.opendatadiscovery.client.model.DataSet;
+import org.opendatadiscovery.client.model.DataSetField;
+import org.opendatadiscovery.client.model.MetadataExtension;
+import org.opendatadiscovery.oddrn.model.KafkaPath;
+import org.springframework.web.reactive.function.client.WebClientResponseException;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
+import reactor.util.function.Tuple2;
+import reactor.util.function.Tuples;
+
+<span class="fc" id="L31">@Slf4j</span>
+<span class="fc" id="L32">@RequiredArgsConstructor</span>
+class TopicsExporter {
+
+  private final Predicate&lt;String&gt; topicFilter;
+  private final StatisticsCache statisticsCache;
+
+  Flux&lt;DataEntityList&gt; export(KafkaCluster cluster) {
+<span class="fc" id="L39">    String clusterOddrn = Oddrn.clusterOddrn(cluster);</span>
+<span class="fc" id="L40">    Statistics stats = statisticsCache.get(cluster);</span>
+<span class="fc" id="L41">    return Flux.fromIterable(stats.getTopicDescriptions().keySet())</span>
+<span class="fc" id="L42">        .filter(topicFilter)</span>
+<span class="fc" id="L43">        .flatMap(topic -&gt; createTopicDataEntity(cluster, topic, stats))</span>
+<span class="fc" id="L44">        .onErrorContinue(</span>
+<span class="nc" id="L45">            (th, topic) -&gt; log.warn(&quot;Error exporting data for topic {}, cluster {}&quot;, topic, cluster.getName(), th))</span>
+<span class="fc" id="L46">        .buffer(100)</span>
+<span class="fc" id="L47">        .map(topicsEntities -&gt;</span>
+<span class="fc" id="L48">            new DataEntityList()</span>
+<span class="fc" id="L49">                .dataSourceOddrn(clusterOddrn)</span>
+<span class="fc" id="L50">                .items(topicsEntities));</span>
+  }
+
+  private Mono&lt;DataEntity&gt; createTopicDataEntity(KafkaCluster cluster, String topic, Statistics stats) {
+<span class="fc" id="L54">    KafkaPath topicOddrnPath = Oddrn.topicOddrnPath(cluster, topic);</span>
+<span class="fc" id="L55">    return</span>
+<span class="fc" id="L56">        Mono.zip(</span>
+<span class="fc" id="L57">                getTopicSchema(cluster, topic, topicOddrnPath, true),</span>
+<span class="fc" id="L58">                getTopicSchema(cluster, topic, topicOddrnPath, false)</span>
+            )
+<span class="fc" id="L60">            .map(keyValueFields -&gt; {</span>
+<span class="fc" id="L61">                  var dataset = new DataSet();</span>
+<span class="fc" id="L62">                  keyValueFields.getT1().forEach(dataset::addFieldListItem);</span>
+<span class="fc" id="L63">                  keyValueFields.getT2().forEach(dataset::addFieldListItem);</span>
+<span class="fc" id="L64">                  return new DataEntity()</span>
+<span class="fc" id="L65">                      .name(topic)</span>
+<span class="fc" id="L66">                      .description(&quot;Kafka topic \&quot;%s\&quot;&quot;.formatted(topic))</span>
+<span class="fc" id="L67">                      .oddrn(Oddrn.topicOddrn(cluster, topic))</span>
+<span class="fc" id="L68">                      .type(DataEntityType.KAFKA_TOPIC)</span>
+<span class="fc" id="L69">                      .dataset(dataset)</span>
+<span class="fc" id="L70">                      .addMetadataItem(</span>
+                          new MetadataExtension()
+<span class="fc" id="L72">                              .schemaUrl(URI.create(&quot;wontbeused.oops&quot;))</span>
+<span class="fc" id="L73">                              .metadata(getTopicMetadata(topic, stats)));</span>
+                }
+            );
+  }
+
+  private Map&lt;String, Object&gt; getNonDefaultConfigs(String topic, Statistics stats) {
+<span class="fc" id="L79">    List&lt;ConfigEntry&gt; config = stats.getTopicConfigs().get(topic);</span>
+<span class="fc bfc" id="L80" title="All 2 branches covered.">    if (config == null) {</span>
+<span class="fc" id="L81">      return Map.of();</span>
+    }
+<span class="fc" id="L83">    return config.stream()</span>
+<span class="pc bpc" id="L84" title="1 of 2 branches missed.">        .filter(c -&gt; c.source() == ConfigEntry.ConfigSource.DYNAMIC_TOPIC_CONFIG)</span>
+<span class="fc" id="L85">        .collect(Collectors.toMap(ConfigEntry::name, ConfigEntry::value));</span>
+  }
+
+  private Map&lt;String, Object&gt; getTopicMetadata(String topic, Statistics stats) {
+<span class="fc" id="L89">    TopicDescription topicDescription = stats.getTopicDescriptions().get(topic);</span>
+<span class="fc" id="L90">    return ImmutableMap.&lt;String, Object&gt;builder()</span>
+<span class="fc" id="L91">        .put(&quot;partitions&quot;, topicDescription.partitions().size())</span>
+<span class="fc" id="L92">        .put(&quot;replication_factor&quot;, topicDescription.partitions().get(0).replicas().size())</span>
+<span class="fc" id="L93">        .putAll(getNonDefaultConfigs(topic, stats))</span>
+<span class="fc" id="L94">        .build();</span>
+  }
+
+  //returns empty list if schemaRegistry is not configured or assumed subject not found
+  private Mono&lt;List&lt;DataSetField&gt;&gt; getTopicSchema(KafkaCluster cluster,
+                                                  String topic,
+                                                  KafkaPath topicOddrn,
+                                                  boolean isKey) {
+<span class="pc bpc" id="L102" title="1 of 2 branches missed.">    if (cluster.getSchemaRegistryClient() == null) {</span>
+<span class="nc" id="L103">      return Mono.just(List.of());</span>
+    }
+<span class="fc bfc" id="L105" title="All 2 branches covered.">    String subject = topic + (isKey ? &quot;-key&quot; : &quot;-value&quot;);</span>
+<span class="fc" id="L106">    return getSubjWithResolvedRefs(cluster, subject)</span>
+<span class="fc" id="L107">        .map(t -&gt; DataSetFieldsExtractors.extract(t.getT1(), t.getT2(), topicOddrn, isKey))</span>
+<span class="fc" id="L108">        .onErrorResume(WebClientResponseException.NotFound.class, th -&gt; Mono.just(List.of()))</span>
+<span class="fc" id="L109">        .onErrorMap(WebClientResponseException.class, err -&gt;</span>
+<span class="nc" id="L110">            new IllegalStateException(&quot;Error retrieving subject %s&quot;.formatted(subject), err));</span>
+  }
+
+  private Mono&lt;Tuple2&lt;SchemaSubject, Map&lt;String, String&gt;&gt;&gt; getSubjWithResolvedRefs(KafkaCluster cluster,
+                                                                                   String subjectName) {
+<span class="fc" id="L115">    return cluster.getSchemaRegistryClient()</span>
+<span class="fc" id="L116">        .mono(client -&gt;</span>
+<span class="fc" id="L117">            client.getSubjectVersion(subjectName, &quot;latest&quot;, false)</span>
+<span class="fc" id="L118">                .flatMap(subj -&gt; new SchemaReferencesResolver(client).resolve(subj.getReferences())</span>
+<span class="fc" id="L119">                    .map(resolvedRefs -&gt; Tuples.of(subj, resolvedRefs))));</span>
+  }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

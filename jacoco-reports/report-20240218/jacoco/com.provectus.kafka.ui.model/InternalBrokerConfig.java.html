@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>InternalBrokerConfig.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">kafka-ui-api</a> &gt; <a href="index.source.html" class="el_package">com.provectus.kafka.ui.model</a> &gt; <span class="el_source">InternalBrokerConfig.java</span></div><h1>InternalBrokerConfig.java</h1><pre class="source lang-java linenums">package com.provectus.kafka.ui.model;
+
+
+import java.util.List;
+import lombok.Builder;
+import lombok.Data;
+import org.apache.kafka.clients.admin.ConfigEntry;
+
+<span class="nc bnc" id="L9" title="All 46 branches missed.">@Data</span>
+<span class="pc" id="L10">@Builder</span>
+public class InternalBrokerConfig {
+<span class="fc" id="L12">  private final String name;</span>
+<span class="fc" id="L13">  private final String value;</span>
+<span class="fc" id="L14">  private final ConfigEntry.ConfigSource source;</span>
+<span class="fc" id="L15">  private final boolean isSensitive;</span>
+<span class="fc" id="L16">  private final boolean isReadOnly;</span>
+<span class="fc" id="L17">  private final List&lt;ConfigEntry.ConfigSynonym&gt; synonyms;</span>
+
+  public static InternalBrokerConfig from(ConfigEntry configEntry) {
+<span class="fc" id="L20">    InternalBrokerConfig.InternalBrokerConfigBuilder builder = InternalBrokerConfig.builder()</span>
+<span class="fc" id="L21">        .name(configEntry.name())</span>
+<span class="fc" id="L22">        .value(configEntry.value())</span>
+<span class="fc" id="L23">        .source(configEntry.source())</span>
+<span class="fc" id="L24">        .isReadOnly(configEntry.isReadOnly())</span>
+<span class="fc" id="L25">        .isSensitive(configEntry.isSensitive())</span>
+<span class="fc" id="L26">        .synonyms(configEntry.synonyms());</span>
+<span class="fc" id="L27">    return builder.build();</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>InternalClusterState.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">kafka-ui-api</a> &gt; <a href="index.source.html" class="el_package">com.provectus.kafka.ui.model</a> &gt; <span class="el_source">InternalClusterState.java</span></div><h1>InternalClusterState.java</h1><pre class="source lang-java linenums">package com.provectus.kafka.ui.model;
+
+import com.google.common.base.Throwables;
+import java.math.BigDecimal;
+import java.util.List;
+import java.util.Optional;
+import java.util.stream.Collectors;
+import lombok.Data;
+import org.apache.kafka.common.Node;
+
+<span class="nc bnc" id="L11" title="All 142 branches missed.">@Data</span>
+public class InternalClusterState {
+<span class="nc" id="L13">  private String name;</span>
+<span class="nc" id="L14">  private ServerStatusDTO status;</span>
+<span class="nc" id="L15">  private MetricsCollectionErrorDTO lastError;</span>
+<span class="nc" id="L16">  private Integer topicCount;</span>
+<span class="nc" id="L17">  private Integer brokerCount;</span>
+<span class="nc" id="L18">  private Integer activeControllers;</span>
+<span class="nc" id="L19">  private Integer onlinePartitionCount;</span>
+<span class="nc" id="L20">  private Integer offlinePartitionCount;</span>
+<span class="nc" id="L21">  private Integer inSyncReplicasCount;</span>
+<span class="nc" id="L22">  private Integer outOfSyncReplicasCount;</span>
+<span class="nc" id="L23">  private Integer underReplicatedPartitionCount;</span>
+<span class="nc" id="L24">  private List&lt;BrokerDiskUsageDTO&gt; diskUsage;</span>
+<span class="nc" id="L25">  private String version;</span>
+<span class="nc" id="L26">  private List&lt;ClusterFeature&gt; features;</span>
+<span class="nc" id="L27">  private BigDecimal bytesInPerSec;</span>
+<span class="nc" id="L28">  private BigDecimal bytesOutPerSec;</span>
+<span class="nc" id="L29">  private Boolean readOnly;</span>
+
+<span class="nc" id="L31">  public InternalClusterState(KafkaCluster cluster, Statistics statistics) {</span>
+<span class="nc" id="L32">    name = cluster.getName();</span>
+<span class="nc" id="L33">    status = statistics.getStatus();</span>
+<span class="nc" id="L34">    lastError = Optional.ofNullable(statistics.getLastKafkaException())</span>
+<span class="nc" id="L35">        .map(e -&gt; new MetricsCollectionErrorDTO()</span>
+<span class="nc" id="L36">            .message(e.getMessage())</span>
+<span class="nc" id="L37">            .stackTrace(Throwables.getStackTraceAsString(e)))</span>
+<span class="nc" id="L38">        .orElse(null);</span>
+<span class="nc" id="L39">    topicCount = statistics.getTopicDescriptions().size();</span>
+<span class="nc" id="L40">    brokerCount = statistics.getClusterDescription().getNodes().size();</span>
+<span class="nc" id="L41">    activeControllers = Optional.ofNullable(statistics.getClusterDescription().getController())</span>
+<span class="nc" id="L42">        .map(Node::id)</span>
+<span class="nc" id="L43">        .orElse(null);</span>
+<span class="nc" id="L44">    version = statistics.getVersion();</span>
+
+<span class="nc bnc" id="L46" title="All 2 branches missed.">    if (statistics.getLogDirInfo() != null) {</span>
+<span class="nc" id="L47">      diskUsage = statistics.getLogDirInfo().getBrokerStats().entrySet().stream()</span>
+<span class="nc" id="L48">          .map(e -&gt; new BrokerDiskUsageDTO()</span>
+<span class="nc" id="L49">              .brokerId(e.getKey())</span>
+<span class="nc" id="L50">              .segmentSize(e.getValue().getSegmentSize())</span>
+<span class="nc" id="L51">              .segmentCount(e.getValue().getSegmentsCount()))</span>
+<span class="nc" id="L52">          .collect(Collectors.toList());</span>
+    }
+
+<span class="nc" id="L55">    features = statistics.getFeatures();</span>
+
+<span class="nc" id="L57">    bytesInPerSec = statistics</span>
+<span class="nc" id="L58">        .getMetrics()</span>
+<span class="nc" id="L59">        .getBrokerBytesInPerSec()</span>
+<span class="nc" id="L60">        .values().stream()</span>
+<span class="nc" id="L61">        .reduce(BigDecimal::add)</span>
+<span class="nc" id="L62">        .orElse(null);</span>
+
+<span class="nc" id="L64">    bytesOutPerSec = statistics</span>
+<span class="nc" id="L65">        .getMetrics()</span>
+<span class="nc" id="L66">        .getBrokerBytesOutPerSec()</span>
+<span class="nc" id="L67">        .values().stream()</span>
+<span class="nc" id="L68">        .reduce(BigDecimal::add)</span>
+<span class="nc" id="L69">        .orElse(null);</span>
+
+<span class="nc" id="L71">    var partitionsStats = new PartitionsStats(statistics.getTopicDescriptions().values());</span>
+<span class="nc" id="L72">    onlinePartitionCount = partitionsStats.getOnlinePartitionCount();</span>
+<span class="nc" id="L73">    offlinePartitionCount = partitionsStats.getOfflinePartitionCount();</span>
+<span class="nc" id="L74">    inSyncReplicasCount = partitionsStats.getInSyncReplicasCount();</span>
+<span class="nc" id="L75">    outOfSyncReplicasCount = partitionsStats.getOutOfSyncReplicasCount();</span>
+<span class="nc" id="L76">    underReplicatedPartitionCount = partitionsStats.getUnderReplicatedPartitionCount();</span>
+<span class="nc" id="L77">    readOnly = cluster.isReadOnly();</span>
+<span class="nc" id="L78">  }</span>
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

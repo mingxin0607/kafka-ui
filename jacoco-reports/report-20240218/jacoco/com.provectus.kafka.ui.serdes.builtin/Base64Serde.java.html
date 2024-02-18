@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Base64Serde.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">kafka-ui-api</a> &gt; <a href="index.source.html" class="el_package">com.provectus.kafka.ui.serdes.builtin</a> &gt; <span class="el_source">Base64Serde.java</span></div><h1>Base64Serde.java</h1><pre class="source lang-java linenums">package com.provectus.kafka.ui.serdes.builtin;
+
+import com.provectus.kafka.ui.serde.api.DeserializeResult;
+import com.provectus.kafka.ui.serde.api.SchemaDescription;
+import com.provectus.kafka.ui.serdes.BuiltInSerde;
+import java.util.Base64;
+import java.util.Map;
+import java.util.Optional;
+
+<span class="fc" id="L10">public class Base64Serde implements BuiltInSerde {</span>
+
+  public static String name() {
+<span class="fc" id="L13">    return &quot;Base64&quot;;</span>
+  }
+
+  @Override
+  public Optional&lt;String&gt; getDescription() {
+<span class="nc" id="L18">    return Optional.empty();</span>
+  }
+
+  @Override
+  public Optional&lt;SchemaDescription&gt; getSchema(String topic, Target type) {
+<span class="fc" id="L23">    return Optional.empty();</span>
+  }
+
+  @Override
+  public boolean canDeserialize(String topic, Target type) {
+<span class="fc" id="L28">    return true;</span>
+  }
+
+  @Override
+  public boolean canSerialize(String topic, Target type) {
+<span class="fc" id="L33">    return true;</span>
+  }
+
+  @Override
+  public Serializer serializer(String topic, Target type) {
+<span class="fc" id="L38">    var decoder = Base64.getDecoder();</span>
+<span class="fc" id="L39">    return inputString -&gt; {</span>
+<span class="fc" id="L40">      inputString = inputString.trim();</span>
+      // it is actually a hack to provide ability to sent empty array as a key/value
+<span class="pc bpc" id="L42" title="1 of 2 branches missed.">      if (inputString.length() == 0) {</span>
+<span class="nc" id="L43">        return new byte[] {};</span>
+      }
+<span class="fc" id="L45">      return decoder.decode(inputString);</span>
+    };
+  }
+
+  @Override
+  public Deserializer deserializer(String topic, Target type) {
+<span class="fc" id="L51">    var encoder = Base64.getEncoder();</span>
+<span class="fc" id="L52">    return (headers, data) -&gt;</span>
+<span class="fc" id="L53">        new DeserializeResult(</span>
+<span class="fc" id="L54">            encoder.encodeToString(data),</span>
+            DeserializeResult.Type.STRING,
+<span class="fc" id="L56">            Map.of()</span>
+        );
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

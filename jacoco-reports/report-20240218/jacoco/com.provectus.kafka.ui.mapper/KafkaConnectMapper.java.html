@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>KafkaConnectMapper.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">kafka-ui-api</a> &gt; <a href="index.source.html" class="el_package">com.provectus.kafka.ui.mapper</a> &gt; <span class="el_source">KafkaConnectMapper.java</span></div><h1>KafkaConnectMapper.java</h1><pre class="source lang-java linenums">package com.provectus.kafka.ui.mapper;
+
+import com.provectus.kafka.ui.connect.model.ConnectorStatusConnector;
+import com.provectus.kafka.ui.connect.model.ConnectorTask;
+import com.provectus.kafka.ui.connect.model.NewConnector;
+import com.provectus.kafka.ui.model.ConnectorDTO;
+import com.provectus.kafka.ui.model.ConnectorPluginConfigValidationResponseDTO;
+import com.provectus.kafka.ui.model.ConnectorPluginDTO;
+import com.provectus.kafka.ui.model.ConnectorStatusDTO;
+import com.provectus.kafka.ui.model.ConnectorTaskStatusDTO;
+import com.provectus.kafka.ui.model.FullConnectorInfoDTO;
+import com.provectus.kafka.ui.model.TaskDTO;
+import com.provectus.kafka.ui.model.TaskStatusDTO;
+import com.provectus.kafka.ui.model.connect.InternalConnectInfo;
+import java.util.List;
+import org.mapstruct.Mapper;
+
+@Mapper(componentModel = &quot;spring&quot;)
+public interface KafkaConnectMapper {
+  NewConnector toClient(com.provectus.kafka.ui.model.NewConnectorDTO newConnector);
+
+  ConnectorDTO fromClient(com.provectus.kafka.ui.connect.model.Connector connector);
+
+  ConnectorStatusDTO fromClient(ConnectorStatusConnector connectorStatus);
+
+  TaskDTO fromClient(ConnectorTask connectorTask);
+
+  TaskStatusDTO fromClient(com.provectus.kafka.ui.connect.model.TaskStatus taskStatus);
+
+  ConnectorPluginDTO fromClient(
+      com.provectus.kafka.ui.connect.model.ConnectorPlugin connectorPlugin);
+
+  ConnectorPluginConfigValidationResponseDTO fromClient(
+      com.provectus.kafka.ui.connect.model.ConnectorPluginConfigValidationResponse
+          connectorPluginConfigValidationResponse);
+
+  default FullConnectorInfoDTO fullConnectorInfo(InternalConnectInfo connectInfo) {
+<span class="fc" id="L38">    ConnectorDTO connector = connectInfo.getConnector();</span>
+<span class="fc" id="L39">    List&lt;TaskDTO&gt; tasks = connectInfo.getTasks();</span>
+<span class="fc" id="L40">    int failedTasksCount = (int) tasks.stream()</span>
+<span class="fc" id="L41">        .map(TaskDTO::getStatus)</span>
+<span class="fc" id="L42">        .map(TaskStatusDTO::getState)</span>
+<span class="fc" id="L43">        .filter(ConnectorTaskStatusDTO.FAILED::equals)</span>
+<span class="fc" id="L44">        .count();</span>
+<span class="fc" id="L45">    return new FullConnectorInfoDTO()</span>
+<span class="fc" id="L46">        .connect(connector.getConnect())</span>
+<span class="fc" id="L47">        .name(connector.getName())</span>
+<span class="fc" id="L48">        .connectorClass((String) connectInfo.getConfig().get(&quot;connector.class&quot;))</span>
+<span class="fc" id="L49">        .type(connector.getType())</span>
+<span class="fc" id="L50">        .topics(connectInfo.getTopics())</span>
+<span class="fc" id="L51">        .status(connector.getStatus())</span>
+<span class="fc" id="L52">        .tasksCount(tasks.size())</span>
+<span class="fc" id="L53">        .failedTasksCount(failedTasksCount);</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

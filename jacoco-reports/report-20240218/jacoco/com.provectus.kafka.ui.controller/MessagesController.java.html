@@ -1,0 +1,202 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MessagesController.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">kafka-ui-api</a> &gt; <a href="index.source.html" class="el_package">com.provectus.kafka.ui.controller</a> &gt; <span class="el_source">MessagesController.java</span></div><h1>MessagesController.java</h1><pre class="source lang-java linenums">package com.provectus.kafka.ui.controller;
+
+import static com.provectus.kafka.ui.model.rbac.permission.TopicAction.MESSAGES_DELETE;
+import static com.provectus.kafka.ui.model.rbac.permission.TopicAction.MESSAGES_PRODUCE;
+import static com.provectus.kafka.ui.model.rbac.permission.TopicAction.MESSAGES_READ;
+import static com.provectus.kafka.ui.serde.api.Serde.Target.KEY;
+import static com.provectus.kafka.ui.serde.api.Serde.Target.VALUE;
+import static java.util.stream.Collectors.toMap;
+
+import com.provectus.kafka.ui.api.MessagesApi;
+import com.provectus.kafka.ui.exception.ValidationException;
+import com.provectus.kafka.ui.model.ConsumerPosition;
+import com.provectus.kafka.ui.model.CreateTopicMessageDTO;
+import com.provectus.kafka.ui.model.MessageFilterTypeDTO;
+import com.provectus.kafka.ui.model.SeekDirectionDTO;
+import com.provectus.kafka.ui.model.SeekTypeDTO;
+import com.provectus.kafka.ui.model.SerdeUsageDTO;
+import com.provectus.kafka.ui.model.SmartFilterTestExecutionDTO;
+import com.provectus.kafka.ui.model.SmartFilterTestExecutionResultDTO;
+import com.provectus.kafka.ui.model.TopicMessageEventDTO;
+import com.provectus.kafka.ui.model.TopicSerdeSuggestionDTO;
+import com.provectus.kafka.ui.model.rbac.AccessContext;
+import com.provectus.kafka.ui.model.rbac.permission.AuditAction;
+import com.provectus.kafka.ui.model.rbac.permission.TopicAction;
+import com.provectus.kafka.ui.service.DeserializationService;
+import com.provectus.kafka.ui.service.MessagesService;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import javax.annotation.Nullable;
+import javax.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.tuple.Pair;
+import org.apache.kafka.common.TopicPartition;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ServerWebExchange;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
+
+@RestController
+<span class="fc" id="L44">@RequiredArgsConstructor</span>
+<span class="fc" id="L45">@Slf4j</span>
+public class MessagesController extends AbstractController implements MessagesApi {
+
+  private final MessagesService messagesService;
+  private final DeserializationService deserializationService;
+
+  @Override
+  public Mono&lt;ResponseEntity&lt;Void&gt;&gt; deleteTopicMessages(
+      String clusterName, String topicName, @Valid List&lt;Integer&gt; partitions,
+      ServerWebExchange exchange) {
+
+<span class="fc" id="L56">    var context = AccessContext.builder()</span>
+<span class="fc" id="L57">        .cluster(clusterName)</span>
+<span class="fc" id="L58">        .topic(topicName)</span>
+<span class="fc" id="L59">        .topicActions(MESSAGES_DELETE)</span>
+<span class="fc" id="L60">        .build();</span>
+
+<span class="fc" id="L62">    return validateAccess(context).&lt;ResponseEntity&lt;Void&gt;&gt;then(</span>
+<span class="fc" id="L63">        messagesService.deleteTopicMessages(</span>
+<span class="fc" id="L64">            getCluster(clusterName),</span>
+            topicName,
+<span class="fc" id="L66">            Optional.ofNullable(partitions).orElse(List.of())</span>
+<span class="fc" id="L67">        ).thenReturn(ResponseEntity.ok().build())</span>
+<span class="fc" id="L68">    ).doOnEach(sig -&gt; audit(context, sig));</span>
+  }
+
+  @Override
+  public Mono&lt;ResponseEntity&lt;SmartFilterTestExecutionResultDTO&gt;&gt; executeSmartFilterTest(
+      Mono&lt;SmartFilterTestExecutionDTO&gt; smartFilterTestExecutionDto, ServerWebExchange exchange) {
+<span class="nc" id="L74">    return smartFilterTestExecutionDto</span>
+<span class="nc" id="L75">        .map(MessagesService::execSmartFilterTest)</span>
+<span class="nc" id="L76">        .map(ResponseEntity::ok);</span>
+  }
+
+  @Override
+  public Mono&lt;ResponseEntity&lt;Flux&lt;TopicMessageEventDTO&gt;&gt;&gt; getTopicMessages(String clusterName,
+                                                                           String topicName,
+                                                                           SeekTypeDTO seekType,
+                                                                           List&lt;String&gt; seekTo,
+                                                                           Integer limit,
+                                                                           String q,
+                                                                           MessageFilterTypeDTO filterQueryType,
+                                                                           SeekDirectionDTO seekDirection,
+                                                                           String keySerde,
+                                                                           String valueSerde,
+                                                                           ServerWebExchange exchange) {
+<span class="fc" id="L91">    var contextBuilder = AccessContext.builder()</span>
+<span class="fc" id="L92">        .cluster(clusterName)</span>
+<span class="fc" id="L93">        .topic(topicName)</span>
+<span class="fc" id="L94">        .topicActions(MESSAGES_READ)</span>
+<span class="fc" id="L95">        .operationName(&quot;getTopicMessages&quot;);</span>
+
+<span class="pc bpc" id="L97" title="1 of 2 branches missed.">    if (auditService.isAuditTopic(getCluster(clusterName), topicName)) {</span>
+<span class="nc" id="L98">      contextBuilder.auditActions(AuditAction.VIEW);</span>
+    }
+
+<span class="pc bpc" id="L101" title="1 of 2 branches missed.">    seekType = seekType != null ? seekType : SeekTypeDTO.BEGINNING;</span>
+<span class="pc bpc" id="L102" title="1 of 2 branches missed.">    seekDirection = seekDirection != null ? seekDirection : SeekDirectionDTO.FORWARD;</span>
+<span class="pc bpc" id="L103" title="1 of 2 branches missed.">    filterQueryType = filterQueryType != null ? filterQueryType : MessageFilterTypeDTO.STRING_CONTAINS;</span>
+
+<span class="fc" id="L105">    var positions = new ConsumerPosition(</span>
+        seekType,
+        topicName,
+<span class="fc" id="L108">        parseSeekTo(topicName, seekType, seekTo)</span>
+    );
+<span class="fc" id="L110">    Mono&lt;ResponseEntity&lt;Flux&lt;TopicMessageEventDTO&gt;&gt;&gt; job = Mono.just(</span>
+<span class="fc" id="L111">        ResponseEntity.ok(</span>
+<span class="fc" id="L112">            messagesService.loadMessages(</span>
+<span class="fc" id="L113">                getCluster(clusterName), topicName, positions, q, filterQueryType,</span>
+                limit, seekDirection, keySerde, valueSerde)
+        )
+    );
+
+<span class="fc" id="L118">    var context = contextBuilder.build();</span>
+<span class="fc" id="L119">    return validateAccess(context)</span>
+<span class="fc" id="L120">        .then(job)</span>
+<span class="fc" id="L121">        .doOnEach(sig -&gt; audit(context, sig));</span>
+  }
+
+  @Override
+  public Mono&lt;ResponseEntity&lt;Void&gt;&gt; sendTopicMessages(
+      String clusterName, String topicName, @Valid Mono&lt;CreateTopicMessageDTO&gt; createTopicMessage,
+      ServerWebExchange exchange) {
+
+<span class="nc" id="L129">    var context = AccessContext.builder()</span>
+<span class="nc" id="L130">        .cluster(clusterName)</span>
+<span class="nc" id="L131">        .topic(topicName)</span>
+<span class="nc" id="L132">        .topicActions(MESSAGES_PRODUCE)</span>
+<span class="nc" id="L133">        .operationName(&quot;sendTopicMessages&quot;)</span>
+<span class="nc" id="L134">        .build();</span>
+
+<span class="nc" id="L136">    return validateAccess(context).then(</span>
+<span class="nc" id="L137">        createTopicMessage.flatMap(msg -&gt;</span>
+<span class="nc" id="L138">            messagesService.sendMessage(getCluster(clusterName), topicName, msg).then()</span>
+<span class="nc" id="L139">        ).map(ResponseEntity::ok)</span>
+<span class="nc" id="L140">    ).doOnEach(sig -&gt; audit(context, sig));</span>
+  }
+
+  /**
+   * The format is [partition]::[offset] for specifying offsets
+   * or [partition]::[timestamp in millis] for specifying timestamps.
+   */
+  @Nullable
+  private Map&lt;TopicPartition, Long&gt; parseSeekTo(String topic, SeekTypeDTO seekType, List&lt;String&gt; seekTo) {
+<span class="pc bpc" id="L149" title="3 of 4 branches missed.">    if (seekTo == null || seekTo.isEmpty()) {</span>
+<span class="pc bpc" id="L150" title="2 of 4 branches missed.">      if (seekType == SeekTypeDTO.LATEST || seekType == SeekTypeDTO.BEGINNING) {</span>
+<span class="fc" id="L151">        return null;</span>
+      }
+<span class="nc" id="L153">      throw new ValidationException(&quot;seekTo should be set if seekType is &quot; + seekType);</span>
+    }
+<span class="nc" id="L155">    return seekTo.stream()</span>
+<span class="nc" id="L156">        .map(p -&gt; {</span>
+<span class="nc" id="L157">          String[] split = p.split(&quot;::&quot;);</span>
+<span class="nc bnc" id="L158" title="All 2 branches missed.">          if (split.length != 2) {</span>
+<span class="nc" id="L159">            throw new IllegalArgumentException(</span>
+                &quot;Wrong seekTo argument format. See API docs for details&quot;);
+          }
+
+<span class="nc" id="L163">          return Pair.of(</span>
+<span class="nc" id="L164">              new TopicPartition(topic, Integer.parseInt(split[0])),</span>
+<span class="nc" id="L165">              Long.parseLong(split[1])</span>
+          );
+        })
+<span class="nc" id="L168">        .collect(toMap(Pair::getKey, Pair::getValue));</span>
+  }
+
+  @Override
+  public Mono&lt;ResponseEntity&lt;TopicSerdeSuggestionDTO&gt;&gt; getSerdes(String clusterName,
+                                                                 String topicName,
+                                                                 SerdeUsageDTO use,
+                                                                 ServerWebExchange exchange) {
+<span class="nc" id="L176">    var context = AccessContext.builder()</span>
+<span class="nc" id="L177">        .cluster(clusterName)</span>
+<span class="nc" id="L178">        .topic(topicName)</span>
+<span class="nc" id="L179">        .topicActions(TopicAction.VIEW)</span>
+<span class="nc" id="L180">        .operationName(&quot;getSerdes&quot;)</span>
+<span class="nc" id="L181">        .build();</span>
+
+<span class="nc" id="L183">    TopicSerdeSuggestionDTO dto = new TopicSerdeSuggestionDTO()</span>
+<span class="nc bnc" id="L184" title="All 2 branches missed.">        .key(use == SerdeUsageDTO.SERIALIZE</span>
+<span class="nc" id="L185">            ? deserializationService.getSerdesForSerialize(getCluster(clusterName), topicName, KEY)</span>
+<span class="nc" id="L186">            : deserializationService.getSerdesForDeserialize(getCluster(clusterName), topicName, KEY))</span>
+<span class="nc bnc" id="L187" title="All 2 branches missed.">        .value(use == SerdeUsageDTO.SERIALIZE</span>
+<span class="nc" id="L188">            ? deserializationService.getSerdesForSerialize(getCluster(clusterName), topicName, VALUE)</span>
+<span class="nc" id="L189">            : deserializationService.getSerdesForDeserialize(getCluster(clusterName), topicName, VALUE));</span>
+
+<span class="nc" id="L191">    return validateAccess(context).then(</span>
+<span class="nc" id="L192">        Mono.just(dto)</span>
+<span class="nc" id="L193">            .subscribeOn(Schedulers.boundedElastic())</span>
+<span class="nc" id="L194">            .map(ResponseEntity::ok)</span>
+    );
+  }
+
+
+
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

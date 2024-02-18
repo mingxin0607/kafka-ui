@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>FeatureService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">kafka-ui-api</a> &gt; <a href="index.source.html" class="el_package">com.provectus.kafka.ui.service</a> &gt; <span class="el_source">FeatureService.java</span></div><h1>FeatureService.java</h1><pre class="source lang-java linenums">package com.provectus.kafka.ui.service;
+
+import com.provectus.kafka.ui.model.ClusterFeature;
+import com.provectus.kafka.ui.model.KafkaCluster;
+import com.provectus.kafka.ui.service.ReactiveAdminClient.ClusterDescription;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import java.util.function.Predicate;
+import lombok.extern.slf4j.Slf4j;
+import org.apache.kafka.common.acl.AclOperation;
+import org.springframework.stereotype.Service;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
+
+@Service
+<span class="fc" id="L19">@Slf4j</span>
+<span class="fc" id="L20">public class FeatureService {</span>
+
+  public Mono&lt;List&lt;ClusterFeature&gt;&gt; getAvailableFeatures(ReactiveAdminClient adminClient,
+                                                         KafkaCluster cluster,
+                                                         ClusterDescription clusterDescription) {
+<span class="fc" id="L25">    List&lt;Mono&lt;ClusterFeature&gt;&gt; features = new ArrayList&lt;&gt;();</span>
+
+<span class="fc" id="L27">    if (Optional.ofNullable(cluster.getConnectsClients())</span>
+<span class="fc" id="L28">        .filter(Predicate.not(Map::isEmpty))</span>
+<span class="pc bpc" id="L29" title="1 of 2 branches missed.">        .isPresent()) {</span>
+<span class="fc" id="L30">      features.add(Mono.just(ClusterFeature.KAFKA_CONNECT));</span>
+    }
+
+<span class="pc bpc" id="L33" title="1 of 2 branches missed.">    if (cluster.getKsqlClient() != null) {</span>
+<span class="nc" id="L34">      features.add(Mono.just(ClusterFeature.KSQL_DB));</span>
+    }
+
+<span class="pc bpc" id="L37" title="1 of 2 branches missed.">    if (cluster.getSchemaRegistryClient() != null) {</span>
+<span class="fc" id="L38">      features.add(Mono.just(ClusterFeature.SCHEMA_REGISTRY));</span>
+    }
+
+<span class="fc" id="L41">    features.add(topicDeletionEnabled(adminClient));</span>
+<span class="fc" id="L42">    features.add(aclView(adminClient));</span>
+<span class="fc" id="L43">    features.add(aclEdit(adminClient, clusterDescription));</span>
+
+<span class="fc" id="L45">    return Flux.fromIterable(features).flatMap(m -&gt; m).collectList();</span>
+  }
+
+  private Mono&lt;ClusterFeature&gt; topicDeletionEnabled(ReactiveAdminClient adminClient) {
+<span class="pc bpc" id="L49" title="1 of 2 branches missed.">    return adminClient.isTopicDeletionEnabled()</span>
+<span class="fc" id="L50">        ? Mono.just(ClusterFeature.TOPIC_DELETION)</span>
+<span class="nc" id="L51">        : Mono.empty();</span>
+  }
+
+  private Mono&lt;ClusterFeature&gt; aclEdit(ReactiveAdminClient adminClient, ClusterDescription clusterDescription) {
+<span class="fc" id="L55">    var authorizedOps = Optional.ofNullable(clusterDescription.getAuthorizedOperations()).orElse(Set.of());</span>
+<span class="pc bpc" id="L56" title="1 of 2 branches missed.">    boolean canEdit = aclViewEnabled(adminClient)</span>
+<span class="pc bnc" id="L57" title="All 4 branches missed.">        &amp;&amp; (authorizedOps.contains(AclOperation.ALL) || authorizedOps.contains(AclOperation.ALTER));</span>
+<span class="pc bpc" id="L58" title="1 of 2 branches missed.">    return canEdit</span>
+<span class="nc" id="L59">        ? Mono.just(ClusterFeature.KAFKA_ACL_EDIT)</span>
+<span class="fc" id="L60">        : Mono.empty();</span>
+  }
+
+  private Mono&lt;ClusterFeature&gt; aclView(ReactiveAdminClient adminClient) {
+<span class="pc bpc" id="L64" title="1 of 2 branches missed.">    return aclViewEnabled(adminClient)</span>
+<span class="nc" id="L65">        ? Mono.just(ClusterFeature.KAFKA_ACL_VIEW)</span>
+<span class="fc" id="L66">        : Mono.empty();</span>
+  }
+
+  private boolean aclViewEnabled(ReactiveAdminClient adminClient) {
+<span class="fc" id="L70">    return adminClient.getClusterFeatures().contains(ReactiveAdminClient.SupportedFeature.AUTHORIZED_SECURITY_ENABLED);</span>
+  }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

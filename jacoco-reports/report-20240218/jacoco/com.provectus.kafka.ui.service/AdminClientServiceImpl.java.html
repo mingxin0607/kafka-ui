@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AdminClientServiceImpl.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">kafka-ui-api</a> &gt; <a href="index.source.html" class="el_package">com.provectus.kafka.ui.service</a> &gt; <span class="el_source">AdminClientServiceImpl.java</span></div><h1>AdminClientServiceImpl.java</h1><pre class="source lang-java linenums">package com.provectus.kafka.ui.service;
+
+import com.provectus.kafka.ui.config.ClustersProperties;
+import com.provectus.kafka.ui.model.KafkaCluster;
+import com.provectus.kafka.ui.util.SslPropertiesUtil;
+import java.io.Closeable;
+import java.time.Instant;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Properties;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicLong;
+import lombok.extern.slf4j.Slf4j;
+import org.apache.kafka.clients.admin.AdminClient;
+import org.apache.kafka.clients.admin.AdminClientConfig;
+import org.springframework.stereotype.Service;
+import reactor.core.publisher.Mono;
+
+@Service
+<span class="fc" id="L20">@Slf4j</span>
+public class AdminClientServiceImpl implements AdminClientService, Closeable {
+
+  private static final int DEFAULT_CLIENT_TIMEOUT_MS = 30_000;
+
+<span class="fc" id="L25">  private static final AtomicLong CLIENT_ID_SEQ = new AtomicLong();</span>
+
+<span class="fc" id="L27">  private final Map&lt;String, ReactiveAdminClient&gt; adminClientCache = new ConcurrentHashMap&lt;&gt;();</span>
+  private final int clientTimeout;
+
+<span class="fc" id="L30">  public AdminClientServiceImpl(ClustersProperties clustersProperties) {</span>
+<span class="fc" id="L31">    this.clientTimeout = Optional.ofNullable(clustersProperties.getAdminClientTimeout())</span>
+<span class="fc" id="L32">        .orElse(DEFAULT_CLIENT_TIMEOUT_MS);</span>
+<span class="fc" id="L33">  }</span>
+
+  @Override
+  public Mono&lt;ReactiveAdminClient&gt; get(KafkaCluster cluster) {
+<span class="fc" id="L37">    return Mono.justOrEmpty(adminClientCache.get(cluster.getName()))</span>
+<span class="fc" id="L38">        .switchIfEmpty(createAdminClient(cluster))</span>
+<span class="fc" id="L39">        .map(e -&gt; adminClientCache.computeIfAbsent(cluster.getName(), key -&gt; e));</span>
+  }
+
+  private Mono&lt;ReactiveAdminClient&gt; createAdminClient(KafkaCluster cluster) {
+<span class="fc" id="L43">    return Mono.fromSupplier(() -&gt; {</span>
+<span class="fc" id="L44">      Properties properties = new Properties();</span>
+<span class="fc" id="L45">      SslPropertiesUtil.addKafkaSslProperties(cluster.getOriginalProperties().getSsl(), properties);</span>
+<span class="fc" id="L46">      properties.putAll(cluster.getProperties());</span>
+<span class="fc" id="L47">      properties.put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, cluster.getBootstrapServers());</span>
+<span class="fc" id="L48">      properties.putIfAbsent(AdminClientConfig.REQUEST_TIMEOUT_MS_CONFIG, clientTimeout);</span>
+<span class="fc" id="L49">      properties.putIfAbsent(</span>
+          AdminClientConfig.CLIENT_ID_CONFIG,
+<span class="fc" id="L51">          &quot;kafka-ui-admin-&quot; + Instant.now().getEpochSecond() + &quot;-&quot; + CLIENT_ID_SEQ.incrementAndGet()</span>
+      );
+<span class="fc" id="L53">      return AdminClient.create(properties);</span>
+<span class="pc" id="L54">    }).flatMap(ac -&gt; ReactiveAdminClient.create(ac).doOnError(th -&gt; ac.close()))</span>
+<span class="pc" id="L55">        .onErrorMap(th -&gt; new IllegalStateException(</span>
+<span class="nc" id="L56">            &quot;Error while creating AdminClient for Cluster &quot; + cluster.getName(), th));</span>
+  }
+
+  @Override
+  public void close() {
+<span class="nc" id="L61">    adminClientCache.values().forEach(ReactiveAdminClient::close);</span>
+<span class="nc" id="L62">  }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

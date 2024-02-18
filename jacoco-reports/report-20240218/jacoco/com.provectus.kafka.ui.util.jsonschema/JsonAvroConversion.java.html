@@ -1,0 +1,545 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>JsonAvroConversion.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">kafka-ui-api</a> &gt; <a href="index.source.html" class="el_package">com.provectus.kafka.ui.util.jsonschema</a> &gt; <span class="el_source">JsonAvroConversion.java</span></div><h1>JsonAvroConversion.java</h1><pre class="source lang-java linenums">package com.provectus.kafka.ui.util.jsonschema;
+
+import com.fasterxml.jackson.core.JsonParser;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.json.JsonMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.BooleanNode;
+import com.fasterxml.jackson.databind.node.DecimalNode;
+import com.fasterxml.jackson.databind.node.DoubleNode;
+import com.fasterxml.jackson.databind.node.FloatNode;
+import com.fasterxml.jackson.databind.node.IntNode;
+import com.fasterxml.jackson.databind.node.JsonNodeType;
+import com.fasterxml.jackson.databind.node.LongNode;
+import com.fasterxml.jackson.databind.node.NullNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.fasterxml.jackson.databind.node.TextNode;
+import com.google.common.collect.Lists;
+import com.provectus.kafka.ui.exception.JsonAvroConversionException;
+import io.confluent.kafka.serializers.AvroData;
+import java.math.BigDecimal;
+import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.time.ZoneOffset;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.concurrent.TimeUnit;
+import java.util.function.BiFunction;
+import java.util.stream.Stream;
+import org.apache.avro.Schema;
+import org.apache.avro.generic.GenericData;
+
+// json &lt;-&gt; avro
+<span class="nc" id="L42">public class JsonAvroConversion {</span>
+
+<span class="fc" id="L44">  private static final JsonMapper MAPPER = new JsonMapper();</span>
+<span class="fc" id="L45">  private static final Schema NULL_SCHEMA = Schema.create(Schema.Type.NULL);</span>
+  private static final String FORMAT = &quot;format&quot;;
+  private static final String DATE_TIME = &quot;date-time&quot;;
+
+  // converts json into Object that is expected input for KafkaAvroSerializer
+  // (with AVRO_USE_LOGICAL_TYPE_CONVERTERS flat enabled!)
+  public static Object convertJsonToAvro(String jsonString, Schema avroSchema) {
+<span class="fc" id="L52">    JsonNode rootNode = null;</span>
+    try {
+<span class="fc" id="L54">      rootNode = MAPPER.readTree(jsonString);</span>
+<span class="nc" id="L55">    } catch (JsonProcessingException e) {</span>
+<span class="nc" id="L56">      throw new JsonAvroConversionException(&quot;String is not a valid json&quot;);</span>
+<span class="fc" id="L57">    }</span>
+<span class="fc" id="L58">    return convert(rootNode, avroSchema);</span>
+  }
+
+  private static Object convert(JsonNode node, Schema avroSchema) {
+<span class="pc bpc" id="L62" title="2 of 15 branches missed.">    return switch (avroSchema.getType()) {</span>
+      case RECORD -&gt; {
+<span class="fc" id="L64">        assertJsonType(node, JsonNodeType.OBJECT);</span>
+<span class="fc" id="L65">        var rec = new GenericData.Record(avroSchema);</span>
+<span class="fc bfc" id="L66" title="All 2 branches covered.">        for (Schema.Field field : avroSchema.getFields()) {</span>
+<span class="fc bfc" id="L67" title="All 4 branches covered.">          if (node.has(field.name()) &amp;&amp; !node.get(field.name()).isNull()) {</span>
+<span class="fc" id="L68">            rec.put(field.name(), convert(node.get(field.name()), field.schema()));</span>
+          }
+<span class="fc" id="L70">        }</span>
+<span class="fc" id="L71">        yield rec;</span>
+      }
+      case MAP -&gt; {
+<span class="fc" id="L74">        assertJsonType(node, JsonNodeType.OBJECT);</span>
+<span class="fc" id="L75">        var map = new LinkedHashMap&lt;String, Object&gt;();</span>
+<span class="fc" id="L76">        var valueSchema = avroSchema.getValueType();</span>
+<span class="fc" id="L77">        node.fields().forEachRemaining(f -&gt; map.put(f.getKey(), convert(f.getValue(), valueSchema)));</span>
+<span class="fc" id="L78">        yield map;</span>
+      }
+      case ARRAY -&gt; {
+<span class="fc" id="L81">        assertJsonType(node, JsonNodeType.ARRAY);</span>
+<span class="fc" id="L82">        var lst = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L83">        node.elements().forEachRemaining(e -&gt; lst.add(convert(e, avroSchema.getElementType())));</span>
+<span class="fc" id="L84">        yield lst;</span>
+      }
+      case ENUM -&gt; {
+<span class="fc" id="L87">        assertJsonType(node, JsonNodeType.STRING);</span>
+<span class="fc" id="L88">        String symbol = node.textValue();</span>
+<span class="pc bpc" id="L89" title="1 of 2 branches missed.">        if (!avroSchema.getEnumSymbols().contains(symbol)) {</span>
+<span class="nc" id="L90">          throw new JsonAvroConversionException(&quot;%s is not a part of enum symbols [%s]&quot;</span>
+<span class="nc" id="L91">              .formatted(symbol, avroSchema.getEnumSymbols()));</span>
+        }
+<span class="fc" id="L93">        yield new GenericData.EnumSymbol(avroSchema, symbol);</span>
+      }
+      case UNION -&gt; {
+        // for types from enum (other than null) payload should be an object with single key == name of type
+        // ex: schema = [ &quot;null&quot;, &quot;int&quot;, &quot;string&quot; ], possible payloads = null, { &quot;string&quot;: &quot;str&quot; },  { &quot;int&quot;: 123 }
+<span class="pc bpc" id="L98" title="1 of 4 branches missed.">        if (node.isNull() &amp;&amp; avroSchema.getTypes().contains(NULL_SCHEMA)) {</span>
+<span class="fc" id="L99">          yield null;</span>
+        }
+
+<span class="fc" id="L102">        assertJsonType(node, JsonNodeType.OBJECT);</span>
+<span class="fc" id="L103">        var elements = Lists.newArrayList(node.fields());</span>
+<span class="pc bpc" id="L104" title="1 of 2 branches missed.">        if (elements.size() != 1) {</span>
+<span class="nc" id="L105">          throw new JsonAvroConversionException(</span>
+              &quot;UNION field value should be an object with single field == type name&quot;);
+        }
+<span class="fc" id="L108">        Map.Entry&lt;String, JsonNode&gt; typeNameToValue = elements.get(0);</span>
+<span class="fc" id="L109">        List&lt;Schema&gt; candidates = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L110" title="All 2 branches covered.">        for (Schema unionType : avroSchema.getTypes()) {</span>
+<span class="fc bfc" id="L111" title="All 2 branches covered.">          if (typeNameToValue.getKey().equals(unionType.getFullName())) {</span>
+<span class="fc" id="L112">            yield convert(typeNameToValue.getValue(), unionType);</span>
+          }
+<span class="fc bfc" id="L114" title="All 2 branches covered.">          if (typeNameToValue.getKey().equals(unionType.getName())) {</span>
+<span class="fc" id="L115">            candidates.add(unionType);</span>
+          }
+<span class="fc" id="L117">        }</span>
+<span class="fc bfc" id="L118" title="All 2 branches covered.">        if (candidates.size() == 1) {</span>
+<span class="fc" id="L119">          yield convert(typeNameToValue.getValue(), candidates.get(0));</span>
+        }
+<span class="fc bfc" id="L121" title="All 2 branches covered.">        if (candidates.size() &gt; 1) {</span>
+<span class="fc" id="L122">          throw new JsonAvroConversionException(</span>
+<span class="fc" id="L123">              &quot;Can't select type within union for value '%s'. Provide full type name.&quot;.formatted(node)</span>
+          );
+        }
+<span class="fc" id="L126">        throw new JsonAvroConversionException(</span>
+            &quot;json value '%s' is cannot be converted to any of union types [%s]&quot;
+<span class="fc" id="L128">                .formatted(node, avroSchema.getTypes()));</span>
+      }
+      case STRING -&gt; {
+<span class="fc bfc" id="L131" title="All 2 branches covered.">        if (isLogicalType(avroSchema)) {</span>
+<span class="fc" id="L132">          yield processLogicalType(node, avroSchema);</span>
+        }
+<span class="fc" id="L134">        assertJsonType(node, JsonNodeType.STRING);</span>
+<span class="fc" id="L135">        yield node.textValue();</span>
+      }
+      case LONG -&gt; {
+<span class="fc bfc" id="L138" title="All 2 branches covered.">        if (isLogicalType(avroSchema)) {</span>
+<span class="fc" id="L139">          yield processLogicalType(node, avroSchema);</span>
+        }
+<span class="fc" id="L141">        assertJsonType(node, JsonNodeType.NUMBER);</span>
+<span class="fc" id="L142">        assertJsonNumberType(node, JsonParser.NumberType.LONG, JsonParser.NumberType.INT);</span>
+<span class="fc" id="L143">        yield node.longValue();</span>
+      }
+      case INT -&gt; {
+<span class="fc bfc" id="L146" title="All 2 branches covered.">        if (isLogicalType(avroSchema)) {</span>
+<span class="fc" id="L147">          yield processLogicalType(node, avroSchema);</span>
+        }
+<span class="fc" id="L149">        assertJsonType(node, JsonNodeType.NUMBER);</span>
+<span class="fc" id="L150">        assertJsonNumberType(node, JsonParser.NumberType.INT);</span>
+<span class="fc" id="L151">        yield node.intValue();</span>
+      }
+      case FLOAT -&gt; {
+<span class="fc" id="L154">        assertJsonType(node, JsonNodeType.NUMBER);</span>
+<span class="fc" id="L155">        assertJsonNumberType(node, JsonParser.NumberType.DOUBLE, JsonParser.NumberType.FLOAT);</span>
+<span class="fc" id="L156">        yield node.floatValue();</span>
+      }
+      case DOUBLE -&gt; {
+<span class="fc" id="L159">        assertJsonType(node, JsonNodeType.NUMBER);</span>
+<span class="fc" id="L160">        assertJsonNumberType(node, JsonParser.NumberType.DOUBLE, JsonParser.NumberType.FLOAT);</span>
+<span class="fc" id="L161">        yield node.doubleValue();</span>
+      }
+      case BOOLEAN -&gt; {
+<span class="fc" id="L164">        assertJsonType(node, JsonNodeType.BOOLEAN);</span>
+<span class="fc" id="L165">        yield node.booleanValue();</span>
+      }
+      case NULL -&gt; {
+<span class="nc" id="L168">        assertJsonType(node, JsonNodeType.NULL);</span>
+<span class="nc" id="L169">        yield null;</span>
+      }
+      case BYTES -&gt; {
+<span class="fc bfc" id="L172" title="All 2 branches covered.">        if (isLogicalType(avroSchema)) {</span>
+<span class="fc" id="L173">          yield processLogicalType(node, avroSchema);</span>
+        }
+<span class="fc" id="L175">        assertJsonType(node, JsonNodeType.STRING);</span>
+        // logic copied from JsonDecoder::readBytes
+<span class="fc" id="L177">        yield ByteBuffer.wrap(node.textValue().getBytes(StandardCharsets.ISO_8859_1));</span>
+      }
+      case FIXED -&gt; {
+<span class="pc bpc" id="L180" title="1 of 2 branches missed.">        if (isLogicalType(avroSchema)) {</span>
+<span class="nc" id="L181">          yield processLogicalType(node, avroSchema);</span>
+        }
+<span class="fc" id="L183">        assertJsonType(node, JsonNodeType.STRING);</span>
+<span class="fc" id="L184">        byte[] bytes = node.textValue().getBytes(StandardCharsets.ISO_8859_1);</span>
+<span class="pc bpc" id="L185" title="1 of 2 branches missed.">        if (bytes.length != avroSchema.getFixedSize()) {</span>
+<span class="nc" id="L186">          throw new JsonAvroConversionException(</span>
+              &quot;Fixed field has unexpected size %d (should be %d)&quot;
+<span class="nc" id="L188">                  .formatted(bytes.length, avroSchema.getFixedSize()));</span>
+        }
+<span class="fc" id="L190">        yield new GenericData.Fixed(avroSchema, bytes);</span>
+      }
+    };
+  }
+
+  // converts output of KafkaAvroDeserializer (with AVRO_USE_LOGICAL_TYPE_CONVERTERS flat enabled!) into json.
+  // Note: conversion should be compatible with AvroJsonSchemaConverter logic!
+  public static JsonNode convertAvroToJson(Object obj, Schema avroSchema) {
+<span class="pc bpc" id="L198" title="1 of 2 branches missed.">    if (obj == null) {</span>
+<span class="nc" id="L199">      return NullNode.getInstance();</span>
+    }
+<span class="pc bpc" id="L201" title="3 of 15 branches missed.">    return switch (avroSchema.getType()) {</span>
+      case RECORD -&gt; {
+<span class="fc" id="L203">        var rec = (GenericData.Record) obj;</span>
+<span class="fc" id="L204">        ObjectNode node = MAPPER.createObjectNode();</span>
+<span class="fc bfc" id="L205" title="All 2 branches covered.">        for (Schema.Field field : avroSchema.getFields()) {</span>
+<span class="fc" id="L206">          var fieldVal = rec.get(field.name());</span>
+<span class="fc bfc" id="L207" title="All 2 branches covered.">          if (fieldVal != null) {</span>
+<span class="fc" id="L208">            node.set(field.name(), convertAvroToJson(fieldVal, field.schema()));</span>
+          }
+<span class="fc" id="L210">        }</span>
+<span class="fc" id="L211">        yield node;</span>
+      }
+      case MAP -&gt; {
+<span class="fc" id="L214">        ObjectNode node = MAPPER.createObjectNode();</span>
+<span class="fc" id="L215">        ((Map) obj).forEach((k, v) -&gt; node.set(k.toString(), convertAvroToJson(v, avroSchema.getValueType())));</span>
+<span class="fc" id="L216">        yield node;</span>
+      }
+      case ARRAY -&gt; {
+<span class="nc" id="L219">        var list = (List&lt;Object&gt;) obj;</span>
+<span class="nc" id="L220">        ArrayNode node = MAPPER.createArrayNode();</span>
+<span class="nc" id="L221">        list.forEach(e -&gt; node.add(convertAvroToJson(e, avroSchema.getElementType())));</span>
+<span class="nc" id="L222">        yield node;</span>
+      }
+      case ENUM -&gt; {
+<span class="fc" id="L225">        yield new TextNode(obj.toString());</span>
+      }
+      case UNION -&gt; {
+<span class="fc" id="L228">        ObjectNode node = MAPPER.createObjectNode();</span>
+<span class="fc" id="L229">        int unionIdx = AvroData.getGenericData().resolveUnion(avroSchema, obj);</span>
+<span class="fc" id="L230">        Schema selectedType = avroSchema.getTypes().get(unionIdx);</span>
+<span class="fc" id="L231">        node.set(</span>
+<span class="fc" id="L232">            selectUnionTypeFieldName(avroSchema, selectedType, unionIdx),</span>
+<span class="fc" id="L233">            convertAvroToJson(obj, selectedType)</span>
+        );
+<span class="fc" id="L235">        yield node;</span>
+      }
+      case STRING -&gt; {
+<span class="fc bfc" id="L238" title="All 2 branches covered.">        if (isLogicalType(avroSchema)) {</span>
+<span class="fc" id="L239">          yield processLogicalType(obj, avroSchema);</span>
+        }
+<span class="fc" id="L241">        yield new TextNode(obj.toString());</span>
+      }
+      case LONG -&gt; {
+<span class="fc bfc" id="L244" title="All 2 branches covered.">        if (isLogicalType(avroSchema)) {</span>
+<span class="fc" id="L245">          yield processLogicalType(obj, avroSchema);</span>
+        }
+<span class="fc" id="L247">        yield new LongNode((Long) obj);</span>
+      }
+      case INT -&gt; {
+<span class="fc bfc" id="L250" title="All 2 branches covered.">        if (isLogicalType(avroSchema)) {</span>
+<span class="fc" id="L251">          yield processLogicalType(obj, avroSchema);</span>
+        }
+<span class="fc" id="L253">        yield new IntNode((Integer) obj);</span>
+      }
+<span class="fc" id="L255">      case FLOAT -&gt; new FloatNode((Float) obj);</span>
+<span class="fc" id="L256">      case DOUBLE -&gt; new DoubleNode((Double) obj);</span>
+<span class="fc" id="L257">      case BOOLEAN -&gt; BooleanNode.valueOf((Boolean) obj);</span>
+<span class="nc" id="L258">      case NULL -&gt; NullNode.getInstance();</span>
+      case BYTES -&gt; {
+<span class="fc bfc" id="L260" title="All 2 branches covered.">        if (isLogicalType(avroSchema)) {</span>
+<span class="fc" id="L261">          yield processLogicalType(obj, avroSchema);</span>
+        }
+<span class="fc" id="L263">        ByteBuffer bytes = (ByteBuffer) obj;</span>
+        //see JsonEncoder::writeByteArray
+<span class="fc" id="L265">        yield new TextNode(new String(bytes.array(), StandardCharsets.ISO_8859_1));</span>
+      }
+      case FIXED -&gt; {
+<span class="pc bpc" id="L268" title="1 of 2 branches missed.">        if (isLogicalType(avroSchema)) {</span>
+<span class="nc" id="L269">          yield processLogicalType(obj, avroSchema);</span>
+        }
+<span class="fc" id="L271">        var fixed = (GenericData.Fixed) obj;</span>
+<span class="fc" id="L272">        yield new TextNode(new String(fixed.bytes(), StandardCharsets.ISO_8859_1));</span>
+      }
+    };
+  }
+
+  // select name for a key field that represents type name of union.
+  // For records selects short name, if it is possible.
+  private static String selectUnionTypeFieldName(Schema unionSchema,
+                                                 Schema chosenType,
+                                                 int chosenTypeIdx) {
+<span class="fc" id="L282">    var types = unionSchema.getTypes();</span>
+<span class="pc bpc" id="L283" title="3 of 4 branches missed.">    if (types.size() == 2 &amp;&amp; types.contains(NULL_SCHEMA)) {</span>
+<span class="nc" id="L284">      return chosenType.getName();</span>
+    }
+<span class="fc bfc" id="L286" title="All 2 branches covered.">    for (int i = 0; i &lt; types.size(); i++) {</span>
+<span class="fc bfc" id="L287" title="All 4 branches covered.">      if (i != chosenTypeIdx &amp;&amp; chosenType.getName().equals(types.get(i).getName())) {</span>
+        // there is another type inside union with the same name
+        // so, we have to use fullname
+<span class="fc" id="L290">        return chosenType.getFullName();</span>
+      }
+    }
+<span class="fc" id="L293">    return chosenType.getName();</span>
+  }
+
+  private static Object processLogicalType(JsonNode node, Schema schema) {
+<span class="fc" id="L297">    return findConversion(schema)</span>
+<span class="fc" id="L298">        .map(c -&gt; c.jsonToAvroConversion.apply(node, schema))</span>
+<span class="fc" id="L299">        .orElseThrow(() -&gt;</span>
+<span class="nc" id="L300">            new JsonAvroConversionException(&quot;'%s' logical type is not supported&quot;</span>
+<span class="nc" id="L301">                .formatted(schema.getLogicalType().getName())));</span>
+  }
+
+  private static JsonNode processLogicalType(Object obj, Schema schema) {
+<span class="fc" id="L305">    return findConversion(schema)</span>
+<span class="fc" id="L306">        .map(c -&gt; c.avroToJsonConversion.apply(obj, schema))</span>
+<span class="fc" id="L307">        .orElseThrow(() -&gt;</span>
+<span class="nc" id="L308">            new JsonAvroConversionException(&quot;'%s' logical type is not supported&quot;</span>
+<span class="nc" id="L309">                .formatted(schema.getLogicalType().getName())));</span>
+  }
+
+  private static Optional&lt;LogicalTypeConversion&gt; findConversion(Schema schema) {
+<span class="fc" id="L313">    String logicalTypeName = schema.getLogicalType().getName();</span>
+<span class="fc" id="L314">    return Stream.of(LogicalTypeConversion.values())</span>
+<span class="fc" id="L315">        .filter(t -&gt; t.name.equalsIgnoreCase(logicalTypeName))</span>
+<span class="fc" id="L316">        .findFirst();</span>
+  }
+
+  private static boolean isLogicalType(Schema schema) {
+<span class="fc bfc" id="L320" title="All 2 branches covered.">    return schema.getLogicalType() != null;</span>
+  }
+
+  private static void assertJsonType(JsonNode node, JsonNodeType... allowedTypes) {
+<span class="fc bfc" id="L324" title="All 4 branches covered.">    if (Stream.of(allowedTypes).noneMatch(t -&gt; node.getNodeType() == t)) {</span>
+<span class="fc" id="L325">      throw new JsonAvroConversionException(</span>
+          &quot;%s node has unexpected type, allowed types %s, actual type %s&quot;
+<span class="fc" id="L327">              .formatted(node, Arrays.toString(allowedTypes), node.getNodeType()));</span>
+    }
+<span class="fc" id="L329">  }</span>
+
+  private static void assertJsonNumberType(JsonNode node, JsonParser.NumberType... allowedTypes) {
+<span class="pc bpc" id="L332" title="1 of 4 branches missed.">    if (Stream.of(allowedTypes).noneMatch(t -&gt; node.numberType() == t)) {</span>
+<span class="nc" id="L333">      throw new JsonAvroConversionException(</span>
+          &quot;%s node has unexpected numeric type, allowed types %s, actual type %s&quot;
+<span class="nc" id="L335">              .formatted(node, Arrays.toString(allowedTypes), node.numberType()));</span>
+    }
+<span class="fc" id="L337">  }</span>
+
+<span class="fc" id="L339">  enum LogicalTypeConversion {</span>
+
+<span class="fc" id="L341">    UUID(&quot;uuid&quot;,</span>
+        (node, schema) -&gt; {
+<span class="fc" id="L343">          assertJsonType(node, JsonNodeType.STRING);</span>
+<span class="fc" id="L344">          return java.util.UUID.fromString(node.asText());</span>
+        },
+        (obj, schema) -&gt; {
+<span class="fc" id="L347">          return new TextNode(obj.toString());</span>
+        },
+        new SimpleFieldSchema(
+            new SimpleJsonType(
+                JsonType.Type.STRING,
+<span class="fc" id="L352">                Map.of(FORMAT, new TextNode(&quot;uuid&quot;))))</span>
+    ),
+
+<span class="fc" id="L355">    DECIMAL(&quot;decimal&quot;,</span>
+        (node, schema) -&gt; {
+<span class="pc bpc" id="L357" title="1 of 2 branches missed.">          if (node.isTextual()) {</span>
+<span class="nc" id="L358">            return new BigDecimal(node.asText());</span>
+<span class="pc bpc" id="L359" title="1 of 2 branches missed.">          } else if (node.isNumber()) {</span>
+<span class="fc" id="L360">            return new BigDecimal(node.numberValue().toString());</span>
+          }
+<span class="nc" id="L362">          throw new JsonAvroConversionException(</span>
+              &quot;node '%s' can't be converted to decimal logical type&quot;
+<span class="nc" id="L364">                  .formatted(node));</span>
+        },
+        (obj, schema) -&gt; {
+<span class="fc" id="L367">          return new DecimalNode((BigDecimal) obj);</span>
+        },
+        new SimpleFieldSchema(new SimpleJsonType(JsonType.Type.NUMBER))
+    ),
+
+<span class="fc" id="L372">    DATE(&quot;date&quot;,</span>
+        (node, schema) -&gt; {
+<span class="pc bpc" id="L374" title="1 of 2 branches missed.">          if (node.isInt()) {</span>
+<span class="nc" id="L375">            return LocalDate.ofEpochDay(node.intValue());</span>
+<span class="pc bpc" id="L376" title="1 of 2 branches missed.">          } else if (node.isTextual()) {</span>
+<span class="fc" id="L377">            return LocalDate.parse(node.asText());</span>
+          } else {
+<span class="nc" id="L379">            throw new JsonAvroConversionException(</span>
+                &quot;node '%s' can't be converted to date logical type&quot;
+<span class="nc" id="L381">                    .formatted(node));</span>
+          }
+        },
+        (obj, schema) -&gt; {
+<span class="fc" id="L385">          return new TextNode(obj.toString());</span>
+        },
+        new SimpleFieldSchema(
+            new SimpleJsonType(
+                JsonType.Type.STRING,
+<span class="fc" id="L390">                Map.of(FORMAT, new TextNode(&quot;date&quot;))))</span>
+    ),
+
+<span class="fc" id="L393">    TIME_MILLIS(&quot;time-millis&quot;,</span>
+        (node, schema) -&gt; {
+<span class="pc bpc" id="L395" title="1 of 2 branches missed.">          if (node.isIntegralNumber()) {</span>
+<span class="nc" id="L396">            return LocalTime.ofNanoOfDay(TimeUnit.MILLISECONDS.toNanos(node.longValue()));</span>
+<span class="pc bpc" id="L397" title="1 of 2 branches missed.">          } else if (node.isTextual()) {</span>
+<span class="fc" id="L398">            return LocalTime.parse(node.asText());</span>
+          } else {
+<span class="nc" id="L400">            throw new JsonAvroConversionException(</span>
+                &quot;node '%s' can't be converted to time-millis logical type&quot;
+<span class="nc" id="L402">                    .formatted(node));</span>
+          }
+        },
+        (obj, schema) -&gt; {
+<span class="fc" id="L406">          return new TextNode(obj.toString());</span>
+        },
+        new SimpleFieldSchema(
+            new SimpleJsonType(
+                JsonType.Type.STRING,
+<span class="fc" id="L411">                Map.of(FORMAT, new TextNode(&quot;time&quot;))))</span>
+    ),
+
+<span class="fc" id="L414">    TIME_MICROS(&quot;time-micros&quot;,</span>
+        (node, schema) -&gt; {
+<span class="pc bpc" id="L416" title="1 of 2 branches missed.">          if (node.isIntegralNumber()) {</span>
+<span class="nc" id="L417">            return LocalTime.ofNanoOfDay(TimeUnit.MICROSECONDS.toNanos(node.longValue()));</span>
+<span class="pc bpc" id="L418" title="1 of 2 branches missed.">          } else if (node.isTextual()) {</span>
+<span class="fc" id="L419">            return LocalTime.parse(node.asText());</span>
+          } else {
+<span class="nc" id="L421">            throw new JsonAvroConversionException(</span>
+                &quot;node '%s' can't be converted to time-micros logical type&quot;
+<span class="nc" id="L423">                    .formatted(node));</span>
+          }
+        },
+        (obj, schema) -&gt; {
+<span class="fc" id="L427">          return new TextNode(obj.toString());</span>
+        },
+        new SimpleFieldSchema(
+            new SimpleJsonType(
+                JsonType.Type.STRING,
+<span class="fc" id="L432">                Map.of(FORMAT, new TextNode(&quot;time&quot;))))</span>
+    ),
+
+<span class="fc" id="L435">    TIMESTAMP_MILLIS(&quot;timestamp-millis&quot;,</span>
+        (node, schema) -&gt; {
+<span class="pc bpc" id="L437" title="1 of 2 branches missed.">          if (node.isIntegralNumber()) {</span>
+<span class="nc" id="L438">            return Instant.ofEpochMilli(node.longValue());</span>
+<span class="pc bpc" id="L439" title="1 of 2 branches missed.">          } else if (node.isTextual()) {</span>
+<span class="fc" id="L440">            return Instant.parse(node.asText());</span>
+          } else {
+<span class="nc" id="L442">            throw new JsonAvroConversionException(</span>
+                &quot;node '%s' can't be converted to timestamp-millis logical type&quot;
+<span class="nc" id="L444">                    .formatted(node));</span>
+          }
+        },
+        (obj, schema) -&gt; {
+<span class="fc" id="L448">          return new TextNode(obj.toString());</span>
+        },
+        new SimpleFieldSchema(
+            new SimpleJsonType(
+                JsonType.Type.STRING,
+<span class="fc" id="L453">                Map.of(FORMAT, new TextNode(DATE_TIME))))</span>
+    ),
+
+<span class="fc" id="L456">    TIMESTAMP_MICROS(&quot;timestamp-micros&quot;,</span>
+        (node, schema) -&gt; {
+<span class="pc bpc" id="L458" title="1 of 2 branches missed.">          if (node.isIntegralNumber()) {</span>
+            // TimeConversions.TimestampMicrosConversion for impl
+<span class="nc" id="L460">            long microsFromEpoch = node.longValue();</span>
+<span class="nc" id="L461">            long epochSeconds = microsFromEpoch / (1_000_000L);</span>
+<span class="nc" id="L462">            long nanoAdjustment = (microsFromEpoch % (1_000_000L)) * 1_000L;</span>
+<span class="nc" id="L463">            return Instant.ofEpochSecond(epochSeconds, nanoAdjustment);</span>
+<span class="pc bpc" id="L464" title="1 of 2 branches missed.">          } else if (node.isTextual()) {</span>
+<span class="fc" id="L465">            return Instant.parse(node.asText());</span>
+          } else {
+<span class="nc" id="L467">            throw new JsonAvroConversionException(</span>
+                &quot;node '%s' can't be converted to timestamp-millis logical type&quot;
+<span class="nc" id="L469">                    .formatted(node));</span>
+          }
+        },
+        (obj, schema) -&gt; {
+<span class="fc" id="L473">          return new TextNode(obj.toString());</span>
+        },
+        new SimpleFieldSchema(
+            new SimpleJsonType(
+                JsonType.Type.STRING,
+<span class="fc" id="L478">                Map.of(FORMAT, new TextNode(DATE_TIME))))</span>
+    ),
+
+<span class="fc" id="L481">    LOCAL_TIMESTAMP_MILLIS(&quot;local-timestamp-millis&quot;,</span>
+        (node, schema) -&gt; {
+<span class="pc bpc" id="L483" title="1 of 2 branches missed.">          if (node.isTextual()) {</span>
+<span class="fc" id="L484">            return LocalDateTime.parse(node.asText());</span>
+          }
+          // TimeConversions.TimestampMicrosConversion for impl
+<span class="nc" id="L487">          Instant instant = (Instant) TIMESTAMP_MILLIS.jsonToAvroConversion.apply(node, schema);</span>
+<span class="nc" id="L488">          return LocalDateTime.ofInstant(instant, ZoneOffset.UTC);</span>
+        },
+        (obj, schema) -&gt; {
+<span class="fc" id="L491">          return new TextNode(obj.toString());</span>
+        },
+        new SimpleFieldSchema(
+            new SimpleJsonType(
+                JsonType.Type.STRING,
+<span class="fc" id="L496">                Map.of(FORMAT, new TextNode(DATE_TIME))))</span>
+    ),
+
+<span class="fc" id="L499">    LOCAL_TIMESTAMP_MICROS(&quot;local-timestamp-micros&quot;,</span>
+        (node, schema) -&gt; {
+<span class="pc bpc" id="L501" title="1 of 2 branches missed.">          if (node.isTextual()) {</span>
+<span class="fc" id="L502">            return LocalDateTime.parse(node.asText());</span>
+          }
+<span class="nc" id="L504">          Instant instant = (Instant) TIMESTAMP_MICROS.jsonToAvroConversion.apply(node, schema);</span>
+<span class="nc" id="L505">          return LocalDateTime.ofInstant(instant, ZoneOffset.UTC);</span>
+        },
+        (obj, schema) -&gt; {
+<span class="fc" id="L508">          return new TextNode(obj.toString());</span>
+        },
+        new SimpleFieldSchema(
+            new SimpleJsonType(
+                JsonType.Type.STRING,
+<span class="fc" id="L513">                Map.of(FORMAT, new TextNode(DATE_TIME))))</span>
+    );
+
+    private final String name;
+    private final BiFunction&lt;JsonNode, Schema, Object&gt; jsonToAvroConversion;
+    private final BiFunction&lt;Object, Schema, JsonNode&gt; avroToJsonConversion;
+    private final FieldSchema jsonSchema;
+
+    LogicalTypeConversion(String name,
+                          BiFunction&lt;JsonNode, Schema, Object&gt; jsonToAvroConversion,
+                          BiFunction&lt;Object, Schema, JsonNode&gt; avroToJsonConversion,
+<span class="fc" id="L524">                          FieldSchema jsonSchema) {</span>
+<span class="fc" id="L525">      this.name = name;</span>
+<span class="fc" id="L526">      this.jsonToAvroConversion = jsonToAvroConversion;</span>
+<span class="fc" id="L527">      this.avroToJsonConversion = avroToJsonConversion;</span>
+<span class="fc" id="L528">      this.jsonSchema = jsonSchema;</span>
+<span class="fc" id="L529">    }</span>
+
+    static Optional&lt;FieldSchema&gt; getJsonSchema(Schema schema) {
+<span class="pc bpc" id="L532" title="1 of 2 branches missed.">      if (schema.getLogicalType() == null) {</span>
+<span class="fc" id="L533">        return Optional.empty();</span>
+      }
+<span class="nc" id="L535">      String logicalTypeName = schema.getLogicalType().getName();</span>
+<span class="nc" id="L536">      return Stream.of(JsonAvroConversion.LogicalTypeConversion.values())</span>
+<span class="nc" id="L537">          .filter(t -&gt; t.name.equalsIgnoreCase(logicalTypeName))</span>
+<span class="nc" id="L538">          .map(c -&gt; c.jsonSchema)</span>
+<span class="nc" id="L539">          .findFirst();</span>
+    }
+  }
+
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

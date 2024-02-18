@@ -10,6 +10,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.client.MultipartBodyBuilder;
 import org.springframework.test.web.reactive.server.WebTestClient;
 import org.springframework.util.MultiValueMap;
@@ -38,6 +40,28 @@ class ApplicationConfigControllerTest extends AbstractIntegrationTest {
     assertThat(result.getLocation()).isNotNull();
     assertThat(Path.of(result.getLocation()))
         .hasSameBinaryContentAs(fileToUpload.getFile().toPath());
+  }
+
+  @Test
+  public void testUploadWithInvalidFile() {
+    var invalidFile = new ClassPathResource("/invalidFile.txt", this.getClass());
+
+    webTestClient.post()
+            .uri("/api/config/relatedfiles")
+            .bodyValue(generateBody(invalidFile))
+            .exchange()
+            .expectStatus().is5xxServerError();
+  }
+
+  @Test
+  public void testUploadEndpointNotFound() {
+    var fileToUpload = new ClassPathResource("/fileForUploadTest.txt", this.getClass());
+
+    webTestClient.post()
+            .uri("/api/config/nonexistentendpoint")
+            .bodyValue(generateBody(fileToUpload))
+            .exchange()
+            .expectStatus().isNotFound();
   }
 
   private MultiValueMap<String, HttpEntity<?>> generateBody(ClassPathResource resource) {

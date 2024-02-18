@@ -1,0 +1,206 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ConsumerGroupsController.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">kafka-ui-api</a> &gt; <a href="index.source.html" class="el_package">com.provectus.kafka.ui.controller</a> &gt; <span class="el_source">ConsumerGroupsController.java</span></div><h1>ConsumerGroupsController.java</h1><pre class="source lang-java linenums">package com.provectus.kafka.ui.controller;
+
+import static com.provectus.kafka.ui.model.rbac.permission.ConsumerGroupAction.DELETE;
+import static com.provectus.kafka.ui.model.rbac.permission.ConsumerGroupAction.RESET_OFFSETS;
+import static com.provectus.kafka.ui.model.rbac.permission.ConsumerGroupAction.VIEW;
+import static java.util.stream.Collectors.toMap;
+
+import com.provectus.kafka.ui.api.ConsumerGroupsApi;
+import com.provectus.kafka.ui.exception.ValidationException;
+import com.provectus.kafka.ui.mapper.ConsumerGroupMapper;
+import com.provectus.kafka.ui.model.ConsumerGroupDTO;
+import com.provectus.kafka.ui.model.ConsumerGroupDetailsDTO;
+import com.provectus.kafka.ui.model.ConsumerGroupOffsetsResetDTO;
+import com.provectus.kafka.ui.model.ConsumerGroupOrderingDTO;
+import com.provectus.kafka.ui.model.ConsumerGroupsPageResponseDTO;
+import com.provectus.kafka.ui.model.PartitionOffsetDTO;
+import com.provectus.kafka.ui.model.SortOrderDTO;
+import com.provectus.kafka.ui.model.rbac.AccessContext;
+import com.provectus.kafka.ui.model.rbac.permission.TopicAction;
+import com.provectus.kafka.ui.service.ConsumerGroupService;
+import com.provectus.kafka.ui.service.OffsetsResetService;
+import java.util.Map;
+import java.util.Optional;
+import java.util.function.Supplier;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.ResponseEntity;
+import org.springframework.util.CollectionUtils;
+import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ServerWebExchange;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
+
+@RestController
+<span class="fc" id="L36">@RequiredArgsConstructor</span>
+<span class="fc" id="L37">@Slf4j</span>
+public class ConsumerGroupsController extends AbstractController implements ConsumerGroupsApi {
+
+  private final ConsumerGroupService consumerGroupService;
+  private final OffsetsResetService offsetsResetService;
+
+  @Value(&quot;${consumer.groups.page.size:25}&quot;)
+  private int defaultConsumerGroupsPageSize;
+
+  @Override
+  public Mono&lt;ResponseEntity&lt;Void&gt;&gt; deleteConsumerGroup(String clusterName,
+                                                        String id,
+                                                        ServerWebExchange exchange) {
+<span class="fc" id="L50">    var context = AccessContext.builder()</span>
+<span class="fc" id="L51">        .cluster(clusterName)</span>
+<span class="fc" id="L52">        .consumerGroup(id)</span>
+<span class="fc" id="L53">        .consumerGroupActions(DELETE)</span>
+<span class="fc" id="L54">        .operationName(&quot;deleteConsumerGroup&quot;)</span>
+<span class="fc" id="L55">        .build();</span>
+
+<span class="fc" id="L57">    return validateAccess(context)</span>
+<span class="fc" id="L58">        .then(consumerGroupService.deleteConsumerGroupById(getCluster(clusterName), id))</span>
+<span class="fc" id="L59">        .doOnEach(sig -&gt; audit(context, sig))</span>
+<span class="fc" id="L60">        .thenReturn(ResponseEntity.ok().build());</span>
+  }
+
+  @Override
+  public Mono&lt;ResponseEntity&lt;ConsumerGroupDetailsDTO&gt;&gt; getConsumerGroup(String clusterName,
+                                                                        String consumerGroupId,
+                                                                        ServerWebExchange exchange) {
+<span class="nc" id="L67">    var context = AccessContext.builder()</span>
+<span class="nc" id="L68">        .cluster(clusterName)</span>
+<span class="nc" id="L69">        .consumerGroup(consumerGroupId)</span>
+<span class="nc" id="L70">        .consumerGroupActions(VIEW)</span>
+<span class="nc" id="L71">        .operationName(&quot;getConsumerGroup&quot;)</span>
+<span class="nc" id="L72">        .build();</span>
+
+<span class="nc" id="L74">    return validateAccess(context)</span>
+<span class="nc" id="L75">        .then(consumerGroupService.getConsumerGroupDetail(getCluster(clusterName), consumerGroupId)</span>
+<span class="nc" id="L76">            .map(ConsumerGroupMapper::toDetailsDto)</span>
+<span class="nc" id="L77">            .map(ResponseEntity::ok))</span>
+<span class="nc" id="L78">        .doOnEach(sig -&gt; audit(context, sig));</span>
+  }
+
+  @Override
+  public Mono&lt;ResponseEntity&lt;Flux&lt;ConsumerGroupDTO&gt;&gt;&gt; getTopicConsumerGroups(String clusterName,
+                                                                             String topicName,
+                                                                             ServerWebExchange exchange) {
+<span class="nc" id="L85">    var context = AccessContext.builder()</span>
+<span class="nc" id="L86">        .cluster(clusterName)</span>
+<span class="nc" id="L87">        .topic(topicName)</span>
+<span class="nc" id="L88">        .topicActions(TopicAction.VIEW)</span>
+<span class="nc" id="L89">        .operationName(&quot;getTopicConsumerGroups&quot;)</span>
+<span class="nc" id="L90">        .build();</span>
+
+<span class="nc" id="L92">    Mono&lt;ResponseEntity&lt;Flux&lt;ConsumerGroupDTO&gt;&gt;&gt; job =</span>
+<span class="nc" id="L93">        consumerGroupService.getConsumerGroupsForTopic(getCluster(clusterName), topicName)</span>
+<span class="nc" id="L94">            .flatMapMany(Flux::fromIterable)</span>
+<span class="nc" id="L95">            .filterWhen(cg -&gt; accessControlService.isConsumerGroupAccessible(cg.getGroupId(), clusterName))</span>
+<span class="nc" id="L96">            .map(ConsumerGroupMapper::toDto)</span>
+<span class="nc" id="L97">            .collectList()</span>
+<span class="nc" id="L98">            .map(Flux::fromIterable)</span>
+<span class="nc" id="L99">            .map(ResponseEntity::ok)</span>
+<span class="nc" id="L100">            .switchIfEmpty(Mono.just(ResponseEntity.notFound().build()));</span>
+
+<span class="nc" id="L102">    return validateAccess(context)</span>
+<span class="nc" id="L103">        .then(job)</span>
+<span class="nc" id="L104">        .doOnEach(sig -&gt; audit(context, sig));</span>
+  }
+
+  @Override
+  public Mono&lt;ResponseEntity&lt;ConsumerGroupsPageResponseDTO&gt;&gt; getConsumerGroupsPage(
+      String clusterName,
+      Integer page,
+      Integer perPage,
+      String search,
+      ConsumerGroupOrderingDTO orderBy,
+      SortOrderDTO sortOrderDto,
+      ServerWebExchange exchange) {
+
+<span class="fc" id="L117">    var context = AccessContext.builder()</span>
+<span class="fc" id="L118">        .cluster(clusterName)</span>
+        // consumer group access validation is within the service
+<span class="fc" id="L120">        .operationName(&quot;getConsumerGroupsPage&quot;)</span>
+<span class="fc" id="L121">        .build();</span>
+
+<span class="fc" id="L123">    return validateAccess(context).then(</span>
+<span class="fc" id="L124">        consumerGroupService.getConsumerGroupsPage(</span>
+<span class="fc" id="L125">                getCluster(clusterName),</span>
+<span class="pc bnc" id="L126" title="All 2 branches missed.">                Optional.ofNullable(page).filter(i -&gt; i &gt; 0).orElse(1),</span>
+<span class="pc bpc" id="L127" title="1 of 2 branches missed.">                Optional.ofNullable(perPage).filter(i -&gt; i &gt; 0).orElse(defaultConsumerGroupsPageSize),</span>
+                search,
+<span class="fc" id="L129">                Optional.ofNullable(orderBy).orElse(ConsumerGroupOrderingDTO.NAME),</span>
+<span class="fc" id="L130">                Optional.ofNullable(sortOrderDto).orElse(SortOrderDTO.ASC)</span>
+            )
+<span class="fc" id="L132">            .map(this::convertPage)</span>
+<span class="fc" id="L133">            .map(ResponseEntity::ok)</span>
+<span class="fc" id="L134">    ).doOnEach(sig -&gt; audit(context, sig));</span>
+  }
+
+  @Override
+  public Mono&lt;ResponseEntity&lt;Void&gt;&gt; resetConsumerGroupOffsets(String clusterName,
+                                                              String group,
+                                                              Mono&lt;ConsumerGroupOffsetsResetDTO&gt; resetDto,
+                                                              ServerWebExchange exchange) {
+<span class="nc" id="L142">    return resetDto.flatMap(reset -&gt; {</span>
+<span class="nc" id="L143">      var context = AccessContext.builder()</span>
+<span class="nc" id="L144">          .cluster(clusterName)</span>
+<span class="nc" id="L145">          .topic(reset.getTopic())</span>
+<span class="nc" id="L146">          .topicActions(TopicAction.VIEW)</span>
+<span class="nc" id="L147">          .consumerGroupActions(RESET_OFFSETS)</span>
+<span class="nc" id="L148">          .operationName(&quot;resetConsumerGroupOffsets&quot;)</span>
+<span class="nc" id="L149">          .build();</span>
+
+<span class="nc" id="L151">      Supplier&lt;Mono&lt;Void&gt;&gt; mono = () -&gt; {</span>
+<span class="nc" id="L152">        var cluster = getCluster(clusterName);</span>
+<span class="nc bnc" id="L153" title="All 5 branches missed.">        switch (reset.getResetType()) {</span>
+          case EARLIEST:
+<span class="nc" id="L155">            return offsetsResetService</span>
+<span class="nc" id="L156">                .resetToEarliest(cluster, group, reset.getTopic(), reset.getPartitions());</span>
+          case LATEST:
+<span class="nc" id="L158">            return offsetsResetService</span>
+<span class="nc" id="L159">                .resetToLatest(cluster, group, reset.getTopic(), reset.getPartitions());</span>
+          case TIMESTAMP:
+<span class="nc bnc" id="L161" title="All 2 branches missed.">            if (reset.getResetToTimestamp() == null) {</span>
+<span class="nc" id="L162">              return Mono.error(</span>
+                  new ValidationException(
+                      &quot;resetToTimestamp is required when TIMESTAMP reset type used&quot;
+                  )
+              );
+            }
+<span class="nc" id="L168">            return offsetsResetService</span>
+<span class="nc" id="L169">                .resetToTimestamp(cluster, group, reset.getTopic(), reset.getPartitions(),</span>
+<span class="nc" id="L170">                    reset.getResetToTimestamp());</span>
+          case OFFSET:
+<span class="nc bnc" id="L172" title="All 2 branches missed.">            if (CollectionUtils.isEmpty(reset.getPartitionsOffsets())) {</span>
+<span class="nc" id="L173">              return Mono.error(</span>
+                  new ValidationException(
+                      &quot;partitionsOffsets is required when OFFSET reset type used&quot;
+                  )
+              );
+            }
+<span class="nc" id="L179">            Map&lt;Integer, Long&gt; offsets = reset.getPartitionsOffsets().stream()</span>
+<span class="nc" id="L180">                .collect(toMap(PartitionOffsetDTO::getPartition, PartitionOffsetDTO::getOffset));</span>
+<span class="nc" id="L181">            return offsetsResetService.resetToOffsets(cluster, group, reset.getTopic(), offsets);</span>
+          default:
+<span class="nc" id="L183">            return Mono.error(</span>
+<span class="nc" id="L184">                new ValidationException(&quot;Unknown resetType &quot; + reset.getResetType())</span>
+            );
+        }
+      };
+
+<span class="nc" id="L189">      return validateAccess(context)</span>
+<span class="nc" id="L190">          .then(mono.get())</span>
+<span class="nc" id="L191">          .doOnEach(sig -&gt; audit(context, sig));</span>
+<span class="nc" id="L192">    }).thenReturn(ResponseEntity.ok().build());</span>
+  }
+
+  private ConsumerGroupsPageResponseDTO convertPage(ConsumerGroupService.ConsumerGroupsPage
+                                                        consumerGroupConsumerGroupsPage) {
+<span class="fc" id="L197">    return new ConsumerGroupsPageResponseDTO()</span>
+<span class="fc" id="L198">        .pageCount(consumerGroupConsumerGroupsPage.totalPages())</span>
+<span class="fc" id="L199">        .consumerGroups(consumerGroupConsumerGroupsPage.consumerGroups()</span>
+<span class="fc" id="L200">            .stream()</span>
+<span class="fc" id="L201">            .map(ConsumerGroupMapper::toDto)</span>
+<span class="fc" id="L202">            .toList());</span>
+  }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

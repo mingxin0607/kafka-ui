@@ -1,0 +1,221 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>JmxSslSocketFactory.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">kafka-ui-api</a> &gt; <a href="index.source.html" class="el_package">com.provectus.kafka.ui.service.metrics</a> &gt; <span class="el_source">JmxSslSocketFactory.java</span></div><h1>JmxSslSocketFactory.java</h1><pre class="source lang-java linenums">package com.provectus.kafka.ui.service.metrics;
+
+import com.google.common.base.Preconditions;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.lang.reflect.Field;
+import java.net.InetAddress;
+import java.net.Socket;
+import java.net.UnknownHostException;
+import java.security.KeyStore;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import javax.annotation.Nullable;
+import javax.net.ssl.KeyManagerFactory;
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.TrustManagerFactory;
+import javax.rmi.ssl.SslRMIClientSocketFactory;
+import lombok.SneakyThrows;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.util.ResourceUtils;
+
+/*
+ * Purpose of this class to provide an ability to connect to different JMX endpoints using different keystores.
+ *
+ * Usually, when you want to establish SSL JMX connection you set &quot;com.sun.jndi.rmi.factory.socket&quot; env
+ * property to SslRMIClientSocketFactory instance. SslRMIClientSocketFactory itself uses SSLSocketFactory.getDefault()
+ * as a socket factory implementation. Problem here is that when ones SslRMIClientSocketFactory instance is created,
+ * the same cached SSLSocketFactory instance will be used to establish connection with *all* JMX endpoints.
+ * Moreover, even if we submit custom SslRMIClientSocketFactory implementation which takes specific ssl context
+ * into account, SslRMIClientSocketFactory is
+ * internally created during RMI calls.
+ *
+ * So, the only way we found to deal with it is to change internal field ('defaultSocketFactory') of
+ * SslRMIClientSocketFactory to our custom impl, and left all internal RMI code work as is.
+ * Since RMI code is synchronous, we can pass parameters (which are truststore/keystore) to our custom factory
+ * that we want to use when creating ssl socket via ThreadLocal variables.
+ *
+ * NOTE 1: Theoretically we could avoid using reflection to set internal field set by
+ * setting &quot;ssl.SocketFactory.provider&quot; security property (see code in SSLSocketFactory.getDefault()),
+ * but that code uses systemClassloader which is not working right when we're creating executable spring boot jar
+ * (https://docs.spring.io/spring-boot/docs/current/reference/html/executable-jar.html#appendix.executable-jar.restrictions).
+ * We can use this if we swith to other jar-packing solutions in the future.
+ *
+ * NOTE 2: There are two paths from which socket factory is called - when jmx connection if established (we manage this
+ * by passing ThreadLocal vars) and from DGCClient in background thread - we deal with that we cache created factories
+ * for specific host+port.
+ *
+ */
+<span class="fc" id="L49">@Slf4j</span>
+class JmxSslSocketFactory extends javax.net.ssl.SSLSocketFactory {
+
+  private static final boolean SSL_JMX_SUPPORTED;
+
+  static {
+<span class="fc" id="L55">    boolean sslJmxSupported = false;</span>
+    try {
+<span class="fc" id="L57">      Field defaultSocketFactoryField = SslRMIClientSocketFactory.class.getDeclaredField(&quot;defaultSocketFactory&quot;);</span>
+<span class="nc" id="L58">      defaultSocketFactoryField.setAccessible(true);</span>
+<span class="nc" id="L59">      defaultSocketFactoryField.set(null, new JmxSslSocketFactory());</span>
+<span class="nc" id="L60">      sslJmxSupported = true;</span>
+<span class="fc" id="L61">    } catch (Exception e) {</span>
+<span class="fc" id="L62">      log.error(&quot;----------------------------------&quot;);</span>
+<span class="fc" id="L63">      log.error(&quot;SSL can't be enabled for JMX retrieval. &quot;</span>
+              + &quot;Make sure your java app run with '--add-opens java.rmi/javax.rmi.ssl=ALL-UNNAMED' arg. Err: {}&quot;,
+<span class="fc" id="L65">          e.getMessage());</span>
+<span class="fc" id="L66">      log.trace(&quot;SSL can't be enabled for JMX retrieval&quot;, e);</span>
+<span class="fc" id="L67">      log.error(&quot;----------------------------------&quot;);</span>
+<span class="nc" id="L68">    }</span>
+<span class="fc" id="L69">    SSL_JMX_SUPPORTED = sslJmxSupported;</span>
+  }
+
+  public static boolean initialized() {
+<span class="fc" id="L73">    return SSL_JMX_SUPPORTED;</span>
+  }
+
+<span class="fc" id="L76">  private static final ThreadLocal&lt;Ssl&gt; SSL_CONTEXT_THREAD_LOCAL = new ThreadLocal&lt;&gt;();</span>
+
+<span class="fc" id="L78">  private static final Map&lt;HostAndPort, javax.net.ssl.SSLSocketFactory&gt; CACHED_FACTORIES = new ConcurrentHashMap&lt;&gt;();</span>
+
+<span class="nc" id="L80">  private record HostAndPort(String host, int port) {</span>
+  }
+
+<span class="nc" id="L83">  private record Ssl(@Nullable String truststoreLocation,</span>
+                     @Nullable String truststorePassword,
+                     @Nullable String keystoreLocation,
+                     @Nullable String keystorePassword) {
+  }
+
+  public static void setSslContextThreadLocal(@Nullable String truststoreLocation,
+                                              @Nullable String truststorePassword,
+                                              @Nullable String keystoreLocation,
+                                              @Nullable String keystorePassword) {
+<span class="nc" id="L93">    SSL_CONTEXT_THREAD_LOCAL.set(</span>
+        new Ssl(truststoreLocation, truststorePassword, keystoreLocation, keystorePassword));
+<span class="nc" id="L95">  }</span>
+
+  // should be called when (host:port) -&gt; factory cache should be invalidated (ex. on app config reload)
+  public static void clearFactoriesCache() {
+<span class="nc" id="L99">    CACHED_FACTORIES.clear();</span>
+<span class="nc" id="L100">  }</span>
+
+  public static void clearThreadLocalContext() {
+<span class="nc" id="L103">    SSL_CONTEXT_THREAD_LOCAL.set(null);</span>
+<span class="nc" id="L104">  }</span>
+
+  public static void editJmxConnectorEnv(Map&lt;String, Object&gt; env) {
+<span class="nc" id="L107">    env.put(&quot;com.sun.jndi.rmi.factory.socket&quot;, new SslRMIClientSocketFactory());</span>
+<span class="nc" id="L108">  }</span>
+
+  //-----------------------------------------------------------------------------------------------
+
+  private final javax.net.ssl.SSLSocketFactory defaultSocketFactory;
+
+<span class="nc" id="L114">  @SneakyThrows</span>
+<span class="nc" id="L115">  public JmxSslSocketFactory() {</span>
+<span class="nc" id="L116">    this.defaultSocketFactory = SSLContext.getDefault().getSocketFactory();</span>
+<span class="nc" id="L117">  }</span>
+
+<span class="nc" id="L119">  @SneakyThrows</span>
+  private javax.net.ssl.SSLSocketFactory createFactoryFromThreadLocalCtx() {
+<span class="nc" id="L121">    Ssl ssl = Preconditions.checkNotNull(SSL_CONTEXT_THREAD_LOCAL.get());</span>
+
+<span class="nc" id="L123">    var trustManagerFactory = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());</span>
+<span class="nc bnc" id="L124" title="All 4 branches missed.">    if (ssl.truststoreLocation() != null &amp;&amp; ssl.truststorePassword() != null) {</span>
+<span class="nc" id="L125">      KeyStore trustStore = KeyStore.getInstance(KeyStore.getDefaultType());</span>
+<span class="nc" id="L126">      trustStore.load(</span>
+<span class="nc" id="L127">          new FileInputStream((ResourceUtils.getFile(ssl.truststoreLocation()))),</span>
+<span class="nc" id="L128">          ssl.truststorePassword().toCharArray()</span>
+      );
+<span class="nc" id="L130">      trustManagerFactory.init(trustStore);</span>
+    }
+
+<span class="nc" id="L133">    var keyManagerFactory = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());</span>
+<span class="nc bnc" id="L134" title="All 4 branches missed.">    if (ssl.keystoreLocation() != null &amp;&amp; ssl.keystorePassword() != null) {</span>
+<span class="nc" id="L135">      KeyStore keyStore = KeyStore.getInstance(KeyStore.getDefaultType());</span>
+<span class="nc" id="L136">      keyStore.load(</span>
+<span class="nc" id="L137">          new FileInputStream(ResourceUtils.getFile(ssl.keystoreLocation())),</span>
+<span class="nc" id="L138">          ssl.keystorePassword().toCharArray()</span>
+      );
+<span class="nc" id="L140">      keyManagerFactory.init(keyStore, ssl.keystorePassword().toCharArray());</span>
+    }
+
+<span class="nc" id="L143">    SSLContext ctx = SSLContext.getInstance(&quot;TLS&quot;);</span>
+<span class="nc" id="L144">    ctx.init(</span>
+<span class="nc" id="L145">        keyManagerFactory.getKeyManagers(),</span>
+<span class="nc" id="L146">        trustManagerFactory.getTrustManagers(),</span>
+        null
+    );
+<span class="nc" id="L149">    return ctx.getSocketFactory();</span>
+  }
+
+  private boolean threadLocalContextSet() {
+<span class="nc bnc" id="L153" title="All 2 branches missed.">    return SSL_CONTEXT_THREAD_LOCAL.get() != null;</span>
+  }
+
+  @Override
+  public Socket createSocket(String host, int port) throws IOException {
+<span class="nc" id="L158">    var hostAndPort = new HostAndPort(host, port);</span>
+<span class="nc bnc" id="L159" title="All 2 branches missed.">    if (CACHED_FACTORIES.containsKey(hostAndPort)) {</span>
+<span class="nc" id="L160">      return CACHED_FACTORIES.get(hostAndPort).createSocket(host, port);</span>
+<span class="nc bnc" id="L161" title="All 2 branches missed.">    } else if (threadLocalContextSet()) {</span>
+<span class="nc" id="L162">      var factory = createFactoryFromThreadLocalCtx();</span>
+<span class="nc" id="L163">      CACHED_FACTORIES.put(hostAndPort, factory);</span>
+<span class="nc" id="L164">      return factory.createSocket(host, port);</span>
+    }
+<span class="nc" id="L166">    return defaultSocketFactory.createSocket(host, port);</span>
+  }
+
+  /// FOLLOWING METHODS WON'T BE USED DURING JMX INTERACTION, IMPLEMENTING THEM JUST FOR CONSISTENCY -&gt;&gt;&gt;&gt;&gt;
+
+  @Override
+  public Socket createSocket(Socket s, String host, int port, boolean autoClose) throws IOException {
+<span class="nc bnc" id="L173" title="All 2 branches missed.">    if (threadLocalContextSet()) {</span>
+<span class="nc" id="L174">      return createFactoryFromThreadLocalCtx().createSocket(s, host, port, autoClose);</span>
+    }
+<span class="nc" id="L176">    return defaultSocketFactory.createSocket(s, host, port, autoClose);</span>
+  }
+
+  @Override
+  public Socket createSocket(String host, int port, InetAddress localHost, int localPort)
+      throws IOException, UnknownHostException {
+<span class="nc bnc" id="L182" title="All 2 branches missed.">    if (threadLocalContextSet()) {</span>
+<span class="nc" id="L183">      return createFactoryFromThreadLocalCtx().createSocket(host, port, localHost, localPort);</span>
+    }
+<span class="nc" id="L185">    return defaultSocketFactory.createSocket(host, port, localHost, localPort);</span>
+  }
+
+  @Override
+  public Socket createSocket(InetAddress host, int port) throws IOException {
+<span class="nc bnc" id="L190" title="All 2 branches missed.">    if (threadLocalContextSet()) {</span>
+<span class="nc" id="L191">      return createFactoryFromThreadLocalCtx().createSocket(host, port);</span>
+    }
+<span class="nc" id="L193">    return defaultSocketFactory.createSocket(host, port);</span>
+  }
+
+  @Override
+  public Socket createSocket(InetAddress address, int port, InetAddress localAddress, int localPort)
+      throws IOException {
+<span class="nc bnc" id="L199" title="All 2 branches missed.">    if (threadLocalContextSet()) {</span>
+<span class="nc" id="L200">      return createFactoryFromThreadLocalCtx().createSocket(address, port, localAddress, localPort);</span>
+    }
+<span class="nc" id="L202">    return defaultSocketFactory.createSocket(address, port, localAddress, localPort);</span>
+  }
+
+  @Override
+  public String[] getDefaultCipherSuites() {
+<span class="nc bnc" id="L207" title="All 2 branches missed.">    if (threadLocalContextSet()) {</span>
+<span class="nc" id="L208">      return createFactoryFromThreadLocalCtx().getDefaultCipherSuites();</span>
+    }
+<span class="nc" id="L210">    return defaultSocketFactory.getDefaultCipherSuites();</span>
+  }
+
+  @Override
+  public String[] getSupportedCipherSuites() {
+<span class="nc bnc" id="L215" title="All 2 branches missed.">    if (threadLocalContextSet()) {</span>
+<span class="nc" id="L216">      return createFactoryFromThreadLocalCtx().getSupportedCipherSuites();</span>
+    }
+<span class="nc" id="L218">    return defaultSocketFactory.getSupportedCipherSuites();</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ErrorCode.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">kafka-ui-api</a> &gt; <a href="index.source.html" class="el_package">com.provectus.kafka.ui.exception</a> &gt; <span class="el_source">ErrorCode.java</span></div><h1>ErrorCode.java</h1><pre class="source lang-java linenums">package com.provectus.kafka.ui.exception;
+
+import java.util.HashSet;
+import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpStatus;
+
+
+<span class="fc" id="L8">public enum ErrorCode {</span>
+
+<span class="fc" id="L10">  FORBIDDEN(403, HttpStatus.FORBIDDEN),</span>
+
+<span class="fc" id="L12">  UNEXPECTED(5000, HttpStatus.INTERNAL_SERVER_ERROR),</span>
+<span class="fc" id="L13">  KSQL_API_ERROR(5001, HttpStatus.INTERNAL_SERVER_ERROR),</span>
+<span class="fc" id="L14">  BINDING_FAIL(4001, HttpStatus.BAD_REQUEST),</span>
+<span class="fc" id="L15">  NOT_FOUND(404, HttpStatus.NOT_FOUND),</span>
+<span class="fc" id="L16">  VALIDATION_FAIL(4002, HttpStatus.BAD_REQUEST),</span>
+<span class="fc" id="L17">  READ_ONLY_MODE_ENABLE(4003, HttpStatus.METHOD_NOT_ALLOWED),</span>
+<span class="fc" id="L18">  CONNECT_CONFLICT_RESPONSE(4004, HttpStatus.CONFLICT),</span>
+<span class="fc" id="L19">  DUPLICATED_ENTITY(4005, HttpStatus.CONFLICT),</span>
+<span class="fc" id="L20">  UNPROCESSABLE_ENTITY(4006, HttpStatus.UNPROCESSABLE_ENTITY),</span>
+<span class="fc" id="L21">  CLUSTER_NOT_FOUND(4007, HttpStatus.NOT_FOUND),</span>
+<span class="fc" id="L22">  TOPIC_NOT_FOUND(4008, HttpStatus.NOT_FOUND),</span>
+<span class="fc" id="L23">  SCHEMA_NOT_FOUND(4009, HttpStatus.NOT_FOUND),</span>
+<span class="fc" id="L24">  CONNECT_NOT_FOUND(4010, HttpStatus.NOT_FOUND),</span>
+<span class="fc" id="L25">  KSQLDB_NOT_FOUND(4011, HttpStatus.NOT_FOUND),</span>
+<span class="fc" id="L26">  DIR_NOT_FOUND(4012, HttpStatus.BAD_REQUEST),</span>
+<span class="fc" id="L27">  TOPIC_OR_PARTITION_NOT_FOUND(4013, HttpStatus.BAD_REQUEST),</span>
+<span class="fc" id="L28">  INVALID_REQUEST(4014, HttpStatus.BAD_REQUEST),</span>
+<span class="fc" id="L29">  RECREATE_TOPIC_TIMEOUT(4015, HttpStatus.REQUEST_TIMEOUT),</span>
+<span class="fc" id="L30">  INVALID_ENTITY_STATE(4016, HttpStatus.BAD_REQUEST),</span>
+<span class="fc" id="L31">  SCHEMA_NOT_DELETED(4017, HttpStatus.INTERNAL_SERVER_ERROR),</span>
+<span class="fc" id="L32">  TOPIC_ANALYSIS_ERROR(4018, HttpStatus.BAD_REQUEST),</span>
+<span class="fc" id="L33">  FILE_UPLOAD_EXCEPTION(4019, HttpStatus.INTERNAL_SERVER_ERROR),</span>
+  ;
+
+  static {
+    // codes uniqueness check
+<span class="fc" id="L38">    var codes = new HashSet&lt;Integer&gt;();</span>
+<span class="fc bfc" id="L39" title="All 2 branches covered.">    for (ErrorCode value : ErrorCode.values()) {</span>
+<span class="pc bpc" id="L40" title="1 of 2 branches missed.">      if (!codes.add(value.code())) {</span>
+<span class="nc" id="L41">        LoggerFactory.getLogger(ErrorCode.class)</span>
+<span class="nc" id="L42">            .warn(&quot;Multiple {} values refer to code {}&quot;, ErrorCode.class, value.code);</span>
+      }
+    }
+<span class="fc" id="L45">  }</span>
+
+  private final int code;
+  private final HttpStatus httpStatus;
+
+<span class="fc" id="L50">  ErrorCode(int code, HttpStatus httpStatus) {</span>
+<span class="fc" id="L51">    this.code = code;</span>
+<span class="fc" id="L52">    this.httpStatus = httpStatus;</span>
+<span class="fc" id="L53">  }</span>
+
+  public int code() {
+<span class="fc" id="L56">    return code;</span>
+  }
+
+  public HttpStatus httpStatus() {
+<span class="fc" id="L60">    return httpStatus;</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

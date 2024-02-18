@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SchemaReferencesResolver.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">kafka-ui-api</a> &gt; <a href="index.source.html" class="el_package">com.provectus.kafka.ui.service.integration.odd</a> &gt; <span class="el_source">SchemaReferencesResolver.java</span></div><h1>SchemaReferencesResolver.java</h1><pre class="source lang-java linenums">package com.provectus.kafka.ui.service.integration.odd;
+
+import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
+import com.provectus.kafka.ui.sr.api.KafkaSrClientApi;
+import com.provectus.kafka.ui.sr.model.SchemaReference;
+import java.util.List;
+import java.util.Optional;
+import javax.annotation.Nullable;
+import reactor.core.publisher.Mono;
+
+// logic copied from AbstractSchemaProvider:resolveReferences
+// https://github.com/confluentinc/schema-registry/blob/fd59613e2c5adf62e36705307f420712e4c8c1ea/client/src/main/java/io/confluent/kafka/schemaregistry/AbstractSchemaProvider.java#L54
+class SchemaReferencesResolver {
+
+  private final KafkaSrClientApi client;
+
+<span class="fc" id="L18">  SchemaReferencesResolver(KafkaSrClientApi client) {</span>
+<span class="fc" id="L19">    this.client = client;</span>
+<span class="fc" id="L20">  }</span>
+
+  Mono&lt;ImmutableMap&lt;String, String&gt;&gt; resolve(List&lt;SchemaReference&gt; refs) {
+<span class="fc" id="L23">    return resolveReferences(refs, new Resolving(ImmutableMap.of(), ImmutableSet.of()))</span>
+<span class="fc" id="L24">        .map(Resolving::resolved);</span>
+  }
+
+<span class="fc" id="L27">  private record Resolving(ImmutableMap&lt;String, String&gt; resolved, ImmutableSet&lt;String&gt; visited) {</span>
+
+    Resolving visit(String name) {
+<span class="fc" id="L30">      return new Resolving(resolved, ImmutableSet.&lt;String&gt;builder().addAll(visited).add(name).build());</span>
+    }
+
+    Resolving resolve(String ref, String schema) {
+<span class="fc" id="L34">      return new Resolving(ImmutableMap.&lt;String, String&gt;builder().putAll(resolved).put(ref, schema).build(), visited);</span>
+    }
+  }
+
+  private Mono&lt;Resolving&gt; resolveReferences(@Nullable List&lt;SchemaReference&gt; refs, Resolving initState) {
+<span class="fc" id="L39">    Mono&lt;Resolving&gt; result = Mono.just(initState);</span>
+<span class="fc bfc" id="L40" title="All 2 branches covered.">    for (SchemaReference reference : Optional.ofNullable(refs).orElse(List.of())) {</span>
+<span class="fc" id="L41">      result = result.flatMap(state -&gt; {</span>
+<span class="fc bfc" id="L42" title="All 2 branches covered.">        if (state.visited().contains(reference.getName())) {</span>
+<span class="fc" id="L43">          return Mono.just(state);</span>
+        } else {
+<span class="fc" id="L45">          final var newState = state.visit(reference.getName());</span>
+<span class="fc" id="L46">          return client.getSubjectVersion(reference.getSubject(), String.valueOf(reference.getVersion()), true)</span>
+<span class="fc" id="L47">              .flatMap(subj -&gt;</span>
+<span class="fc" id="L48">                  resolveReferences(subj.getReferences(), newState)</span>
+<span class="fc" id="L49">                      .map(withNewRefs -&gt; withNewRefs.resolve(reference.getName(), subj.getSchema())));</span>
+        }
+      });
+<span class="fc" id="L52">    }</span>
+<span class="fc" id="L53">    return result;</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

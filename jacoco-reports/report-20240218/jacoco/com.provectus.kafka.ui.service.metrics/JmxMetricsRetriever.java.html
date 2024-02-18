@@ -1,0 +1,135 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>JmxMetricsRetriever.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">kafka-ui-api</a> &gt; <a href="index.source.html" class="el_package">com.provectus.kafka.ui.service.metrics</a> &gt; <span class="el_source">JmxMetricsRetriever.java</span></div><h1>JmxMetricsRetriever.java</h1><pre class="source lang-java linenums">package com.provectus.kafka.ui.service.metrics;
+
+import com.provectus.kafka.ui.model.KafkaCluster;
+import java.io.Closeable;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.function.Consumer;
+import javax.management.MBeanAttributeInfo;
+import javax.management.MBeanServerConnection;
+import javax.management.ObjectName;
+import javax.management.remote.JMXConnector;
+import javax.management.remote.JMXConnectorFactory;
+import javax.management.remote.JMXServiceURL;
+import lombok.SneakyThrows;
+import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.kafka.common.Node;
+import org.springframework.stereotype.Service;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
+
+
+@Service
+<span class="fc" id="L27">@Slf4j</span>
+<span class="fc" id="L28">class JmxMetricsRetriever implements MetricsRetriever, Closeable {</span>
+
+  private static final boolean SSL_JMX_SUPPORTED;
+
+  static {
+    // see JmxSslSocketFactory doc for details
+<span class="fc" id="L34">    SSL_JMX_SUPPORTED = JmxSslSocketFactory.initialized();</span>
+<span class="fc" id="L35">  }</span>
+
+  private static final String JMX_URL = &quot;service:jmx:rmi:///jndi/rmi://&quot;;
+  private static final String JMX_SERVICE_TYPE = &quot;jmxrmi&quot;;
+  private static final String CANONICAL_NAME_PATTERN = &quot;kafka.server*:*&quot;;
+
+  @Override
+  public void close() {
+<span class="nc" id="L43">    JmxSslSocketFactory.clearFactoriesCache();</span>
+<span class="nc" id="L44">  }</span>
+
+  @Override
+  public Flux&lt;RawMetric&gt; retrieve(KafkaCluster c, Node node) {
+<span class="nc bnc" id="L48" title="All 4 branches missed.">    if (isSslJmxEndpoint(c) &amp;&amp; !SSL_JMX_SUPPORTED) {</span>
+<span class="nc" id="L49">      log.warn(&quot;Cluster {} has jmx ssl configured, but it is not supported&quot;, c.getName());</span>
+<span class="nc" id="L50">      return Flux.empty();</span>
+    }
+<span class="nc" id="L52">    return Mono.fromSupplier(() -&gt; retrieveSync(c, node))</span>
+<span class="nc" id="L53">        .subscribeOn(Schedulers.boundedElastic())</span>
+<span class="nc" id="L54">        .flatMapMany(Flux::fromIterable);</span>
+  }
+
+  private boolean isSslJmxEndpoint(KafkaCluster cluster) {
+<span class="nc bnc" id="L58" title="All 2 branches missed.">    return cluster.getMetricsConfig().getKeystoreLocation() != null;</span>
+  }
+
+<span class="nc" id="L61">  @SneakyThrows</span>
+  private List&lt;RawMetric&gt; retrieveSync(KafkaCluster c, Node node) {
+<span class="nc" id="L63">    String jmxUrl = JMX_URL + node.host() + &quot;:&quot; + c.getMetricsConfig().getPort() + &quot;/&quot; + JMX_SERVICE_TYPE;</span>
+<span class="nc" id="L64">    log.debug(&quot;Collection JMX metrics for {}&quot;, jmxUrl);</span>
+<span class="nc" id="L65">    List&lt;RawMetric&gt; result = new ArrayList&lt;&gt;();</span>
+<span class="nc" id="L66">    withJmxConnector(jmxUrl, c, jmxConnector -&gt; getMetricsFromJmx(jmxConnector, result));</span>
+<span class="nc" id="L67">    log.debug(&quot;{} metrics collected for {}&quot;, result.size(), jmxUrl);</span>
+<span class="nc" id="L68">    return result;</span>
+  }
+
+  private void withJmxConnector(String jmxUrl,
+                                KafkaCluster c,
+                                Consumer&lt;JMXConnector&gt; consumer) {
+<span class="nc" id="L74">    var env = prepareJmxEnvAndSetThreadLocal(c);</span>
+<span class="nc" id="L75">    try (JMXConnector connector = JMXConnectorFactory.newJMXConnector(new JMXServiceURL(jmxUrl), env)) {</span>
+      try {
+<span class="nc" id="L77">        connector.connect(env);</span>
+<span class="nc" id="L78">      } catch (Exception exception) {</span>
+<span class="nc" id="L79">        log.error(&quot;Error connecting to {}&quot;, jmxUrl, exception);</span>
+<span class="nc" id="L80">        return;</span>
+<span class="nc" id="L81">      }</span>
+<span class="nc" id="L82">      consumer.accept(connector);</span>
+<span class="nc bnc" id="L83" title="All 2 branches missed.">    } catch (Exception e) {</span>
+<span class="nc" id="L84">      log.error(&quot;Error getting jmx metrics from {}&quot;, jmxUrl, e);</span>
+    } finally {
+<span class="nc" id="L86">      JmxSslSocketFactory.clearThreadLocalContext();</span>
+    }
+<span class="nc" id="L88">  }</span>
+
+  private Map&lt;String, Object&gt; prepareJmxEnvAndSetThreadLocal(KafkaCluster cluster) {
+<span class="nc" id="L91">    var metricsConfig = cluster.getMetricsConfig();</span>
+<span class="nc" id="L92">    Map&lt;String, Object&gt; env = new HashMap&lt;&gt;();</span>
+<span class="nc bnc" id="L93" title="All 2 branches missed.">    if (isSslJmxEndpoint(cluster)) {</span>
+<span class="nc" id="L94">      var clusterSsl = cluster.getOriginalProperties().getSsl();</span>
+<span class="nc" id="L95">      JmxSslSocketFactory.setSslContextThreadLocal(</span>
+<span class="nc bnc" id="L96" title="All 2 branches missed.">          clusterSsl != null ? clusterSsl.getTruststoreLocation() : null,</span>
+<span class="nc bnc" id="L97" title="All 2 branches missed.">          clusterSsl != null ? clusterSsl.getTruststorePassword() : null,</span>
+<span class="nc" id="L98">          metricsConfig.getKeystoreLocation(),</span>
+<span class="nc" id="L99">          metricsConfig.getKeystorePassword()</span>
+      );
+<span class="nc" id="L101">      JmxSslSocketFactory.editJmxConnectorEnv(env);</span>
+    }
+
+<span class="nc bnc" id="L104" title="All 2 branches missed.">    if (StringUtils.isNotEmpty(metricsConfig.getUsername())</span>
+<span class="nc bnc" id="L105" title="All 2 branches missed.">        &amp;&amp; StringUtils.isNotEmpty(metricsConfig.getPassword())) {</span>
+<span class="nc" id="L106">      env.put(</span>
+          JMXConnector.CREDENTIALS,
+<span class="nc" id="L108">          new String[] {metricsConfig.getUsername(), metricsConfig.getPassword()}</span>
+      );
+    }
+<span class="nc" id="L111">    return env;</span>
+  }
+
+<span class="nc" id="L114">  @SneakyThrows</span>
+  private void getMetricsFromJmx(JMXConnector jmxConnector, List&lt;RawMetric&gt; sink) {
+<span class="nc" id="L116">    MBeanServerConnection msc = jmxConnector.getMBeanServerConnection();</span>
+<span class="nc" id="L117">    var jmxMetrics = msc.queryNames(new ObjectName(CANONICAL_NAME_PATTERN), null);</span>
+<span class="nc bnc" id="L118" title="All 2 branches missed.">    for (ObjectName jmxMetric : jmxMetrics) {</span>
+<span class="nc" id="L119">      sink.addAll(extractObjectMetrics(jmxMetric, msc));</span>
+<span class="nc" id="L120">    }</span>
+<span class="nc" id="L121">  }</span>
+
+<span class="nc" id="L123">  @SneakyThrows</span>
+  private List&lt;RawMetric&gt; extractObjectMetrics(ObjectName objectName, MBeanServerConnection msc) {
+<span class="nc" id="L125">    MBeanAttributeInfo[] attrNames = msc.getMBeanInfo(objectName).getAttributes();</span>
+<span class="nc" id="L126">    Object[] attrValues = new Object[attrNames.length];</span>
+<span class="nc bnc" id="L127" title="All 2 branches missed.">    for (int i = 0; i &lt; attrNames.length; i++) {</span>
+<span class="nc" id="L128">      attrValues[i] = msc.getAttribute(objectName, attrNames[i].getName());</span>
+    }
+<span class="nc" id="L130">    return JmxMetricsFormatter.constructMetricsList(objectName, attrNames, attrValues);</span>
+  }
+
+}
+
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

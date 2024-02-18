@@ -1,0 +1,487 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AccessControlService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">kafka-ui-api</a> &gt; <a href="index.source.html" class="el_package">com.provectus.kafka.ui.service.rbac</a> &gt; <span class="el_source">AccessControlService.java</span></div><h1>AccessControlService.java</h1><pre class="source lang-java linenums">package com.provectus.kafka.ui.service.rbac;
+
+import static com.provectus.kafka.ui.model.rbac.Resource.APPLICATIONCONFIG;
+
+import com.provectus.kafka.ui.config.auth.AuthenticatedUser;
+import com.provectus.kafka.ui.config.auth.RbacUser;
+import com.provectus.kafka.ui.config.auth.RoleBasedAccessControlProperties;
+import com.provectus.kafka.ui.model.ClusterDTO;
+import com.provectus.kafka.ui.model.ConnectDTO;
+import com.provectus.kafka.ui.model.InternalTopic;
+import com.provectus.kafka.ui.model.rbac.AccessContext;
+import com.provectus.kafka.ui.model.rbac.Permission;
+import com.provectus.kafka.ui.model.rbac.Resource;
+import com.provectus.kafka.ui.model.rbac.Role;
+import com.provectus.kafka.ui.model.rbac.Subject;
+import com.provectus.kafka.ui.model.rbac.permission.ConnectAction;
+import com.provectus.kafka.ui.model.rbac.permission.ConsumerGroupAction;
+import com.provectus.kafka.ui.model.rbac.permission.SchemaAction;
+import com.provectus.kafka.ui.model.rbac.permission.TopicAction;
+import com.provectus.kafka.ui.service.rbac.extractor.CognitoAuthorityExtractor;
+import com.provectus.kafka.ui.service.rbac.extractor.GithubAuthorityExtractor;
+import com.provectus.kafka.ui.service.rbac.extractor.GoogleAuthorityExtractor;
+import com.provectus.kafka.ui.service.rbac.extractor.OauthAuthorityExtractor;
+import com.provectus.kafka.ui.service.rbac.extractor.ProviderAuthorityExtractor;
+import jakarta.annotation.PostConstruct;
+import java.util.Collections;
+import java.util.List;
+import java.util.Objects;
+import java.util.Set;
+import java.util.function.Predicate;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
+import javax.annotation.Nullable;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.lang3.StringUtils;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.core.env.Environment;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.context.ReactiveSecurityContextHolder;
+import org.springframework.security.core.context.SecurityContext;
+import org.springframework.security.oauth2.client.registration.InMemoryReactiveClientRegistrationRepository;
+import org.springframework.stereotype.Service;
+import org.springframework.util.Assert;
+import reactor.core.publisher.Mono;
+
+@Service
+<span class="fc" id="L49">@RequiredArgsConstructor</span>
+@EnableConfigurationProperties(RoleBasedAccessControlProperties.class)
+<span class="fc" id="L51">@Slf4j</span>
+public class AccessControlService {
+
+  private static final String ACCESS_DENIED = &quot;Access denied&quot;;
+  private static final String ACTIONS_ARE_EMPTY = &quot;actions are empty&quot;;
+
+  @Nullable
+  private final InMemoryReactiveClientRegistrationRepository clientRegistrationRepository;
+  private final RoleBasedAccessControlProperties properties;
+  private final Environment environment;
+
+<span class="fc" id="L62">  private boolean rbacEnabled = false;</span>
+<span class="fc" id="L63">  private Set&lt;ProviderAuthorityExtractor&gt; oauthExtractors = Collections.emptySet();</span>
+
+  @PostConstruct
+  public void init() {
+<span class="pc bpc" id="L67" title="1 of 2 branches missed.">    if (CollectionUtils.isEmpty(properties.getRoles())) {</span>
+<span class="fc" id="L68">      log.trace(&quot;No roles provided, disabling RBAC&quot;);</span>
+<span class="fc" id="L69">      return;</span>
+    }
+<span class="nc" id="L71">    rbacEnabled = true;</span>
+
+<span class="nc" id="L73">    this.oauthExtractors = properties.getRoles()</span>
+<span class="nc" id="L74">        .stream()</span>
+<span class="nc" id="L75">        .map(role -&gt; role.getSubjects()</span>
+<span class="nc" id="L76">            .stream()</span>
+<span class="nc" id="L77">            .map(Subject::getProvider)</span>
+<span class="nc" id="L78">            .distinct()</span>
+<span class="nc bnc" id="L79" title="All 5 branches missed.">            .map(provider -&gt; switch (provider) {</span>
+<span class="nc" id="L80">              case OAUTH_COGNITO -&gt; new CognitoAuthorityExtractor();</span>
+<span class="nc" id="L81">              case OAUTH_GOOGLE -&gt; new GoogleAuthorityExtractor();</span>
+<span class="nc" id="L82">              case OAUTH_GITHUB -&gt; new GithubAuthorityExtractor();</span>
+<span class="nc" id="L83">              case OAUTH -&gt; new OauthAuthorityExtractor();</span>
+<span class="nc" id="L84">              default -&gt; null;</span>
+            })
+<span class="nc" id="L86">            .filter(Objects::nonNull)</span>
+<span class="nc" id="L87">            .collect(Collectors.toSet()))</span>
+<span class="nc" id="L88">        .flatMap(Set::stream)</span>
+<span class="nc" id="L89">        .collect(Collectors.toSet());</span>
+
+<span class="nc bnc" id="L91" title="All 2 branches missed.">    if (!properties.getRoles().isEmpty()</span>
+<span class="nc bnc" id="L92" title="All 4 branches missed.">        &amp;&amp; &quot;oauth2&quot;.equalsIgnoreCase(environment.getProperty(&quot;auth.type&quot;))</span>
+<span class="nc bnc" id="L93" title="All 2 branches missed.">        &amp;&amp; (clientRegistrationRepository == null || !clientRegistrationRepository.iterator().hasNext())) {</span>
+<span class="nc" id="L94">      log.error(&quot;Roles are configured but no authentication methods are present. Authentication might fail.&quot;);</span>
+    }
+<span class="nc" id="L96">  }</span>
+
+  public Mono&lt;Void&gt; validateAccess(AccessContext context) {
+<span class="pc bpc" id="L99" title="1 of 2 branches missed.">    if (!rbacEnabled) {</span>
+<span class="fc" id="L100">      return Mono.empty();</span>
+    }
+
+<span class="nc bnc" id="L103" title="All 2 branches missed.">    if (CollectionUtils.isNotEmpty(context.getApplicationConfigActions())) {</span>
+<span class="nc" id="L104">      return getUser()</span>
+<span class="nc" id="L105">          .doOnNext(user -&gt; {</span>
+<span class="nc" id="L106">            boolean accessGranted = isApplicationConfigAccessible(context, user);</span>
+
+<span class="nc bnc" id="L108" title="All 2 branches missed.">            if (!accessGranted) {</span>
+<span class="nc" id="L109">              throw new AccessDeniedException(ACCESS_DENIED);</span>
+            }
+<span class="nc" id="L111">          }).then();</span>
+    }
+
+<span class="nc" id="L114">    return getUser()</span>
+<span class="nc" id="L115">        .doOnNext(user -&gt; {</span>
+<span class="nc" id="L116">          boolean accessGranted =</span>
+<span class="nc bnc" id="L117" title="All 2 branches missed.">              isApplicationConfigAccessible(context, user)</span>
+<span class="nc bnc" id="L118" title="All 2 branches missed.">                  &amp;&amp; isClusterAccessible(context, user)</span>
+<span class="nc bnc" id="L119" title="All 2 branches missed.">                  &amp;&amp; isClusterConfigAccessible(context, user)</span>
+<span class="nc bnc" id="L120" title="All 2 branches missed.">                  &amp;&amp; isTopicAccessible(context, user)</span>
+<span class="nc bnc" id="L121" title="All 2 branches missed.">                  &amp;&amp; isConsumerGroupAccessible(context, user)</span>
+<span class="nc bnc" id="L122" title="All 2 branches missed.">                  &amp;&amp; isConnectAccessible(context, user)</span>
+<span class="nc bnc" id="L123" title="All 2 branches missed.">                  &amp;&amp; isConnectorAccessible(context, user) // TODO connector selectors</span>
+<span class="nc bnc" id="L124" title="All 2 branches missed.">                  &amp;&amp; isSchemaAccessible(context, user)</span>
+<span class="nc bnc" id="L125" title="All 2 branches missed.">                  &amp;&amp; isKsqlAccessible(context, user)</span>
+<span class="nc bnc" id="L126" title="All 2 branches missed.">                  &amp;&amp; isAclAccessible(context, user)</span>
+<span class="nc bnc" id="L127" title="All 2 branches missed.">                  &amp;&amp; isAuditAccessible(context, user);</span>
+
+<span class="nc bnc" id="L129" title="All 2 branches missed.">          if (!accessGranted) {</span>
+<span class="nc" id="L130">            throw new AccessDeniedException(ACCESS_DENIED);</span>
+          }
+<span class="nc" id="L132">        })</span>
+<span class="nc" id="L133">        .then();</span>
+  }
+
+  public Mono&lt;AuthenticatedUser&gt; getUser() {
+<span class="nc" id="L137">    return ReactiveSecurityContextHolder.getContext()</span>
+<span class="nc" id="L138">        .map(SecurityContext::getAuthentication)</span>
+<span class="nc" id="L139">        .filter(authentication -&gt; authentication.getPrincipal() instanceof RbacUser)</span>
+<span class="nc" id="L140">        .map(authentication -&gt; ((RbacUser) authentication.getPrincipal()))</span>
+<span class="nc" id="L141">        .map(user -&gt; new AuthenticatedUser(user.name(), user.groups()));</span>
+  }
+
+  public boolean isApplicationConfigAccessible(AccessContext context, AuthenticatedUser user) {
+<span class="nc bnc" id="L145" title="All 2 branches missed.">    if (!rbacEnabled) {</span>
+<span class="nc" id="L146">      return true;</span>
+    }
+<span class="nc bnc" id="L148" title="All 2 branches missed.">    if (CollectionUtils.isEmpty(context.getApplicationConfigActions())) {</span>
+<span class="nc" id="L149">      return true;</span>
+    }
+<span class="nc" id="L151">    Set&lt;String&gt; requiredActions = context.getApplicationConfigActions()</span>
+<span class="nc" id="L152">        .stream()</span>
+<span class="nc" id="L153">        .map(a -&gt; a.toString().toUpperCase())</span>
+<span class="nc" id="L154">        .collect(Collectors.toSet());</span>
+<span class="nc" id="L155">    return isAccessible(APPLICATIONCONFIG, null, user, context, requiredActions);</span>
+  }
+
+  private boolean isClusterAccessible(AccessContext context, AuthenticatedUser user) {
+<span class="nc bnc" id="L159" title="All 2 branches missed.">    if (!rbacEnabled) {</span>
+<span class="nc" id="L160">      return true;</span>
+    }
+
+<span class="nc" id="L163">    Assert.isTrue(StringUtils.isNotEmpty(context.getCluster()), &quot;cluster value is empty&quot;);</span>
+
+<span class="nc" id="L165">    return properties.getRoles()</span>
+<span class="nc" id="L166">        .stream()</span>
+<span class="nc" id="L167">        .filter(filterRole(user))</span>
+<span class="nc" id="L168">        .anyMatch(filterCluster(context.getCluster()));</span>
+  }
+
+  public Mono&lt;Boolean&gt; isClusterAccessible(ClusterDTO cluster) {
+<span class="nc bnc" id="L172" title="All 2 branches missed.">    if (!rbacEnabled) {</span>
+<span class="nc" id="L173">      return Mono.just(true);</span>
+    }
+
+    AccessContext accessContext = AccessContext
+<span class="nc" id="L177">        .builder()</span>
+<span class="nc" id="L178">        .cluster(cluster.getName())</span>
+<span class="nc" id="L179">        .build();</span>
+
+<span class="nc" id="L181">    return getUser().map(u -&gt; isClusterAccessible(accessContext, u));</span>
+  }
+
+  public boolean isClusterConfigAccessible(AccessContext context, AuthenticatedUser user) {
+<span class="nc bnc" id="L185" title="All 2 branches missed.">    if (!rbacEnabled) {</span>
+<span class="nc" id="L186">      return true;</span>
+    }
+
+<span class="nc bnc" id="L189" title="All 2 branches missed.">    if (CollectionUtils.isEmpty(context.getClusterConfigActions())) {</span>
+<span class="nc" id="L190">      return true;</span>
+    }
+<span class="nc" id="L192">    Assert.isTrue(StringUtils.isNotEmpty(context.getCluster()), &quot;cluster value is empty&quot;);</span>
+
+<span class="nc" id="L194">    Set&lt;String&gt; requiredActions = context.getClusterConfigActions()</span>
+<span class="nc" id="L195">        .stream()</span>
+<span class="nc" id="L196">        .map(a -&gt; a.toString().toUpperCase())</span>
+<span class="nc" id="L197">        .collect(Collectors.toSet());</span>
+
+<span class="nc" id="L199">    return isAccessible(Resource.CLUSTERCONFIG, context.getCluster(), user, context, requiredActions);</span>
+  }
+
+  public boolean isTopicAccessible(AccessContext context, AuthenticatedUser user) {
+<span class="nc bnc" id="L203" title="All 2 branches missed.">    if (!rbacEnabled) {</span>
+<span class="nc" id="L204">      return true;</span>
+    }
+
+<span class="nc bnc" id="L207" title="All 4 branches missed.">    if (context.getTopic() == null &amp;&amp; context.getTopicActions().isEmpty()) {</span>
+<span class="nc" id="L208">      return true;</span>
+    }
+<span class="nc bnc" id="L210" title="All 2 branches missed.">    Assert.isTrue(!context.getTopicActions().isEmpty(), ACTIONS_ARE_EMPTY);</span>
+
+<span class="nc" id="L212">    Set&lt;String&gt; requiredActions = context.getTopicActions()</span>
+<span class="nc" id="L213">        .stream()</span>
+<span class="nc" id="L214">        .map(a -&gt; a.toString().toUpperCase())</span>
+<span class="nc" id="L215">        .collect(Collectors.toSet());</span>
+
+<span class="nc" id="L217">    return isAccessible(Resource.TOPIC, context.getTopic(), user, context, requiredActions);</span>
+  }
+
+  public Mono&lt;List&lt;InternalTopic&gt;&gt; filterViewableTopics(List&lt;InternalTopic&gt; topics, String clusterName) {
+<span class="nc bnc" id="L221" title="All 2 branches missed.">    if (!rbacEnabled) {</span>
+<span class="nc" id="L222">      return Mono.just(topics);</span>
+    }
+
+<span class="nc" id="L225">    return getUser()</span>
+<span class="nc" id="L226">        .map(user -&gt; topics.stream()</span>
+<span class="nc" id="L227">            .filter(topic -&gt; {</span>
+                  var accessContext = AccessContext
+<span class="nc" id="L229">                      .builder()</span>
+<span class="nc" id="L230">                      .cluster(clusterName)</span>
+<span class="nc" id="L231">                      .topic(topic.getName())</span>
+<span class="nc" id="L232">                      .topicActions(TopicAction.VIEW)</span>
+<span class="nc" id="L233">                      .build();</span>
+<span class="nc" id="L234">                  return isTopicAccessible(accessContext, user);</span>
+                }
+<span class="nc" id="L236">            ).toList());</span>
+  }
+
+  private boolean isConsumerGroupAccessible(AccessContext context, AuthenticatedUser user) {
+<span class="nc bnc" id="L240" title="All 2 branches missed.">    if (!rbacEnabled) {</span>
+<span class="nc" id="L241">      return true;</span>
+    }
+
+<span class="nc bnc" id="L244" title="All 4 branches missed.">    if (context.getConsumerGroup() == null &amp;&amp; context.getConsumerGroupActions().isEmpty()) {</span>
+<span class="nc" id="L245">      return true;</span>
+    }
+<span class="nc bnc" id="L247" title="All 2 branches missed.">    Assert.isTrue(!context.getConsumerGroupActions().isEmpty(), ACTIONS_ARE_EMPTY);</span>
+
+<span class="nc" id="L249">    Set&lt;String&gt; requiredActions = context.getConsumerGroupActions()</span>
+<span class="nc" id="L250">        .stream()</span>
+<span class="nc" id="L251">        .map(a -&gt; a.toString().toUpperCase())</span>
+<span class="nc" id="L252">        .collect(Collectors.toSet());</span>
+
+<span class="nc" id="L254">    return isAccessible(Resource.CONSUMER, context.getConsumerGroup(), user, context, requiredActions);</span>
+  }
+
+  public Mono&lt;Boolean&gt; isConsumerGroupAccessible(String groupId, String clusterName) {
+<span class="pc bpc" id="L258" title="1 of 2 branches missed.">    if (!rbacEnabled) {</span>
+<span class="fc" id="L259">      return Mono.just(true);</span>
+    }
+
+    AccessContext accessContext = AccessContext
+<span class="nc" id="L263">        .builder()</span>
+<span class="nc" id="L264">        .cluster(clusterName)</span>
+<span class="nc" id="L265">        .consumerGroup(groupId)</span>
+<span class="nc" id="L266">        .consumerGroupActions(ConsumerGroupAction.VIEW)</span>
+<span class="nc" id="L267">        .build();</span>
+
+<span class="nc" id="L269">    return getUser().map(u -&gt; isConsumerGroupAccessible(accessContext, u));</span>
+  }
+
+  public boolean isSchemaAccessible(AccessContext context, AuthenticatedUser user) {
+<span class="nc bnc" id="L273" title="All 2 branches missed.">    if (!rbacEnabled) {</span>
+<span class="nc" id="L274">      return true;</span>
+    }
+
+<span class="nc bnc" id="L277" title="All 4 branches missed.">    if (context.getSchema() == null &amp;&amp; context.getSchemaActions().isEmpty()) {</span>
+<span class="nc" id="L278">      return true;</span>
+    }
+<span class="nc bnc" id="L280" title="All 2 branches missed.">    Assert.isTrue(!context.getSchemaActions().isEmpty(), ACTIONS_ARE_EMPTY);</span>
+
+<span class="nc" id="L282">    Set&lt;String&gt; requiredActions = context.getSchemaActions()</span>
+<span class="nc" id="L283">        .stream()</span>
+<span class="nc" id="L284">        .map(a -&gt; a.toString().toUpperCase())</span>
+<span class="nc" id="L285">        .collect(Collectors.toSet());</span>
+
+<span class="nc" id="L287">    return isAccessible(Resource.SCHEMA, context.getSchema(), user, context, requiredActions);</span>
+  }
+
+  public Mono&lt;Boolean&gt; isSchemaAccessible(String schema, String clusterName) {
+<span class="pc bpc" id="L291" title="1 of 2 branches missed.">    if (!rbacEnabled) {</span>
+<span class="fc" id="L292">      return Mono.just(true);</span>
+    }
+
+    AccessContext accessContext = AccessContext
+<span class="nc" id="L296">        .builder()</span>
+<span class="nc" id="L297">        .cluster(clusterName)</span>
+<span class="nc" id="L298">        .schema(schema)</span>
+<span class="nc" id="L299">        .schemaActions(SchemaAction.VIEW)</span>
+<span class="nc" id="L300">        .build();</span>
+
+<span class="nc" id="L302">    return getUser().map(u -&gt; isSchemaAccessible(accessContext, u));</span>
+  }
+
+  public boolean isConnectAccessible(AccessContext context, AuthenticatedUser user) {
+<span class="nc bnc" id="L306" title="All 2 branches missed.">    if (!rbacEnabled) {</span>
+<span class="nc" id="L307">      return true;</span>
+    }
+
+<span class="nc bnc" id="L310" title="All 4 branches missed.">    if (context.getConnect() == null &amp;&amp; context.getConnectActions().isEmpty()) {</span>
+<span class="nc" id="L311">      return true;</span>
+    }
+<span class="nc bnc" id="L313" title="All 2 branches missed.">    Assert.isTrue(!context.getConnectActions().isEmpty(), ACTIONS_ARE_EMPTY);</span>
+
+<span class="nc" id="L315">    Set&lt;String&gt; requiredActions = context.getConnectActions()</span>
+<span class="nc" id="L316">        .stream()</span>
+<span class="nc" id="L317">        .map(a -&gt; a.toString().toUpperCase())</span>
+<span class="nc" id="L318">        .collect(Collectors.toSet());</span>
+
+<span class="nc" id="L320">    return isAccessible(Resource.CONNECT, context.getConnect(), user, context, requiredActions);</span>
+  }
+
+  public Mono&lt;Boolean&gt; isConnectAccessible(ConnectDTO dto, String clusterName) {
+<span class="nc bnc" id="L324" title="All 2 branches missed.">    if (!rbacEnabled) {</span>
+<span class="nc" id="L325">      return Mono.just(true);</span>
+    }
+
+<span class="nc" id="L328">    return isConnectAccessible(dto.getName(), clusterName);</span>
+  }
+
+  public Mono&lt;Boolean&gt; isConnectAccessible(String connectName, String clusterName) {
+<span class="pc bpc" id="L332" title="1 of 2 branches missed.">    if (!rbacEnabled) {</span>
+<span class="fc" id="L333">      return Mono.just(true);</span>
+    }
+
+    AccessContext accessContext = AccessContext
+<span class="nc" id="L337">        .builder()</span>
+<span class="nc" id="L338">        .cluster(clusterName)</span>
+<span class="nc" id="L339">        .connect(connectName)</span>
+<span class="nc" id="L340">        .connectActions(ConnectAction.VIEW)</span>
+<span class="nc" id="L341">        .build();</span>
+
+<span class="nc" id="L343">    return getUser().map(u -&gt; isConnectAccessible(accessContext, u));</span>
+  }
+
+  public boolean isConnectorAccessible(AccessContext context, AuthenticatedUser user) {
+<span class="nc bnc" id="L347" title="All 2 branches missed.">    if (!rbacEnabled) {</span>
+<span class="nc" id="L348">      return true;</span>
+    }
+
+<span class="nc" id="L351">    return isConnectAccessible(context, user);</span>
+  }
+
+  public Mono&lt;Boolean&gt; isConnectorAccessible(String connectName, String connectorName, String clusterName) {
+<span class="pc bpc" id="L355" title="1 of 2 branches missed.">    if (!rbacEnabled) {</span>
+<span class="fc" id="L356">      return Mono.just(true);</span>
+    }
+
+    AccessContext accessContext = AccessContext
+<span class="nc" id="L360">        .builder()</span>
+<span class="nc" id="L361">        .cluster(clusterName)</span>
+<span class="nc" id="L362">        .connect(connectName)</span>
+<span class="nc" id="L363">        .connectActions(ConnectAction.VIEW)</span>
+<span class="nc" id="L364">        .connector(connectorName)</span>
+<span class="nc" id="L365">        .build();</span>
+
+<span class="nc" id="L367">    return getUser().map(u -&gt; isConnectorAccessible(accessContext, u));</span>
+  }
+
+  private boolean isKsqlAccessible(AccessContext context, AuthenticatedUser user) {
+<span class="nc bnc" id="L371" title="All 2 branches missed.">    if (!rbacEnabled) {</span>
+<span class="nc" id="L372">      return true;</span>
+    }
+
+<span class="nc bnc" id="L375" title="All 2 branches missed.">    if (context.getKsqlActions().isEmpty()) {</span>
+<span class="nc" id="L376">      return true;</span>
+    }
+
+<span class="nc" id="L379">    Set&lt;String&gt; requiredActions = context.getKsqlActions()</span>
+<span class="nc" id="L380">        .stream()</span>
+<span class="nc" id="L381">        .map(a -&gt; a.toString().toUpperCase())</span>
+<span class="nc" id="L382">        .collect(Collectors.toSet());</span>
+
+<span class="nc" id="L384">    return isAccessible(Resource.KSQL, null, user, context, requiredActions);</span>
+  }
+
+  private boolean isAclAccessible(AccessContext context, AuthenticatedUser user) {
+<span class="nc bnc" id="L388" title="All 2 branches missed.">    if (!rbacEnabled) {</span>
+<span class="nc" id="L389">      return true;</span>
+    }
+
+<span class="nc bnc" id="L392" title="All 2 branches missed.">    if (context.getAclActions().isEmpty()) {</span>
+<span class="nc" id="L393">      return true;</span>
+    }
+
+<span class="nc" id="L396">    Set&lt;String&gt; requiredActions = context.getAclActions()</span>
+<span class="nc" id="L397">        .stream()</span>
+<span class="nc" id="L398">        .map(a -&gt; a.toString().toUpperCase())</span>
+<span class="nc" id="L399">        .collect(Collectors.toSet());</span>
+
+<span class="nc" id="L401">    return isAccessible(Resource.ACL, null, user, context, requiredActions);</span>
+  }
+
+  private boolean isAuditAccessible(AccessContext context, AuthenticatedUser user) {
+<span class="nc bnc" id="L405" title="All 2 branches missed.">    if (!rbacEnabled) {</span>
+<span class="nc" id="L406">      return true;</span>
+    }
+
+<span class="nc bnc" id="L409" title="All 2 branches missed.">    if (context.getAuditAction().isEmpty()) {</span>
+<span class="nc" id="L410">      return true;</span>
+    }
+
+<span class="nc" id="L413">    Set&lt;String&gt; requiredActions = context.getAuditAction()</span>
+<span class="nc" id="L414">        .stream()</span>
+<span class="nc" id="L415">        .map(a -&gt; a.toString().toUpperCase())</span>
+<span class="nc" id="L416">        .collect(Collectors.toSet());</span>
+
+<span class="nc" id="L418">    return isAccessible(Resource.AUDIT, null, user, context, requiredActions);</span>
+  }
+
+  public Set&lt;ProviderAuthorityExtractor&gt; getOauthExtractors() {
+<span class="nc" id="L422">    return oauthExtractors;</span>
+  }
+
+  public List&lt;Role&gt; getRoles() {
+<span class="nc bnc" id="L426" title="All 2 branches missed.">    if (!rbacEnabled) {</span>
+<span class="nc" id="L427">      return Collections.emptyList();</span>
+    }
+<span class="nc" id="L429">    return Collections.unmodifiableList(properties.getRoles());</span>
+  }
+
+  private boolean isAccessible(Resource resource, @Nullable String resourceValue,
+                               AuthenticatedUser user, AccessContext context, Set&lt;String&gt; requiredActions) {
+<span class="nc" id="L434">    Set&lt;String&gt; grantedActions = properties.getRoles()</span>
+<span class="nc" id="L435">        .stream()</span>
+<span class="nc" id="L436">        .filter(filterRole(user))</span>
+<span class="nc" id="L437">        .filter(filterCluster(resource, context.getCluster()))</span>
+<span class="nc" id="L438">        .flatMap(grantedRole -&gt; grantedRole.getPermissions().stream())</span>
+<span class="nc" id="L439">        .filter(filterResource(resource))</span>
+<span class="nc" id="L440">        .filter(filterResourceValue(resourceValue))</span>
+<span class="nc" id="L441">        .flatMap(grantedPermission -&gt; grantedPermission.getActions().stream())</span>
+<span class="nc" id="L442">        .map(String::toUpperCase)</span>
+<span class="nc" id="L443">        .collect(Collectors.toSet());</span>
+
+<span class="nc" id="L445">    return grantedActions.containsAll(requiredActions);</span>
+  }
+
+  private Predicate&lt;Role&gt; filterRole(AuthenticatedUser user) {
+<span class="nc" id="L449">    return role -&gt; user.groups().contains(role.getName());</span>
+  }
+
+  private Predicate&lt;Role&gt; filterCluster(String cluster) {
+<span class="nc" id="L453">    return grantedRole -&gt; grantedRole.getClusters()</span>
+<span class="nc" id="L454">        .stream()</span>
+<span class="nc" id="L455">        .anyMatch(cluster::equalsIgnoreCase);</span>
+  }
+
+  private Predicate&lt;Role&gt; filterCluster(Resource resource, String cluster) {
+<span class="nc bnc" id="L459" title="All 2 branches missed.">    if (resource == APPLICATIONCONFIG) {</span>
+<span class="nc" id="L460">      return role -&gt; true;</span>
+    }
+<span class="nc" id="L462">    return filterCluster(cluster);</span>
+  }
+
+  private Predicate&lt;Permission&gt; filterResource(Resource resource) {
+<span class="nc bnc" id="L466" title="All 2 branches missed.">    return grantedPermission -&gt; resource == grantedPermission.getResource();</span>
+  }
+
+  private Predicate&lt;Permission&gt; filterResourceValue(@Nullable String resourceValue) {
+
+<span class="nc bnc" id="L471" title="All 2 branches missed.">    if (resourceValue == null) {</span>
+<span class="nc" id="L472">      return grantedPermission -&gt; true;</span>
+    }
+<span class="nc" id="L474">    return grantedPermission -&gt; {</span>
+<span class="nc" id="L475">      Pattern valuePattern = grantedPermission.getCompiledValuePattern();</span>
+<span class="nc bnc" id="L476" title="All 2 branches missed.">      if (valuePattern == null) {</span>
+<span class="nc" id="L477">        return true;</span>
+      }
+<span class="nc" id="L479">      return valuePattern.matcher(resourceValue).matches();</span>
+    };
+  }
+
+  public boolean isRbacEnabled() {
+<span class="nc" id="L484">    return rbacEnabled;</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

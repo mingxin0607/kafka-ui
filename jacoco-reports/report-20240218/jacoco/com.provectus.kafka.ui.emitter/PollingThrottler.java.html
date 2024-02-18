@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PollingThrottler.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">kafka-ui-api</a> &gt; <a href="index.source.html" class="el_package">com.provectus.kafka.ui.emitter</a> &gt; <span class="el_source">PollingThrottler.java</span></div><h1>PollingThrottler.java</h1><pre class="source lang-java linenums">package com.provectus.kafka.ui.emitter;
+
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.util.concurrent.RateLimiter;
+import com.provectus.kafka.ui.config.ClustersProperties;
+import java.util.function.Supplier;
+import lombok.extern.slf4j.Slf4j;
+
+<span class="fc" id="L9">@Slf4j</span>
+public class PollingThrottler {
+
+  public static Supplier&lt;PollingThrottler&gt; throttlerSupplier(ClustersProperties.Cluster cluster) {
+<span class="fc" id="L13">    Long rate = cluster.getPollingThrottleRate();</span>
+<span class="pc bpc" id="L14" title="3 of 4 branches missed.">    if (rate == null || rate &lt;= 0) {</span>
+<span class="fc" id="L15">      return PollingThrottler::noop;</span>
+    }
+    // RateLimiter instance should be shared across all created throttlers
+<span class="nc" id="L18">    var rateLimiter = RateLimiter.create(rate);</span>
+<span class="nc" id="L19">    return () -&gt; new PollingThrottler(cluster.getName(), rateLimiter);</span>
+  }
+
+  private final String clusterName;
+  private final RateLimiter rateLimiter;
+  private boolean throttled;
+
+  @VisibleForTesting
+<span class="fc" id="L27">  public PollingThrottler(String clusterName, RateLimiter rateLimiter) {</span>
+<span class="fc" id="L28">    this.clusterName = clusterName;</span>
+<span class="fc" id="L29">    this.rateLimiter = rateLimiter;</span>
+<span class="fc" id="L30">  }</span>
+
+  public static PollingThrottler noop() {
+<span class="fc" id="L33">    return new PollingThrottler(&quot;noop&quot;, RateLimiter.create(Long.MAX_VALUE));</span>
+  }
+
+  //returns true if polling was throttled
+  public boolean throttleAfterPoll(int polledBytes) {
+<span class="fc bfc" id="L38" title="All 2 branches covered.">    if (polledBytes &gt; 0) {</span>
+<span class="fc" id="L39">      double sleptSeconds = rateLimiter.acquire(polledBytes);</span>
+<span class="fc bfc" id="L40" title="All 4 branches covered.">      if (!throttled &amp;&amp; sleptSeconds &gt; 0.0) {</span>
+<span class="fc" id="L41">        throttled = true;</span>
+<span class="fc" id="L42">        log.debug(&quot;Polling throttling enabled for cluster {} at rate {} bytes/sec&quot;, clusterName, rateLimiter.getRate());</span>
+<span class="fc" id="L43">        return true;</span>
+      }
+    }
+<span class="fc" id="L46">    return false;</span>
+  }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

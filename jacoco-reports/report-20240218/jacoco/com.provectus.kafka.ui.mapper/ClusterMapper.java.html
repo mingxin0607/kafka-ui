@@ -1,0 +1,204 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ClusterMapper.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">kafka-ui-api</a> &gt; <a href="index.source.html" class="el_package">com.provectus.kafka.ui.mapper</a> &gt; <span class="el_source">ClusterMapper.java</span></div><h1>ClusterMapper.java</h1><pre class="source lang-java linenums">package com.provectus.kafka.ui.mapper;
+
+import com.provectus.kafka.ui.config.ClustersProperties;
+import com.provectus.kafka.ui.model.BrokerConfigDTO;
+import com.provectus.kafka.ui.model.BrokerDTO;
+import com.provectus.kafka.ui.model.BrokerDiskUsageDTO;
+import com.provectus.kafka.ui.model.BrokerMetricsDTO;
+import com.provectus.kafka.ui.model.ClusterDTO;
+import com.provectus.kafka.ui.model.ClusterFeature;
+import com.provectus.kafka.ui.model.ClusterMetricsDTO;
+import com.provectus.kafka.ui.model.ClusterStatsDTO;
+import com.provectus.kafka.ui.model.ConfigSourceDTO;
+import com.provectus.kafka.ui.model.ConfigSynonymDTO;
+import com.provectus.kafka.ui.model.ConnectDTO;
+import com.provectus.kafka.ui.model.InternalBroker;
+import com.provectus.kafka.ui.model.InternalBrokerConfig;
+import com.provectus.kafka.ui.model.InternalBrokerDiskUsage;
+import com.provectus.kafka.ui.model.InternalClusterState;
+import com.provectus.kafka.ui.model.InternalPartition;
+import com.provectus.kafka.ui.model.InternalReplica;
+import com.provectus.kafka.ui.model.InternalTopic;
+import com.provectus.kafka.ui.model.InternalTopicConfig;
+import com.provectus.kafka.ui.model.KafkaAclDTO;
+import com.provectus.kafka.ui.model.KafkaAclNamePatternTypeDTO;
+import com.provectus.kafka.ui.model.KafkaAclResourceTypeDTO;
+import com.provectus.kafka.ui.model.MetricDTO;
+import com.provectus.kafka.ui.model.Metrics;
+import com.provectus.kafka.ui.model.PartitionDTO;
+import com.provectus.kafka.ui.model.ReplicaDTO;
+import com.provectus.kafka.ui.model.TopicConfigDTO;
+import com.provectus.kafka.ui.model.TopicDTO;
+import com.provectus.kafka.ui.model.TopicDetailsDTO;
+import com.provectus.kafka.ui.model.TopicProducerStateDTO;
+import com.provectus.kafka.ui.service.metrics.RawMetric;
+import java.util.List;
+import java.util.Map;
+import org.apache.kafka.clients.admin.ConfigEntry;
+import org.apache.kafka.clients.admin.ProducerState;
+import org.apache.kafka.common.acl.AccessControlEntry;
+import org.apache.kafka.common.acl.AclBinding;
+import org.apache.kafka.common.acl.AclOperation;
+import org.apache.kafka.common.acl.AclPermissionType;
+import org.apache.kafka.common.resource.PatternType;
+import org.apache.kafka.common.resource.ResourcePattern;
+import org.apache.kafka.common.resource.ResourceType;
+import org.mapstruct.Mapper;
+import org.mapstruct.Mapping;
+
+@Mapper(componentModel = &quot;spring&quot;)
+public interface ClusterMapper {
+
+  ClusterDTO toCluster(InternalClusterState clusterState);
+
+  ClusterStatsDTO toClusterStats(InternalClusterState clusterState);
+
+  default ClusterMetricsDTO toClusterMetrics(Metrics metrics) {
+<span class="nc" id="L57">    return new ClusterMetricsDTO()</span>
+<span class="nc" id="L58">        .items(metrics.getSummarizedMetrics().map(this::convert).toList());</span>
+  }
+
+  private MetricDTO convert(RawMetric rawMetric) {
+<span class="nc" id="L62">    return new MetricDTO()</span>
+<span class="nc" id="L63">        .name(rawMetric.name())</span>
+<span class="nc" id="L64">        .labels(rawMetric.labels())</span>
+<span class="nc" id="L65">        .value(rawMetric.value());</span>
+  }
+
+  default BrokerMetricsDTO toBrokerMetrics(List&lt;RawMetric&gt; metrics) {
+<span class="nc" id="L69">    return new BrokerMetricsDTO()</span>
+<span class="nc" id="L70">        .metrics(metrics.stream().map(this::convert).toList());</span>
+  }
+
+  @Mapping(target = &quot;isSensitive&quot;, source = &quot;sensitive&quot;)
+  @Mapping(target = &quot;isReadOnly&quot;, source = &quot;readOnly&quot;)
+  BrokerConfigDTO toBrokerConfig(InternalBrokerConfig config);
+
+  default ConfigSynonymDTO toConfigSynonym(ConfigEntry.ConfigSynonym config) {
+<span class="pc bpc" id="L78" title="1 of 2 branches missed.">    if (config == null) {</span>
+<span class="nc" id="L79">      return null;</span>
+    }
+
+<span class="fc" id="L82">    ConfigSynonymDTO configSynonym = new ConfigSynonymDTO();</span>
+<span class="fc" id="L83">    configSynonym.setName(config.name());</span>
+<span class="fc" id="L84">    configSynonym.setValue(config.value());</span>
+<span class="pc bpc" id="L85" title="1 of 2 branches missed.">    if (config.source() != null) {</span>
+<span class="fc" id="L86">      configSynonym.setSource(ConfigSourceDTO.valueOf(config.source().name()));</span>
+    }
+
+<span class="fc" id="L89">    return configSynonym;</span>
+  }
+
+  TopicDTO toTopic(InternalTopic topic);
+
+  PartitionDTO toPartition(InternalPartition topic);
+
+  BrokerDTO toBrokerDto(InternalBroker broker);
+
+  TopicDetailsDTO toTopicDetails(InternalTopic topic);
+
+  @Mapping(target = &quot;isReadOnly&quot;, source = &quot;readOnly&quot;)
+  @Mapping(target = &quot;isSensitive&quot;, source = &quot;sensitive&quot;)
+  TopicConfigDTO toTopicConfig(InternalTopicConfig topic);
+
+  ReplicaDTO toReplica(InternalReplica replica);
+
+  ConnectDTO toKafkaConnect(ClustersProperties.ConnectCluster connect);
+
+  List&lt;ClusterDTO.FeaturesEnum&gt; toFeaturesEnum(List&lt;ClusterFeature&gt; features);
+
+  default List&lt;PartitionDTO&gt; map(Map&lt;Integer, InternalPartition&gt; map) {
+<span class="fc" id="L111">    return map.values().stream().map(this::toPartition).toList();</span>
+  }
+
+  default BrokerDiskUsageDTO map(Integer id, InternalBrokerDiskUsage internalBrokerDiskUsage) {
+<span class="nc" id="L115">    final BrokerDiskUsageDTO brokerDiskUsage = new BrokerDiskUsageDTO();</span>
+<span class="nc" id="L116">    brokerDiskUsage.setBrokerId(id);</span>
+<span class="nc" id="L117">    brokerDiskUsage.segmentCount((int) internalBrokerDiskUsage.getSegmentCount());</span>
+<span class="nc" id="L118">    brokerDiskUsage.segmentSize(internalBrokerDiskUsage.getSegmentSize());</span>
+<span class="nc" id="L119">    return brokerDiskUsage;</span>
+  }
+
+  default TopicProducerStateDTO map(int partition, ProducerState state) {
+<span class="nc" id="L123">    return new TopicProducerStateDTO()</span>
+<span class="nc" id="L124">        .partition(partition)</span>
+<span class="nc" id="L125">        .producerId(state.producerId())</span>
+<span class="nc" id="L126">        .producerEpoch(state.producerEpoch())</span>
+<span class="nc" id="L127">        .lastSequence(state.lastSequence())</span>
+<span class="nc" id="L128">        .lastTimestampMs(state.lastTimestamp())</span>
+<span class="nc" id="L129">        .coordinatorEpoch(state.coordinatorEpoch().stream().boxed().findAny().orElse(null))</span>
+<span class="nc" id="L130">        .currentTransactionStartOffset(state.currentTransactionStartOffset().stream().boxed().findAny().orElse(null));</span>
+  }
+
+  static KafkaAclDTO.OperationEnum mapAclOperation(AclOperation operation) {
+<span class="nc bnc" id="L134" title="All 16 branches missed.">    return switch (operation) {</span>
+<span class="nc" id="L135">      case ALL -&gt; KafkaAclDTO.OperationEnum.ALL;</span>
+<span class="nc" id="L136">      case READ -&gt; KafkaAclDTO.OperationEnum.READ;</span>
+<span class="nc" id="L137">      case WRITE -&gt; KafkaAclDTO.OperationEnum.WRITE;</span>
+<span class="nc" id="L138">      case CREATE -&gt; KafkaAclDTO.OperationEnum.CREATE;</span>
+<span class="nc" id="L139">      case DELETE -&gt; KafkaAclDTO.OperationEnum.DELETE;</span>
+<span class="nc" id="L140">      case ALTER -&gt; KafkaAclDTO.OperationEnum.ALTER;</span>
+<span class="nc" id="L141">      case DESCRIBE -&gt; KafkaAclDTO.OperationEnum.DESCRIBE;</span>
+<span class="nc" id="L142">      case CLUSTER_ACTION -&gt; KafkaAclDTO.OperationEnum.CLUSTER_ACTION;</span>
+<span class="nc" id="L143">      case DESCRIBE_CONFIGS -&gt; KafkaAclDTO.OperationEnum.DESCRIBE_CONFIGS;</span>
+<span class="nc" id="L144">      case ALTER_CONFIGS -&gt; KafkaAclDTO.OperationEnum.ALTER_CONFIGS;</span>
+<span class="nc" id="L145">      case IDEMPOTENT_WRITE -&gt; KafkaAclDTO.OperationEnum.IDEMPOTENT_WRITE;</span>
+<span class="nc" id="L146">      case CREATE_TOKENS -&gt; KafkaAclDTO.OperationEnum.CREATE_TOKENS;</span>
+<span class="nc" id="L147">      case DESCRIBE_TOKENS -&gt; KafkaAclDTO.OperationEnum.DESCRIBE_TOKENS;</span>
+<span class="nc" id="L148">      case ANY -&gt; throw new IllegalArgumentException(&quot;ANY operation can be only part of filter&quot;);</span>
+<span class="nc" id="L149">      case UNKNOWN -&gt; KafkaAclDTO.OperationEnum.UNKNOWN;</span>
+    };
+  }
+
+  static KafkaAclResourceTypeDTO mapAclResourceType(ResourceType resourceType) {
+<span class="nc bnc" id="L154" title="All 9 branches missed.">    return switch (resourceType) {</span>
+<span class="nc" id="L155">      case CLUSTER -&gt; KafkaAclResourceTypeDTO.CLUSTER;</span>
+<span class="nc" id="L156">      case TOPIC -&gt; KafkaAclResourceTypeDTO.TOPIC;</span>
+<span class="nc" id="L157">      case GROUP -&gt; KafkaAclResourceTypeDTO.GROUP;</span>
+<span class="nc" id="L158">      case DELEGATION_TOKEN -&gt; KafkaAclResourceTypeDTO.DELEGATION_TOKEN;</span>
+<span class="nc" id="L159">      case TRANSACTIONAL_ID -&gt; KafkaAclResourceTypeDTO.TRANSACTIONAL_ID;</span>
+<span class="nc" id="L160">      case USER -&gt; KafkaAclResourceTypeDTO.USER;</span>
+<span class="nc" id="L161">      case ANY -&gt; throw new IllegalArgumentException(&quot;ANY type can be only part of filter&quot;);</span>
+<span class="nc" id="L162">      case UNKNOWN -&gt; KafkaAclResourceTypeDTO.UNKNOWN;</span>
+    };
+  }
+
+  static ResourceType mapAclResourceTypeDto(KafkaAclResourceTypeDTO dto) {
+<span class="nc" id="L167">    return ResourceType.valueOf(dto.name());</span>
+  }
+
+  static PatternType mapPatternTypeDto(KafkaAclNamePatternTypeDTO dto) {
+<span class="nc" id="L171">    return PatternType.valueOf(dto.name());</span>
+  }
+
+  static AclBinding toAclBinding(KafkaAclDTO dto) {
+<span class="nc" id="L175">    return new AclBinding(</span>
+        new ResourcePattern(
+<span class="nc" id="L177">            mapAclResourceTypeDto(dto.getResourceType()),</span>
+<span class="nc" id="L178">            dto.getResourceName(),</span>
+<span class="nc" id="L179">            mapPatternTypeDto(dto.getNamePatternType())</span>
+        ),
+        new AccessControlEntry(
+<span class="nc" id="L182">            dto.getPrincipal(),</span>
+<span class="nc" id="L183">            dto.getHost(),</span>
+<span class="nc" id="L184">            AclOperation.valueOf(dto.getOperation().name()),</span>
+<span class="nc" id="L185">            AclPermissionType.valueOf(dto.getPermission().name())</span>
+        )
+    );
+  }
+
+  static KafkaAclDTO toKafkaAclDto(AclBinding binding) {
+<span class="nc" id="L191">    var pattern = binding.pattern();</span>
+<span class="nc" id="L192">    var filter = binding.toFilter().entryFilter();</span>
+<span class="nc" id="L193">    return new KafkaAclDTO()</span>
+<span class="nc" id="L194">        .resourceType(mapAclResourceType(pattern.resourceType()))</span>
+<span class="nc" id="L195">        .resourceName(pattern.name())</span>
+<span class="nc" id="L196">        .namePatternType(KafkaAclNamePatternTypeDTO.fromValue(pattern.patternType().name()))</span>
+<span class="nc" id="L197">        .principal(filter.principal())</span>
+<span class="nc" id="L198">        .host(filter.host())</span>
+<span class="nc" id="L199">        .operation(mapAclOperation(filter.operation()))</span>
+<span class="nc" id="L200">        .permission(KafkaAclDTO.PermissionEnum.fromValue(filter.permissionType().name()));</span>
+  }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

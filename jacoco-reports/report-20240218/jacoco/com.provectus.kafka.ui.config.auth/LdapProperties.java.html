@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>LdapProperties.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">kafka-ui-api</a> &gt; <a href="index.source.html" class="el_package">com.provectus.kafka.ui.config.auth</a> &gt; <span class="el_source">LdapProperties.java</span></div><h1>LdapProperties.java</h1><pre class="source lang-java linenums">package com.provectus.kafka.ui.config.auth;
+
+import lombok.Data;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.context.properties.ConfigurationProperties;
+
+@ConfigurationProperties(&quot;spring.ldap&quot;)
+<span class="nc bnc" id="L8" title="All 90 branches missed.">@Data</span>
+public class LdapProperties {
+
+<span class="nc" id="L11">  private String urls;</span>
+<span class="nc" id="L12">  private String base;</span>
+<span class="nc" id="L13">  private String adminUser;</span>
+<span class="nc" id="L14">  private String adminPassword;</span>
+<span class="nc" id="L15">  private String userFilterSearchBase;</span>
+<span class="nc" id="L16">  private String userFilterSearchFilter;</span>
+<span class="nc" id="L17">  private String groupFilterSearchBase;</span>
+<span class="nc" id="L18">  private String groupFilterSearchFilter;</span>
+<span class="nc" id="L19">  private String groupRoleAttribute;</span>
+
+  @Value(&quot;${oauth2.ldap.activeDirectory:false}&quot;)
+<span class="nc" id="L22">  private boolean isActiveDirectory;</span>
+  @Value(&quot;${oauth2.ldap.aсtiveDirectory.domain:@null}&quot;)
+<span class="nc" id="L24">  private String activeDirectoryDomain;</span>
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

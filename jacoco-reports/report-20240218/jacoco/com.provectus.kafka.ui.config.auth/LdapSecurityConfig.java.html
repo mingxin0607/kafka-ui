@@ -1,0 +1,153 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>LdapSecurityConfig.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">kafka-ui-api</a> &gt; <a href="index.source.html" class="el_package">com.provectus.kafka.ui.config.auth</a> &gt; <span class="el_source">LdapSecurityConfig.java</span></div><h1>LdapSecurityConfig.java</h1><pre class="source lang-java linenums">package com.provectus.kafka.ui.config.auth;
+
+import static com.provectus.kafka.ui.config.auth.AbstractAuthSecurityConfig.AUTH_WHITELIST;
+
+import com.provectus.kafka.ui.service.rbac.AccessControlService;
+import com.provectus.kafka.ui.service.rbac.extractor.RbacLdapAuthoritiesExtractor;
+import java.util.Collection;
+import java.util.List;
+import java.util.Optional;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.boot.autoconfigure.ldap.LdapAutoConfiguration;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.context.ApplicationContext;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Import;
+import org.springframework.context.annotation.Primary;
+import org.springframework.ldap.core.DirContextOperations;
+import org.springframework.ldap.core.support.BaseLdapPathContextSource;
+import org.springframework.ldap.core.support.LdapContextSource;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.ProviderManager;
+import org.springframework.security.authentication.ReactiveAuthenticationManager;
+import org.springframework.security.authentication.ReactiveAuthenticationManagerAdapter;
+import org.springframework.security.config.Customizer;
+import org.springframework.security.config.annotation.web.reactive.EnableWebFluxSecurity;
+import org.springframework.security.config.web.server.ServerHttpSecurity;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.ldap.authentication.AbstractLdapAuthenticationProvider;
+import org.springframework.security.ldap.authentication.BindAuthenticator;
+import org.springframework.security.ldap.authentication.LdapAuthenticationProvider;
+import org.springframework.security.ldap.authentication.ad.ActiveDirectoryLdapAuthenticationProvider;
+import org.springframework.security.ldap.search.FilterBasedLdapUserSearch;
+import org.springframework.security.ldap.search.LdapUserSearch;
+import org.springframework.security.ldap.userdetails.DefaultLdapAuthoritiesPopulator;
+import org.springframework.security.ldap.userdetails.LdapAuthoritiesPopulator;
+import org.springframework.security.ldap.userdetails.LdapUserDetailsMapper;
+import org.springframework.security.web.server.SecurityWebFilterChain;
+
+@Configuration
+@EnableWebFluxSecurity
+@ConditionalOnProperty(value = &quot;auth.type&quot;, havingValue = &quot;LDAP&quot;)
+@Import(LdapAutoConfiguration.class)
+@EnableConfigurationProperties(LdapProperties.class)
+<span class="nc" id="L48">@RequiredArgsConstructor</span>
+<span class="nc" id="L49">@Slf4j</span>
+public class LdapSecurityConfig {
+
+  private final LdapProperties props;
+
+  @Bean
+  public ReactiveAuthenticationManager authenticationManager(BaseLdapPathContextSource contextSource,
+                                                             LdapAuthoritiesPopulator authoritiesExtractor,
+                                                             AccessControlService acs) {
+<span class="nc" id="L58">    var rbacEnabled = acs.isRbacEnabled();</span>
+<span class="nc" id="L59">    BindAuthenticator ba = new BindAuthenticator(contextSource);</span>
+<span class="nc bnc" id="L60" title="All 2 branches missed.">    if (props.getBase() != null) {</span>
+<span class="nc" id="L61">      ba.setUserDnPatterns(new String[] {props.getBase()});</span>
+    }
+<span class="nc bnc" id="L63" title="All 2 branches missed.">    if (props.getUserFilterSearchFilter() != null) {</span>
+<span class="nc" id="L64">      LdapUserSearch userSearch =</span>
+<span class="nc" id="L65">          new FilterBasedLdapUserSearch(props.getUserFilterSearchBase(), props.getUserFilterSearchFilter(),</span>
+              contextSource);
+<span class="nc" id="L67">      ba.setUserSearch(userSearch);</span>
+    }
+
+    AbstractLdapAuthenticationProvider authenticationProvider;
+<span class="nc bnc" id="L71" title="All 2 branches missed.">    if (!props.isActiveDirectory()) {</span>
+<span class="nc bnc" id="L72" title="All 2 branches missed.">      authenticationProvider = rbacEnabled</span>
+<span class="nc" id="L73">          ? new LdapAuthenticationProvider(ba, authoritiesExtractor)</span>
+<span class="nc" id="L74">          : new LdapAuthenticationProvider(ba);</span>
+    } else {
+<span class="nc" id="L76">      authenticationProvider = new ActiveDirectoryLdapAuthenticationProvider(props.getActiveDirectoryDomain(),</span>
+<span class="nc" id="L77">          props.getUrls()); // TODO Issue #3741</span>
+<span class="nc" id="L78">      authenticationProvider.setUseAuthenticationRequestCredentials(true);</span>
+    }
+
+<span class="nc bnc" id="L81" title="All 2 branches missed.">    if (rbacEnabled) {</span>
+<span class="nc" id="L82">      authenticationProvider.setUserDetailsContextMapper(new UserDetailsMapper());</span>
+    }
+
+<span class="nc" id="L85">    AuthenticationManager am = new ProviderManager(List.of(authenticationProvider));</span>
+
+<span class="nc" id="L87">    return new ReactiveAuthenticationManagerAdapter(am);</span>
+  }
+
+  @Bean
+  @Primary
+  public BaseLdapPathContextSource contextSource() {
+<span class="nc" id="L93">    LdapContextSource ctx = new LdapContextSource();</span>
+<span class="nc" id="L94">    ctx.setUrl(props.getUrls());</span>
+<span class="nc" id="L95">    ctx.setUserDn(props.getAdminUser());</span>
+<span class="nc" id="L96">    ctx.setPassword(props.getAdminPassword());</span>
+<span class="nc" id="L97">    ctx.afterPropertiesSet();</span>
+<span class="nc" id="L98">    return ctx;</span>
+  }
+
+  @Bean
+  @Primary
+  public DefaultLdapAuthoritiesPopulator ldapAuthoritiesExtractor(ApplicationContext context,
+                                                                  BaseLdapPathContextSource contextSource,
+                                                                  AccessControlService acs) {
+<span class="nc bnc" id="L106" title="All 4 branches missed.">    var rbacEnabled = acs != null &amp;&amp; acs.isRbacEnabled();</span>
+
+    DefaultLdapAuthoritiesPopulator extractor;
+
+<span class="nc bnc" id="L110" title="All 2 branches missed.">    if (rbacEnabled) {</span>
+<span class="nc" id="L111">      extractor = new RbacLdapAuthoritiesExtractor(context, contextSource, props.getGroupFilterSearchBase());</span>
+    } else {
+<span class="nc" id="L113">      extractor = new DefaultLdapAuthoritiesPopulator(contextSource, props.getGroupFilterSearchBase());</span>
+    }
+
+<span class="nc" id="L116">    Optional.ofNullable(props.getGroupFilterSearchFilter()).ifPresent(extractor::setGroupSearchFilter);</span>
+<span class="nc" id="L117">    extractor.setRolePrefix(&quot;&quot;);</span>
+<span class="nc" id="L118">    extractor.setConvertToUpperCase(false);</span>
+<span class="nc" id="L119">    extractor.setSearchSubtree(true);</span>
+<span class="nc" id="L120">    return extractor;</span>
+  }
+
+  @Bean
+  public SecurityWebFilterChain configureLdap(ServerHttpSecurity http) {
+<span class="nc" id="L125">    log.info(&quot;Configuring LDAP authentication.&quot;);</span>
+<span class="nc bnc" id="L126" title="All 2 branches missed.">    if (props.isActiveDirectory()) {</span>
+<span class="nc" id="L127">      log.info(&quot;Active Directory support for LDAP has been enabled.&quot;);</span>
+    }
+
+<span class="nc" id="L130">    return http.authorizeExchange(spec -&gt; spec</span>
+<span class="nc" id="L131">            .pathMatchers(AUTH_WHITELIST)</span>
+<span class="nc" id="L132">            .permitAll()</span>
+<span class="nc" id="L133">            .anyExchange()</span>
+<span class="nc" id="L134">            .authenticated()</span>
+        )
+<span class="nc" id="L136">        .formLogin(Customizer.withDefaults())</span>
+<span class="nc" id="L137">        .logout(Customizer.withDefaults())</span>
+<span class="nc" id="L138">        .csrf(ServerHttpSecurity.CsrfSpec::disable)</span>
+<span class="nc" id="L139">        .build();</span>
+  }
+
+  private static class UserDetailsMapper extends LdapUserDetailsMapper {
+    @Override
+    public UserDetails mapUserFromContext(DirContextOperations ctx, String username,
+                                          Collection&lt;? extends GrantedAuthority&gt; authorities) {
+<span class="nc" id="L146">      UserDetails userDetails = super.mapUserFromContext(ctx, username, authorities);</span>
+<span class="nc" id="L147">      return new RbacLdapUser(userDetails);</span>
+    }
+  }
+
+}
+
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

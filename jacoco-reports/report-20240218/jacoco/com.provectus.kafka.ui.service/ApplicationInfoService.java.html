@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ApplicationInfoService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">kafka-ui-api</a> &gt; <a href="index.source.html" class="el_package">com.provectus.kafka.ui.service</a> &gt; <span class="el_source">ApplicationInfoService.java</span></div><h1>ApplicationInfoService.java</h1><pre class="source lang-java linenums">package com.provectus.kafka.ui.service;
+
+import static com.provectus.kafka.ui.model.ApplicationInfoDTO.EnabledFeaturesEnum;
+
+import com.provectus.kafka.ui.model.ApplicationInfoBuildDTO;
+import com.provectus.kafka.ui.model.ApplicationInfoDTO;
+import com.provectus.kafka.ui.model.ApplicationInfoLatestReleaseDTO;
+import com.provectus.kafka.ui.util.DynamicConfigOperations;
+import com.provectus.kafka.ui.util.GithubReleaseInfo;
+import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
+import java.util.Properties;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.info.BuildProperties;
+import org.springframework.boot.info.GitProperties;
+import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.stereotype.Service;
+
+@Service
+public class ApplicationInfoService {
+
+<span class="fc" id="L24">  private final GithubReleaseInfo githubReleaseInfo = new GithubReleaseInfo();</span>
+
+  private final DynamicConfigOperations dynamicConfigOperations;
+  private final BuildProperties buildProperties;
+  private final GitProperties gitProperties;
+
+  public ApplicationInfoService(DynamicConfigOperations dynamicConfigOperations,
+                                @Autowired(required = false) BuildProperties buildProperties,
+<span class="fc" id="L32">                                @Autowired(required = false) GitProperties gitProperties) {</span>
+<span class="fc" id="L33">    this.dynamicConfigOperations = dynamicConfigOperations;</span>
+<span class="fc" id="L34">    this.buildProperties = Optional.ofNullable(buildProperties).orElse(new BuildProperties(new Properties()));</span>
+<span class="fc" id="L35">    this.gitProperties = Optional.ofNullable(gitProperties).orElse(new GitProperties(new Properties()));</span>
+<span class="fc" id="L36">  }</span>
+
+  public ApplicationInfoDTO getApplicationInfo() {
+<span class="nc" id="L39">    var releaseInfo = githubReleaseInfo.get();</span>
+<span class="nc" id="L40">    return new ApplicationInfoDTO()</span>
+<span class="nc" id="L41">        .build(getBuildInfo(releaseInfo))</span>
+<span class="nc" id="L42">        .enabledFeatures(getEnabledFeatures())</span>
+<span class="nc" id="L43">        .latestRelease(convert(releaseInfo));</span>
+  }
+
+  private ApplicationInfoLatestReleaseDTO convert(GithubReleaseInfo.GithubReleaseDto releaseInfo) {
+<span class="nc" id="L47">    return new ApplicationInfoLatestReleaseDTO()</span>
+<span class="nc" id="L48">        .htmlUrl(releaseInfo.html_url())</span>
+<span class="nc" id="L49">        .publishedAt(releaseInfo.published_at())</span>
+<span class="nc" id="L50">        .versionTag(releaseInfo.tag_name());</span>
+  }
+
+  private ApplicationInfoBuildDTO getBuildInfo(GithubReleaseInfo.GithubReleaseDto release) {
+<span class="nc" id="L54">    return new ApplicationInfoBuildDTO()</span>
+<span class="nc bnc" id="L55" title="All 4 branches missed.">        .isLatestRelease(release.tag_name() != null &amp;&amp; release.tag_name().equals(buildProperties.getVersion()))</span>
+<span class="nc" id="L56">        .commitId(gitProperties.getShortCommitId())</span>
+<span class="nc" id="L57">        .version(buildProperties.getVersion())</span>
+<span class="nc bnc" id="L58" title="All 2 branches missed.">        .buildTime(buildProperties.getTime() != null</span>
+<span class="nc" id="L59">            ? DateTimeFormatter.ISO_INSTANT.format(buildProperties.getTime()) : null);</span>
+  }
+
+  private List&lt;EnabledFeaturesEnum&gt; getEnabledFeatures() {
+<span class="nc" id="L63">    var enabledFeatures = new ArrayList&lt;EnabledFeaturesEnum&gt;();</span>
+<span class="nc bnc" id="L64" title="All 2 branches missed.">    if (dynamicConfigOperations.dynamicConfigEnabled()) {</span>
+<span class="nc" id="L65">      enabledFeatures.add(EnabledFeaturesEnum.DYNAMIC_CONFIG);</span>
+    }
+<span class="nc" id="L67">    return enabledFeatures;</span>
+  }
+
+  // updating on startup and every hour
+  @Scheduled(fixedRateString = &quot;${github-release-info-update-rate:3600000}&quot;)
+  public void updateGithubReleaseInfo() {
+<span class="fc" id="L73">    githubReleaseInfo.refresh().block();</span>
+<span class="fc" id="L74">  }</span>
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

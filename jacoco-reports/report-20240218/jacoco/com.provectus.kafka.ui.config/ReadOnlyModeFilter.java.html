@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ReadOnlyModeFilter.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">kafka-ui-api</a> &gt; <a href="index.source.html" class="el_package">com.provectus.kafka.ui.config</a> &gt; <span class="el_source">ReadOnlyModeFilter.java</span></div><h1>ReadOnlyModeFilter.java</h1><pre class="source lang-java linenums">package com.provectus.kafka.ui.config;
+
+import com.provectus.kafka.ui.exception.ClusterNotFoundException;
+import com.provectus.kafka.ui.exception.ReadOnlyModeException;
+import com.provectus.kafka.ui.service.ClustersStorage;
+import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
+import java.util.regex.Pattern;
+import lombok.RequiredArgsConstructor;
+import org.jetbrains.annotations.NotNull;
+import org.springframework.core.annotation.Order;
+import org.springframework.http.HttpMethod;
+import org.springframework.stereotype.Component;
+import org.springframework.web.server.ServerWebExchange;
+import org.springframework.web.server.WebFilter;
+import org.springframework.web.server.WebFilterChain;
+import reactor.core.publisher.Mono;
+
+@Order
+@Component
+<span class="fc" id="L21">@RequiredArgsConstructor</span>
+public class ReadOnlyModeFilter implements WebFilter {
+<span class="fc" id="L23">  private static final Pattern CLUSTER_NAME_REGEX =</span>
+<span class="fc" id="L24">      Pattern.compile(&quot;/api/clusters/(?&lt;clusterName&gt;[^/]++)&quot;);</span>
+
+  private final ClustersStorage clustersStorage;
+
+  @NotNull
+  @Override
+  public Mono&lt;Void&gt; filter(ServerWebExchange exchange, @NotNull WebFilterChain chain) {
+<span class="fc bfc" id="L31" title="All 2 branches covered.">    var isSafeMethod = exchange.getRequest().getMethod() == HttpMethod.GET;</span>
+<span class="fc bfc" id="L32" title="All 2 branches covered.">    if (isSafeMethod) {</span>
+<span class="fc" id="L33">      return chain.filter(exchange);</span>
+    }
+
+<span class="fc" id="L36">    var path = exchange.getRequest().getPath().pathWithinApplication().value();</span>
+<span class="fc" id="L37">    var decodedPath = URLDecoder.decode(path, StandardCharsets.UTF_8);</span>
+<span class="fc" id="L38">    var matcher = CLUSTER_NAME_REGEX.matcher(decodedPath);</span>
+<span class="fc bfc" id="L39" title="All 2 branches covered.">    if (!matcher.find()) {</span>
+<span class="fc" id="L40">      return chain.filter(exchange);</span>
+    }
+<span class="fc" id="L42">    var clusterName = matcher.group(&quot;clusterName&quot;);</span>
+<span class="fc" id="L43">    var kafkaCluster = clustersStorage.getClusterByName(clusterName)</span>
+<span class="fc" id="L44">        .orElseThrow(</span>
+<span class="nc" id="L45">            () -&gt; new ClusterNotFoundException(</span>
+<span class="nc" id="L46">                String.format(&quot;No cluster for name '%s'&quot;, clusterName)));</span>
+
+<span class="fc bfc" id="L48" title="All 2 branches covered.">    if (!kafkaCluster.isReadOnly()) {</span>
+<span class="fc" id="L49">      return chain.filter(exchange);</span>
+    }
+
+<span class="fc" id="L52">    return Mono.error(ReadOnlyModeException::new);</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

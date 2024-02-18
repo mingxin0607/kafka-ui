@@ -1,0 +1,313 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ConsumerOffsetsSerde.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">kafka-ui-api</a> &gt; <a href="index.source.html" class="el_package">com.provectus.kafka.ui.serdes.builtin</a> &gt; <span class="el_source">ConsumerOffsetsSerde.java</span></div><h1>ConsumerOffsetsSerde.java</h1><pre class="source lang-java linenums">package com.provectus.kafka.ui.serdes.builtin;
+
+import com.fasterxml.jackson.core.JsonGenerator;
+import com.fasterxml.jackson.databind.JsonSerializer;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializerProvider;
+import com.fasterxml.jackson.databind.json.JsonMapper;
+import com.fasterxml.jackson.databind.module.SimpleModule;
+import com.provectus.kafka.ui.serde.api.DeserializeResult;
+import com.provectus.kafka.ui.serde.api.SchemaDescription;
+import com.provectus.kafka.ui.serdes.BuiltInSerde;
+import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.util.Map;
+import java.util.Optional;
+import lombok.SneakyThrows;
+import org.apache.kafka.common.protocol.types.ArrayOf;
+import org.apache.kafka.common.protocol.types.BoundField;
+import org.apache.kafka.common.protocol.types.CompactArrayOf;
+import org.apache.kafka.common.protocol.types.Field;
+import org.apache.kafka.common.protocol.types.Schema;
+import org.apache.kafka.common.protocol.types.Struct;
+import org.apache.kafka.common.protocol.types.Type;
+
+// Deserialization logic and message's schemas can be found in
+// kafka.coordinator.group.GroupMetadataManager (readMessageKey, readOffsetMessageValue, readGroupMessageValue)
+<span class="fc" id="L27">public class ConsumerOffsetsSerde implements BuiltInSerde {</span>
+
+<span class="fc" id="L29">  private static final JsonMapper JSON_MAPPER = createMapper();</span>
+
+  private static final String ASSIGNMENT = &quot;assignment&quot;;
+  private static final String CLIENT_HOST = &quot;client_host&quot;;
+  private static final String CLIENT_ID = &quot;client_id&quot;;
+  private static final String COMMIT_TIMESTAMP = &quot;commit_timestamp&quot;;
+  private static final String CURRENT_STATE_TIMESTAMP = &quot;current_state_timestamp&quot;;
+  private static final String GENERATION = &quot;generation&quot;;
+  private static final String LEADER = &quot;leader&quot;;
+  private static final String MEMBERS = &quot;members&quot;;
+  private static final String MEMBER_ID = &quot;member_id&quot;;
+  private static final String METADATA = &quot;metadata&quot;;
+  private static final String OFFSET = &quot;offset&quot;;
+  private static final String PROTOCOL = &quot;protocol&quot;;
+  private static final String PROTOCOL_TYPE = &quot;protocol_type&quot;;
+  private static final String REBALANCE_TIMEOUT = &quot;rebalance_timeout&quot;;
+  private static final String SESSION_TIMEOUT = &quot;session_timeout&quot;;
+  private static final String SUBSCRIPTION = &quot;subscription&quot;;
+
+  public static final String TOPIC = &quot;__consumer_offsets&quot;;
+
+  public static String name() {
+<span class="fc" id="L51">    return &quot;__consumer_offsets&quot;;</span>
+  }
+
+  private static JsonMapper createMapper() {
+<span class="fc" id="L55">    var module = new SimpleModule();</span>
+<span class="fc" id="L56">    module.addSerializer(Struct.class, new JsonSerializer&lt;&gt;() {</span>
+      @Override
+      public void serialize(Struct value, JsonGenerator gen, SerializerProvider serializers) throws IOException {
+<span class="fc" id="L59">        gen.writeStartObject();</span>
+<span class="fc bfc" id="L60" title="All 2 branches covered.">        for (BoundField field : value.schema().fields()) {</span>
+<span class="fc" id="L61">          var fieldVal = value.get(field);</span>
+<span class="fc" id="L62">          gen.writeObjectField(field.def.name, fieldVal);</span>
+        }
+<span class="fc" id="L64">        gen.writeEndObject();</span>
+<span class="fc" id="L65">      }</span>
+    });
+<span class="fc" id="L67">    var mapper = new JsonMapper();</span>
+<span class="fc" id="L68">    mapper.registerModule(module);</span>
+<span class="fc" id="L69">    return mapper;</span>
+  }
+
+  @Override
+  public Optional&lt;String&gt; getDescription() {
+<span class="nc" id="L74">    return Optional.empty();</span>
+  }
+
+  @Override
+  public Optional&lt;SchemaDescription&gt; getSchema(String topic, Target type) {
+<span class="nc" id="L79">    return Optional.empty();</span>
+  }
+
+  @Override
+  public boolean canDeserialize(String topic, Target type) {
+<span class="fc" id="L84">    return topic.equals(TOPIC);</span>
+  }
+
+  @Override
+  public boolean canSerialize(String topic, Target type) {
+<span class="nc" id="L89">    return false;</span>
+  }
+
+  @Override
+  public Serializer serializer(String topic, Target type) {
+<span class="nc" id="L94">    throw new UnsupportedOperationException();</span>
+  }
+
+  @Override
+  public Deserializer deserializer(String topic, Target type) {
+<span class="pc bpc" id="L99" title="1 of 3 branches missed.">    return switch (type) {</span>
+<span class="fc" id="L100">      case KEY -&gt; keyDeserializer();</span>
+<span class="fc" id="L101">      case VALUE -&gt; valueDeserializer();</span>
+    };
+  }
+
+  private Deserializer keyDeserializer() {
+<span class="fc" id="L106">    final Schema commitKeySchema = new Schema(</span>
+        new Field(&quot;group&quot;, Type.STRING, &quot;&quot;),
+        new Field(&quot;topic&quot;, Type.STRING, &quot;&quot;),
+        new Field(&quot;partition&quot;, Type.INT32, &quot;&quot;)
+    );
+
+<span class="fc" id="L112">    final Schema groupMetadataSchema = new Schema(</span>
+        new Field(&quot;group&quot;, Type.STRING, &quot;&quot;)
+    );
+
+<span class="fc" id="L116">    return (headers, data) -&gt; {</span>
+<span class="fc" id="L117">      var bb = ByteBuffer.wrap(data);</span>
+<span class="fc" id="L118">      short version = bb.getShort();</span>
+<span class="pc bpc" id="L119" title="1 of 3 branches missed.">      return new DeserializeResult(</span>
+<span class="fc" id="L120">          toJson(</span>
+              switch (version) {
+<span class="fc" id="L122">                case 0, 1 -&gt; commitKeySchema.read(bb);</span>
+<span class="fc" id="L123">                case 2 -&gt; groupMetadataSchema.read(bb);</span>
+<span class="nc" id="L124">                default -&gt; throw new IllegalStateException(&quot;Unknown group metadata message version: &quot; + version);</span>
+              }
+          ),
+          DeserializeResult.Type.JSON,
+<span class="fc" id="L128">          Map.of()</span>
+      );
+    };
+  }
+
+  private Deserializer valueDeserializer() {
+<span class="fc" id="L134">    final Schema commitOffsetSchemaV0 =</span>
+        new Schema(
+            new Field(OFFSET, Type.INT64, &quot;&quot;),
+            new Field(METADATA, Type.STRING, &quot;&quot;),
+            new Field(COMMIT_TIMESTAMP, Type.INT64, &quot;&quot;)
+        );
+
+<span class="fc" id="L141">    final Schema commitOffsetSchemaV1 =</span>
+        new Schema(
+            new Field(OFFSET, Type.INT64, &quot;&quot;),
+            new Field(METADATA, Type.STRING, &quot;&quot;),
+            new Field(COMMIT_TIMESTAMP, Type.INT64, &quot;&quot;),
+            new Field(&quot;expire_timestamp&quot;, Type.INT64, &quot;&quot;)
+        );
+
+<span class="fc" id="L149">    final Schema commitOffsetSchemaV2 =</span>
+        new Schema(
+            new Field(OFFSET, Type.INT64, &quot;&quot;),
+            new Field(METADATA, Type.STRING, &quot;&quot;),
+            new Field(COMMIT_TIMESTAMP, Type.INT64, &quot;&quot;)
+        );
+
+<span class="fc" id="L156">    final Schema commitOffsetSchemaV3 =</span>
+        new Schema(
+            new Field(OFFSET, Type.INT64, &quot;&quot;),
+            new Field(&quot;leader_epoch&quot;, Type.INT32, &quot;&quot;),
+            new Field(METADATA, Type.STRING, &quot;&quot;),
+            new Field(COMMIT_TIMESTAMP, Type.INT64, &quot;&quot;)
+        );
+
+<span class="fc" id="L164">    final Schema commitOffsetSchemaV4 = new Schema(</span>
+        new Field(OFFSET, Type.INT64, &quot;&quot;),
+        new Field(&quot;leader_epoch&quot;, Type.INT32, &quot;&quot;),
+        new Field(METADATA, Type.COMPACT_STRING, &quot;&quot;),
+        new Field(COMMIT_TIMESTAMP, Type.INT64, &quot;&quot;),
+<span class="fc" id="L169">        Field.TaggedFieldsSection.of()</span>
+    );
+
+<span class="fc" id="L172">    final Schema metadataSchema0 =</span>
+        new Schema(
+            new Field(PROTOCOL_TYPE, Type.STRING, &quot;&quot;),
+            new Field(GENERATION, Type.INT32, &quot;&quot;),
+            new Field(PROTOCOL, Type.NULLABLE_STRING, &quot;&quot;),
+            new Field(LEADER, Type.NULLABLE_STRING, &quot;&quot;),
+            new Field(MEMBERS, new ArrayOf(new Schema(
+                new Field(MEMBER_ID, Type.STRING, &quot;&quot;),
+                new Field(CLIENT_ID, Type.STRING, &quot;&quot;),
+                new Field(CLIENT_HOST, Type.STRING, &quot;&quot;),
+                new Field(SESSION_TIMEOUT, Type.INT32, &quot;&quot;),
+                new Field(SUBSCRIPTION, Type.BYTES, &quot;&quot;),
+                new Field(ASSIGNMENT, Type.BYTES, &quot;&quot;)
+            )), &quot;&quot;)
+        );
+
+<span class="fc" id="L188">    final Schema metadataSchema1 =</span>
+        new Schema(
+            new Field(PROTOCOL_TYPE, Type.STRING, &quot;&quot;),
+            new Field(GENERATION, Type.INT32, &quot;&quot;),
+            new Field(PROTOCOL, Type.NULLABLE_STRING, &quot;&quot;),
+            new Field(LEADER, Type.NULLABLE_STRING, &quot;&quot;),
+            new Field(MEMBERS, new ArrayOf(new Schema(
+                new Field(MEMBER_ID, Type.STRING, &quot;&quot;),
+                new Field(CLIENT_ID, Type.STRING, &quot;&quot;),
+                new Field(CLIENT_HOST, Type.STRING, &quot;&quot;),
+                new Field(REBALANCE_TIMEOUT, Type.INT32, &quot;&quot;),
+                new Field(SESSION_TIMEOUT, Type.INT32, &quot;&quot;),
+                new Field(SUBSCRIPTION, Type.BYTES, &quot;&quot;),
+                new Field(ASSIGNMENT, Type.BYTES, &quot;&quot;)
+            )), &quot;&quot;)
+        );
+
+<span class="fc" id="L205">    final Schema metadataSchema2 =</span>
+        new Schema(
+            new Field(PROTOCOL_TYPE, Type.STRING, &quot;&quot;),
+            new Field(GENERATION, Type.INT32, &quot;&quot;),
+            new Field(PROTOCOL, Type.NULLABLE_STRING, &quot;&quot;),
+            new Field(LEADER, Type.NULLABLE_STRING, &quot;&quot;),
+            new Field(CURRENT_STATE_TIMESTAMP, Type.INT64, &quot;&quot;),
+            new Field(MEMBERS, new ArrayOf(new Schema(
+                new Field(MEMBER_ID, Type.STRING, &quot;&quot;),
+                new Field(CLIENT_ID, Type.STRING, &quot;&quot;),
+                new Field(CLIENT_HOST, Type.STRING, &quot;&quot;),
+                new Field(REBALANCE_TIMEOUT, Type.INT32, &quot;&quot;),
+                new Field(SESSION_TIMEOUT, Type.INT32, &quot;&quot;),
+                new Field(SUBSCRIPTION, Type.BYTES, &quot;&quot;),
+                new Field(ASSIGNMENT, Type.BYTES, &quot;&quot;)
+            )), &quot;&quot;)
+        );
+
+<span class="fc" id="L223">    final Schema metadataSchema3 =</span>
+        new Schema(
+            new Field(PROTOCOL_TYPE, Type.STRING, &quot;&quot;),
+            new Field(GENERATION, Type.INT32, &quot;&quot;),
+            new Field(PROTOCOL, Type.NULLABLE_STRING, &quot;&quot;),
+            new Field(LEADER, Type.NULLABLE_STRING, &quot;&quot;),
+            new Field(CURRENT_STATE_TIMESTAMP, Type.INT64, &quot;&quot;),
+            new Field(MEMBERS, new ArrayOf(new Schema(
+                new Field(MEMBER_ID, Type.STRING, &quot;&quot;),
+                new Field(&quot;group_instance_id&quot;, Type.NULLABLE_STRING, &quot;&quot;),
+                new Field(CLIENT_ID, Type.STRING, &quot;&quot;),
+                new Field(CLIENT_HOST, Type.STRING, &quot;&quot;),
+                new Field(REBALANCE_TIMEOUT, Type.INT32, &quot;&quot;),
+                new Field(SESSION_TIMEOUT, Type.INT32, &quot;&quot;),
+                new Field(SUBSCRIPTION, Type.BYTES, &quot;&quot;),
+                new Field(ASSIGNMENT, Type.BYTES, &quot;&quot;)
+            )), &quot;&quot;)
+        );
+
+<span class="fc" id="L242">    final Schema metadataSchema4 =</span>
+        new Schema(
+            new Field(PROTOCOL_TYPE, Type.COMPACT_STRING, &quot;&quot;),
+            new Field(GENERATION, Type.INT32, &quot;&quot;),
+            new Field(PROTOCOL, Type.COMPACT_NULLABLE_STRING, &quot;&quot;),
+            new Field(LEADER, Type.COMPACT_NULLABLE_STRING, &quot;&quot;),
+            new Field(CURRENT_STATE_TIMESTAMP, Type.INT64, &quot;&quot;),
+            new Field(MEMBERS, new CompactArrayOf(new Schema(
+                new Field(MEMBER_ID, Type.COMPACT_STRING, &quot;&quot;),
+                new Field(&quot;group_instance_id&quot;, Type.COMPACT_NULLABLE_STRING, &quot;&quot;),
+                new Field(CLIENT_ID, Type.COMPACT_STRING, &quot;&quot;),
+                new Field(CLIENT_HOST, Type.COMPACT_STRING, &quot;&quot;),
+                new Field(REBALANCE_TIMEOUT, Type.INT32, &quot;&quot;),
+                new Field(SESSION_TIMEOUT, Type.INT32, &quot;&quot;),
+                new Field(SUBSCRIPTION, Type.COMPACT_BYTES, &quot;&quot;),
+                new Field(ASSIGNMENT, Type.COMPACT_BYTES, &quot;&quot;),
+<span class="fc" id="L258">                Field.TaggedFieldsSection.of()</span>
+            )), &quot;&quot;),
+<span class="fc" id="L260">            Field.TaggedFieldsSection.of()</span>
+        );
+
+<span class="fc" id="L263">    return (headers, data) -&gt; {</span>
+      String result;
+<span class="fc" id="L265">      var bb = ByteBuffer.wrap(data);</span>
+<span class="fc" id="L266">      short version = bb.getShort();</span>
+      // ideally, we should distinguish if value is commit or metadata
+      // by checking record's key, but our current serde structure doesn't allow that.
+      // so, we are trying to parse into metadata first and after into commit msg
+      try {
+<span class="pc bpc" id="L271" title="5 of 6 branches missed.">        result = toJson(</span>
+            switch (version) {
+<span class="nc" id="L273">              case 0 -&gt; metadataSchema0.read(bb);</span>
+<span class="nc" id="L274">              case 1 -&gt; metadataSchema1.read(bb);</span>
+<span class="nc" id="L275">              case 2 -&gt; metadataSchema2.read(bb);</span>
+<span class="fc" id="L276">              case 3 -&gt; metadataSchema3.read(bb);</span>
+<span class="nc" id="L277">              case 4 -&gt; metadataSchema4.read(bb);</span>
+<span class="nc" id="L278">              default -&gt; throw new IllegalArgumentException(&quot;Unrecognized version: &quot; + version);</span>
+            }
+        );
+<span class="fc" id="L281">      } catch (Throwable e) {</span>
+<span class="fc" id="L282">        bb = bb.rewind();</span>
+<span class="fc" id="L283">        bb.getShort(); // skipping version</span>
+<span class="pc bpc" id="L284" title="5 of 6 branches missed.">        result = toJson(</span>
+            switch (version) {
+<span class="nc" id="L286">              case 0 -&gt; commitOffsetSchemaV0.read(bb);</span>
+<span class="nc" id="L287">              case 1 -&gt; commitOffsetSchemaV1.read(bb);</span>
+<span class="nc" id="L288">              case 2 -&gt; commitOffsetSchemaV2.read(bb);</span>
+<span class="fc" id="L289">              case 3 -&gt; commitOffsetSchemaV3.read(bb);</span>
+<span class="nc" id="L290">              case 4 -&gt; commitOffsetSchemaV4.read(bb);</span>
+<span class="nc" id="L291">              default -&gt; throw new IllegalArgumentException(&quot;Unrecognized version: &quot; + version);</span>
+            }
+        );
+<span class="fc" id="L294">      }</span>
+
+<span class="pc bpc" id="L296" title="1 of 2 branches missed.">      if (bb.remaining() != 0) {</span>
+<span class="nc" id="L297">        throw new IllegalArgumentException(</span>
+            &quot;Message buffer is not read to the end, which is likely means message is unrecognized&quot;);
+      }
+<span class="fc" id="L300">      return new DeserializeResult(</span>
+          result,
+          DeserializeResult.Type.JSON,
+<span class="fc" id="L303">          Map.of()</span>
+      );
+    };
+  }
+
+<span class="nc" id="L308">  @SneakyThrows</span>
+  private String toJson(Struct s) {
+<span class="fc" id="L310">    return JSON_MAPPER.writeValueAsString(s);</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

@@ -1,0 +1,202 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ProtobufSchemaConverter.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">kafka-ui-api</a> &gt; <a href="index.source.html" class="el_package">com.provectus.kafka.ui.util.jsonschema</a> &gt; <span class="el_source">ProtobufSchemaConverter.java</span></div><h1>ProtobufSchemaConverter.java</h1><pre class="source lang-java linenums">package com.provectus.kafka.ui.util.jsonschema;
+
+import static java.util.Objects.requireNonNull;
+
+import com.fasterxml.jackson.databind.node.BigIntegerNode;
+import com.fasterxml.jackson.databind.node.IntNode;
+import com.fasterxml.jackson.databind.node.LongNode;
+import com.fasterxml.jackson.databind.node.TextNode;
+import com.google.common.primitives.UnsignedInteger;
+import com.google.common.primitives.UnsignedLong;
+import com.google.protobuf.Any;
+import com.google.protobuf.BoolValue;
+import com.google.protobuf.BytesValue;
+import com.google.protobuf.Descriptors;
+import com.google.protobuf.DoubleValue;
+import com.google.protobuf.Duration;
+import com.google.protobuf.FieldMask;
+import com.google.protobuf.FloatValue;
+import com.google.protobuf.Int32Value;
+import com.google.protobuf.Int64Value;
+import com.google.protobuf.ListValue;
+import com.google.protobuf.StringValue;
+import com.google.protobuf.Struct;
+import com.google.protobuf.Timestamp;
+import com.google.protobuf.UInt32Value;
+import com.google.protobuf.UInt64Value;
+import com.google.protobuf.Value;
+import java.net.URI;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
+import reactor.util.function.Tuple2;
+import reactor.util.function.Tuples;
+
+<span class="fc" id="L38">public class ProtobufSchemaConverter implements JsonSchemaConverter&lt;Descriptors.Descriptor&gt; {</span>
+
+  private static final String MAXIMUM = &quot;maximum&quot;;
+  private static final String MINIMUM = &quot;minimum&quot;;
+
+<span class="fc" id="L43">  private final Set&lt;String&gt; simpleTypesWrapperNames = Set.of(</span>
+<span class="fc" id="L44">      BoolValue.getDescriptor().getFullName(),</span>
+<span class="fc" id="L45">      Int32Value.getDescriptor().getFullName(),</span>
+<span class="fc" id="L46">      UInt32Value.getDescriptor().getFullName(),</span>
+<span class="fc" id="L47">      Int64Value.getDescriptor().getFullName(),</span>
+<span class="fc" id="L48">      UInt64Value.getDescriptor().getFullName(),</span>
+<span class="fc" id="L49">      StringValue.getDescriptor().getFullName(),</span>
+<span class="fc" id="L50">      BytesValue.getDescriptor().getFullName(),</span>
+<span class="fc" id="L51">      FloatValue.getDescriptor().getFullName(),</span>
+<span class="fc" id="L52">      DoubleValue.getDescriptor().getFullName()</span>
+  );
+
+  @Override
+  public JsonSchema convert(URI basePath, Descriptors.Descriptor schema) {
+<span class="fc" id="L57">    Map&lt;String, FieldSchema&gt; definitions = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L58">    RefFieldSchema rootRef = registerObjectAndReturnRef(schema, definitions);</span>
+<span class="fc" id="L59">    return JsonSchema.builder()</span>
+<span class="fc" id="L60">        .id(basePath.resolve(schema.getFullName()))</span>
+<span class="fc" id="L61">        .type(new SimpleJsonType(JsonType.Type.OBJECT))</span>
+<span class="fc" id="L62">        .rootRef(rootRef.getRef())</span>
+<span class="fc" id="L63">        .definitions(definitions)</span>
+<span class="fc" id="L64">        .build();</span>
+  }
+
+  private RefFieldSchema registerObjectAndReturnRef(Descriptors.Descriptor schema,
+                                                    Map&lt;String, FieldSchema&gt; definitions) {
+<span class="fc" id="L69">    var definition = schema.getFullName();</span>
+<span class="fc bfc" id="L70" title="All 2 branches covered.">    if (definitions.containsKey(definition)) {</span>
+<span class="fc" id="L71">      return createRefField(definition);</span>
+    }
+    // adding stub record, need to avoid infinite recursion
+<span class="fc" id="L74">    definitions.put(definition, ObjectFieldSchema.EMPTY);</span>
+
+<span class="fc" id="L76">    Map&lt;String, FieldSchema&gt; fields = schema.getFields().stream()</span>
+<span class="fc" id="L77">        .map(f -&gt; Tuples.of(f.getName(), convertField(f, definitions)))</span>
+<span class="fc" id="L78">        .collect(Collectors.toMap(Tuple2::getT1, Tuple2::getT2));</span>
+
+<span class="fc" id="L80">    List&lt;String&gt; required = schema.getFields().stream()</span>
+<span class="fc" id="L81">        .filter(Descriptors.FieldDescriptor::isRequired)</span>
+<span class="fc" id="L82">        .map(Descriptors.FieldDescriptor::getName)</span>
+<span class="fc" id="L83">        .collect(Collectors.toList());</span>
+
+    // replacing stub record with actual object structure
+<span class="fc" id="L86">    definitions.put(definition, new ObjectFieldSchema(fields, required));</span>
+<span class="fc" id="L87">    return createRefField(definition);</span>
+  }
+
+  private RefFieldSchema createRefField(String definition) {
+<span class="fc" id="L91">    return new RefFieldSchema(&quot;#/definitions/%s&quot;.formatted(definition));</span>
+  }
+
+  private FieldSchema convertField(Descriptors.FieldDescriptor field,
+                                   Map&lt;String, FieldSchema&gt; definitions) {
+<span class="fc" id="L96">    Optional&lt;FieldSchema&gt; wellKnownTypeSchema = convertProtoWellKnownTypes(field);</span>
+<span class="fc bfc" id="L97" title="All 2 branches covered.">    if (wellKnownTypeSchema.isPresent()) {</span>
+<span class="fc" id="L98">      return wellKnownTypeSchema.get();</span>
+    }
+<span class="fc bfc" id="L100" title="All 2 branches covered.">    if (field.isMapField()) {</span>
+<span class="fc" id="L101">      return new MapFieldSchema();</span>
+    }
+<span class="fc" id="L103">    final JsonType jsonType = convertType(field);</span>
+    FieldSchema fieldSchema;
+<span class="fc bfc" id="L105" title="All 2 branches covered.">    if (jsonType.getType().equals(JsonType.Type.OBJECT)) {</span>
+<span class="fc" id="L106">      fieldSchema = registerObjectAndReturnRef(field.getMessageType(), definitions);</span>
+    } else {
+<span class="fc" id="L108">      fieldSchema = new SimpleFieldSchema(jsonType);</span>
+    }
+
+<span class="fc bfc" id="L111" title="All 2 branches covered.">    if (field.isRepeated()) {</span>
+<span class="fc" id="L112">      return new ArrayFieldSchema(fieldSchema);</span>
+    } else {
+<span class="fc" id="L114">      return fieldSchema;</span>
+    }
+  }
+
+  // converts Protobuf Well-known type (from google.protobuf.* packages) to Json-schema types
+  // see JsonFormat::buildWellKnownTypePrinters for impl details
+  private Optional&lt;FieldSchema&gt; convertProtoWellKnownTypes(Descriptors.FieldDescriptor field) {
+    // all well-known types are messages
+<span class="fc bfc" id="L122" title="All 2 branches covered.">    if (field.getType() != Descriptors.FieldDescriptor.Type.MESSAGE) {</span>
+<span class="fc" id="L123">      return Optional.empty();</span>
+    }
+<span class="fc" id="L125">    String typeName = field.getMessageType().getFullName();</span>
+<span class="fc bfc" id="L126" title="All 2 branches covered.">    if (typeName.equals(Timestamp.getDescriptor().getFullName())) {</span>
+<span class="fc" id="L127">      return Optional.of(</span>
+          new SimpleFieldSchema(
+<span class="fc" id="L129">              new SimpleJsonType(JsonType.Type.STRING, Map.of(&quot;format&quot;, new TextNode(&quot;date-time&quot;)))));</span>
+    }
+<span class="fc bfc" id="L131" title="All 2 branches covered.">    if (typeName.equals(Duration.getDescriptor().getFullName())) {</span>
+<span class="fc" id="L132">      return Optional.of(</span>
+          new SimpleFieldSchema(
+              //TODO: current UI is failing when format=duration is set - need to fix this first
+              new SimpleJsonType(JsonType.Type.STRING // , Map.of(&quot;format&quot;, new TextNode(&quot;duration&quot;))
+              )));
+    }
+<span class="pc bpc" id="L138" title="1 of 2 branches missed.">    if (typeName.equals(FieldMask.getDescriptor().getFullName())) {</span>
+<span class="nc" id="L139">      return Optional.of(new SimpleFieldSchema(new SimpleJsonType(JsonType.Type.STRING)));</span>
+    }
+<span class="pc bpc" id="L141" title="1 of 4 branches missed.">    if (typeName.equals(Any.getDescriptor().getFullName()) || typeName.equals(Struct.getDescriptor().getFullName())) {</span>
+<span class="fc" id="L142">      return Optional.of(ObjectFieldSchema.EMPTY);</span>
+    }
+<span class="fc bfc" id="L144" title="All 2 branches covered.">    if (typeName.equals(Value.getDescriptor().getFullName())) {</span>
+<span class="fc" id="L145">      return Optional.of(AnyFieldSchema.get());</span>
+    }
+<span class="fc bfc" id="L147" title="All 2 branches covered.">    if (typeName.equals(ListValue.getDescriptor().getFullName())) {</span>
+<span class="fc" id="L148">      return Optional.of(new ArrayFieldSchema(AnyFieldSchema.get()));</span>
+    }
+<span class="fc bfc" id="L150" title="All 2 branches covered.">    if (simpleTypesWrapperNames.contains(typeName)) {</span>
+<span class="fc" id="L151">      return Optional.of(new SimpleFieldSchema(</span>
+<span class="fc" id="L152">          convertType(requireNonNull(field.getMessageType().findFieldByName(&quot;value&quot;)))));</span>
+    }
+<span class="fc" id="L154">    return Optional.empty();</span>
+  }
+
+  private JsonType convertType(Descriptors.FieldDescriptor field) {
+<span class="pc bpc" id="L158" title="1 of 10 branches missed.">    return switch (field.getType()) {</span>
+<span class="fc" id="L159">      case INT32, FIXED32, SFIXED32, SINT32 -&gt; new SimpleJsonType(</span>
+          JsonType.Type.INTEGER,
+<span class="fc" id="L161">          Map.of(</span>
+<span class="fc" id="L162">              MAXIMUM, IntNode.valueOf(Integer.MAX_VALUE),</span>
+<span class="fc" id="L163">              MINIMUM, IntNode.valueOf(Integer.MIN_VALUE)</span>
+          )
+      );
+<span class="fc" id="L166">      case UINT32 -&gt; new SimpleJsonType(</span>
+          JsonType.Type.INTEGER,
+<span class="fc" id="L168">          Map.of(</span>
+<span class="fc" id="L169">              MAXIMUM, LongNode.valueOf(UnsignedInteger.MAX_VALUE.longValue()),</span>
+<span class="fc" id="L170">              MINIMUM, IntNode.valueOf(0)</span>
+          )
+      );
+      //TODO: actually all *64 types will be printed with quotes (as strings),
+      // see JsonFormat::printSingleFieldValue for impl. This can cause problems when you copy-paste from messages
+      // table to `Produce` area - need to think if it is critical or not.
+<span class="fc" id="L176">      case INT64, FIXED64, SFIXED64, SINT64 -&gt; new SimpleJsonType(</span>
+          JsonType.Type.INTEGER,
+<span class="fc" id="L178">          Map.of(</span>
+<span class="fc" id="L179">              MAXIMUM, LongNode.valueOf(Long.MAX_VALUE),</span>
+<span class="fc" id="L180">              MINIMUM, LongNode.valueOf(Long.MIN_VALUE)</span>
+          )
+      );
+<span class="fc" id="L183">      case UINT64 -&gt; new SimpleJsonType(</span>
+          JsonType.Type.INTEGER,
+<span class="fc" id="L185">          Map.of(</span>
+<span class="fc" id="L186">              MAXIMUM, new BigIntegerNode(UnsignedLong.MAX_VALUE.bigIntegerValue()),</span>
+<span class="fc" id="L187">              MINIMUM, LongNode.valueOf(0)</span>
+          )
+      );
+<span class="fc" id="L190">      case MESSAGE, GROUP -&gt; new SimpleJsonType(JsonType.Type.OBJECT);</span>
+<span class="fc" id="L191">      case ENUM -&gt; new EnumJsonType(</span>
+<span class="fc" id="L192">          field.getEnumType().getValues().stream()</span>
+<span class="fc" id="L193">              .map(Descriptors.EnumValueDescriptor::getName)</span>
+<span class="fc" id="L194">              .collect(Collectors.toList())</span>
+      );
+<span class="fc" id="L196">      case BYTES, STRING -&gt; new SimpleJsonType(JsonType.Type.STRING);</span>
+<span class="fc" id="L197">      case FLOAT, DOUBLE -&gt; new SimpleJsonType(JsonType.Type.NUMBER);</span>
+<span class="fc" id="L198">      case BOOL -&gt; new SimpleJsonType(JsonType.Type.BOOLEAN);</span>
+    };
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

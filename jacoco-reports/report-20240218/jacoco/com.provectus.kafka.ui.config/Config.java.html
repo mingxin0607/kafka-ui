@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Config.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">kafka-ui-api</a> &gt; <a href="index.source.html" class="el_package">com.provectus.kafka.ui.config</a> &gt; <span class="el_source">Config.java</span></div><h1>Config.java</h1><pre class="source lang-java linenums">package com.provectus.kafka.ui.config;
+
+import java.util.Collections;
+import java.util.Map;
+import lombok.AllArgsConstructor;
+import org.openapitools.jackson.nullable.JsonNullableModule;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.boot.autoconfigure.web.ServerProperties;
+import org.springframework.boot.autoconfigure.web.reactive.WebFluxProperties;
+import org.springframework.context.ApplicationContext;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.http.server.reactive.ContextPathCompositeHandler;
+import org.springframework.http.server.reactive.HttpHandler;
+import org.springframework.jmx.export.MBeanExporter;
+import org.springframework.util.StringUtils;
+import org.springframework.web.server.adapter.WebHttpHandlerBuilder;
+
+@Configuration
+<span class="fc" id="L20">@AllArgsConstructor</span>
+public class Config {
+
+  private final ApplicationContext applicationContext;
+
+  private final ServerProperties serverProperties;
+
+  @Bean
+  public HttpHandler httpHandler(ObjectProvider&lt;WebFluxProperties&gt; propsProvider) {
+
+<span class="fc" id="L30">    final String basePath = serverProperties.getServlet().getContextPath();</span>
+
+<span class="fc" id="L32">    HttpHandler httpHandler = WebHttpHandlerBuilder</span>
+<span class="fc" id="L33">        .applicationContext(this.applicationContext).build();</span>
+
+<span class="pc bpc" id="L35" title="1 of 2 branches missed.">    if (StringUtils.hasText(basePath)) {</span>
+<span class="nc" id="L36">      Map&lt;String, HttpHandler&gt; handlersMap =</span>
+<span class="nc" id="L37">          Collections.singletonMap(basePath, httpHandler);</span>
+<span class="nc" id="L38">      return new ContextPathCompositeHandler(handlersMap);</span>
+    }
+<span class="fc" id="L40">    return httpHandler;</span>
+  }
+
+  @Bean
+  public MBeanExporter exporter() {
+<span class="fc" id="L45">    final var exporter = new MBeanExporter();</span>
+<span class="fc" id="L46">    exporter.setAutodetect(true);</span>
+<span class="fc" id="L47">    exporter.setExcludedBeans(&quot;pool&quot;);</span>
+<span class="fc" id="L48">    return exporter;</span>
+  }
+
+  @Bean
+  // will be used by webflux json mapping
+  public JsonNullableModule jsonNullableModule() {
+<span class="fc" id="L54">    return new JsonNullableModule();</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

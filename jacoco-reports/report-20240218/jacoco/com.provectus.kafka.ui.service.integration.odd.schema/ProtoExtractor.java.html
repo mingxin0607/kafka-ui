@@ -1,0 +1,230 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ProtoExtractor.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">kafka-ui-api</a> &gt; <a href="index.source.html" class="el_package">com.provectus.kafka.ui.service.integration.odd.schema</a> &gt; <span class="el_source">ProtoExtractor.java</span></div><h1>ProtoExtractor.java</h1><pre class="source lang-java linenums">package com.provectus.kafka.ui.service.integration.odd.schema;
+
+import com.google.common.collect.ImmutableSet;
+import com.google.protobuf.BoolValue;
+import com.google.protobuf.BytesValue;
+import com.google.protobuf.Descriptors;
+import com.google.protobuf.Descriptors.Descriptor;
+import com.google.protobuf.DoubleValue;
+import com.google.protobuf.Duration;
+import com.google.protobuf.FloatValue;
+import com.google.protobuf.Int32Value;
+import com.google.protobuf.Int64Value;
+import com.google.protobuf.StringValue;
+import com.google.protobuf.Timestamp;
+import com.google.protobuf.UInt32Value;
+import com.google.protobuf.UInt64Value;
+import com.google.protobuf.Value;
+import io.confluent.kafka.schemaregistry.protobuf.ProtobufSchema;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Set;
+import org.opendatadiscovery.client.model.DataSetField;
+import org.opendatadiscovery.client.model.DataSetFieldType;
+import org.opendatadiscovery.client.model.DataSetFieldType.TypeEnum;
+import org.opendatadiscovery.oddrn.model.KafkaPath;
+
+final class ProtoExtractor {
+
+<span class="fc" id="L29">  private static final Set&lt;String&gt; PRIMITIVES_WRAPPER_TYPE_NAMES = Set.of(</span>
+<span class="fc" id="L30">      BoolValue.getDescriptor().getFullName(),</span>
+<span class="fc" id="L31">      Int32Value.getDescriptor().getFullName(),</span>
+<span class="fc" id="L32">      UInt32Value.getDescriptor().getFullName(),</span>
+<span class="fc" id="L33">      Int64Value.getDescriptor().getFullName(),</span>
+<span class="fc" id="L34">      UInt64Value.getDescriptor().getFullName(),</span>
+<span class="fc" id="L35">      StringValue.getDescriptor().getFullName(),</span>
+<span class="fc" id="L36">      BytesValue.getDescriptor().getFullName(),</span>
+<span class="fc" id="L37">      FloatValue.getDescriptor().getFullName(),</span>
+<span class="fc" id="L38">      DoubleValue.getDescriptor().getFullName()</span>
+  );
+
+  private ProtoExtractor() {
+  }
+
+  static List&lt;DataSetField&gt; extract(ProtobufSchema protobufSchema, KafkaPath topicOddrn, boolean isKey) {
+<span class="fc" id="L45">    Descriptor schema = protobufSchema.toDescriptor();</span>
+<span class="fc" id="L46">    List&lt;DataSetField&gt; result = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L47">    result.add(DataSetFieldsExtractors.rootField(topicOddrn, isKey));</span>
+<span class="fc bfc" id="L48" title="All 2 branches covered.">    var rootOddrn = topicOddrn.oddrn() + &quot;/columns/&quot; + (isKey ? &quot;key&quot; : &quot;value&quot;);</span>
+<span class="fc" id="L49">    schema.getFields().forEach(f -&gt;</span>
+<span class="fc" id="L50">        extract(f,</span>
+            rootOddrn,
+<span class="fc" id="L52">            rootOddrn + &quot;/&quot; + f.getName(),</span>
+<span class="fc" id="L53">            f.getName(),</span>
+<span class="pc bpc" id="L54" title="1 of 2 branches missed.">            !f.isRequired(),</span>
+<span class="fc" id="L55">            f.isRepeated(),</span>
+<span class="fc" id="L56">            ImmutableSet.of(schema.getFullName()),</span>
+            result
+        ));
+<span class="fc" id="L59">    return result;</span>
+  }
+
+  private static void extract(Descriptors.FieldDescriptor field,
+                              String parentOddr,
+                              String oddrn, //null for root
+                              String name,
+                              boolean nullable,
+                              boolean repeated,
+                              ImmutableSet&lt;String&gt; registeredRecords,
+                              List&lt;DataSetField&gt; sink) {
+<span class="fc bfc" id="L70" title="All 2 branches covered.">    if (repeated) {</span>
+<span class="fc" id="L71">      extractRepeated(field, parentOddr, oddrn, name, nullable, registeredRecords, sink);</span>
+<span class="fc bfc" id="L72" title="All 2 branches covered.">    } else if (field.getType() == Descriptors.FieldDescriptor.Type.MESSAGE) {</span>
+<span class="fc" id="L73">      extractMessage(field, parentOddr, oddrn, name, nullable, registeredRecords, sink);</span>
+    } else {
+<span class="fc" id="L75">      extractPrimitive(field, parentOddr, oddrn, name, nullable, sink);</span>
+    }
+<span class="fc" id="L77">  }</span>
+
+  // converts some(!) Protobuf Well-known type (from google.protobuf.* packages)
+  // see JsonFormat::buildWellKnownTypePrinters for impl details
+  private static boolean extractProtoWellKnownType(Descriptors.FieldDescriptor field,
+                                                   String parentOddr,
+                                                   String oddrn, //null for root
+                                                   String name,
+                                                   boolean nullable,
+                                                   List&lt;DataSetField&gt; sink) {
+    // all well-known types are messages
+<span class="pc bpc" id="L88" title="1 of 2 branches missed.">    if (field.getType() != Descriptors.FieldDescriptor.Type.MESSAGE) {</span>
+<span class="nc" id="L89">      return false;</span>
+    }
+<span class="fc" id="L91">    String typeName = field.getMessageType().getFullName();</span>
+<span class="fc bfc" id="L92" title="All 2 branches covered.">    if (typeName.equals(Timestamp.getDescriptor().getFullName())) {</span>
+<span class="fc" id="L93">      sink.add(createDataSetField(name, parentOddr, oddrn, TypeEnum.DATETIME, typeName, nullable));</span>
+<span class="fc" id="L94">      return true;</span>
+    }
+<span class="fc bfc" id="L96" title="All 2 branches covered.">    if (typeName.equals(Duration.getDescriptor().getFullName())) {</span>
+<span class="fc" id="L97">      sink.add(createDataSetField(name, parentOddr, oddrn, TypeEnum.DURATION, typeName, nullable));</span>
+<span class="fc" id="L98">      return true;</span>
+    }
+<span class="fc bfc" id="L100" title="All 2 branches covered.">    if (typeName.equals(Value.getDescriptor().getFullName())) {</span>
+      //TODO: use ANY type when it will appear in ODD
+<span class="fc" id="L102">      sink.add(createDataSetField(name, parentOddr, oddrn, TypeEnum.UNKNOWN, typeName, nullable));</span>
+<span class="fc" id="L103">      return true;</span>
+    }
+<span class="fc bfc" id="L105" title="All 2 branches covered.">    if (PRIMITIVES_WRAPPER_TYPE_NAMES.contains(typeName)) {</span>
+<span class="fc" id="L106">      var wrapped = field.getMessageType().findFieldByName(&quot;value&quot;);</span>
+<span class="fc" id="L107">      sink.add(createDataSetField(name, parentOddr, oddrn, mapType(wrapped.getType()), typeName, true));</span>
+<span class="fc" id="L108">      return true;</span>
+    }
+<span class="fc" id="L110">    return false;</span>
+  }
+
+  private static void extractRepeated(Descriptors.FieldDescriptor field,
+                                      String parentOddr,
+                                      String oddrn, //null for root
+                                      String name,
+                                      boolean nullable,
+                                      ImmutableSet&lt;String&gt; registeredRecords,
+                                      List&lt;DataSetField&gt; sink) {
+<span class="fc" id="L120">    sink.add(createDataSetField(name, parentOddr, oddrn, TypeEnum.LIST, &quot;repeated&quot;, nullable));</span>
+
+<span class="pc bpc" id="L122" title="1 of 2 branches missed.">    String itemName = field.getType() == Descriptors.FieldDescriptor.Type.MESSAGE</span>
+<span class="fc" id="L123">        ? field.getMessageType().getName()</span>
+<span class="pc" id="L124">        : field.getType().name().toLowerCase();</span>
+
+<span class="fc" id="L126">    extract(</span>
+        field,
+        oddrn,
+        oddrn + &quot;/items/&quot; + itemName,
+        itemName,
+        nullable,
+        false,
+        registeredRecords,
+        sink
+    );
+<span class="fc" id="L136">  }</span>
+
+  private static void extractMessage(Descriptors.FieldDescriptor field,
+                                     String parentOddr,
+                                     String oddrn, //null for root
+                                     String name,
+                                     boolean nullable,
+                                     ImmutableSet&lt;String&gt; registeredRecords,
+                                     List&lt;DataSetField&gt; sink) {
+<span class="fc bfc" id="L145" title="All 2 branches covered.">    if (extractProtoWellKnownType(field, parentOddr, oddrn, name, nullable, sink)) {</span>
+<span class="fc" id="L146">      return;</span>
+    }
+<span class="fc" id="L148">    sink.add(createDataSetField(name, parentOddr, oddrn, TypeEnum.STRUCT, getLogicalTypeName(field), nullable));</span>
+
+<span class="fc" id="L150">    String msgTypeName = field.getMessageType().getFullName();</span>
+<span class="fc bfc" id="L151" title="All 2 branches covered.">    if (registeredRecords.contains(msgTypeName)) {</span>
+      // avoiding recursion by checking if record already registered in parsing chain
+<span class="fc" id="L153">      return;</span>
+    }
+<span class="fc" id="L155">    var newRegisteredRecords = ImmutableSet.&lt;String&gt;builder()</span>
+<span class="fc" id="L156">        .addAll(registeredRecords)</span>
+<span class="fc" id="L157">        .add(msgTypeName)</span>
+<span class="fc" id="L158">        .build();</span>
+
+<span class="fc" id="L160">    field.getMessageType()</span>
+<span class="fc" id="L161">        .getFields()</span>
+<span class="fc" id="L162">        .forEach(f -&gt; {</span>
+<span class="fc" id="L163">          extract(f,</span>
+              oddrn,
+<span class="fc" id="L165">              oddrn + &quot;/fields/&quot; + f.getName(),</span>
+<span class="fc" id="L166">              f.getName(),</span>
+<span class="pc bpc" id="L167" title="1 of 2 branches missed.">              !f.isRequired(),</span>
+<span class="fc" id="L168">              f.isRepeated(),</span>
+              newRegisteredRecords,
+              sink
+          );
+<span class="fc" id="L172">        });</span>
+<span class="fc" id="L173">  }</span>
+
+  private static void extractPrimitive(Descriptors.FieldDescriptor field,
+                                       String parentOddr,
+                                       String oddrn,
+                                       String name,
+                                       boolean nullable,
+                                       List&lt;DataSetField&gt; sink) {
+<span class="fc" id="L181">    sink.add(</span>
+<span class="fc" id="L182">        createDataSetField(</span>
+            name,
+            parentOddr,
+            oddrn,
+<span class="fc" id="L186">            mapType(field.getType()),</span>
+<span class="fc" id="L187">            getLogicalTypeName(field),</span>
+<span class="fc" id="L188">            nullable</span>
+        )
+    );
+<span class="fc" id="L191">  }</span>
+
+  private static String getLogicalTypeName(Descriptors.FieldDescriptor f) {
+<span class="fc bfc" id="L194" title="All 2 branches covered.">    return f.getType() == Descriptors.FieldDescriptor.Type.MESSAGE</span>
+<span class="fc" id="L195">        ? f.getMessageType().getFullName()</span>
+<span class="fc" id="L196">        : f.getType().name().toLowerCase();</span>
+  }
+
+  private static DataSetField createDataSetField(String name,
+                                                 String parentOddrn,
+                                                 String oddrn,
+                                                 TypeEnum type,
+                                                 String logicalType,
+                                                 Boolean nullable) {
+<span class="fc" id="L205">    return new DataSetField()</span>
+<span class="fc" id="L206">        .name(name)</span>
+<span class="fc" id="L207">        .parentFieldOddrn(parentOddrn)</span>
+<span class="fc" id="L208">        .oddrn(oddrn)</span>
+<span class="fc" id="L209">        .type(</span>
+            new DataSetFieldType()
+<span class="fc" id="L211">                .isNullable(nullable)</span>
+<span class="fc" id="L212">                .logicalType(logicalType)</span>
+<span class="fc" id="L213">                .type(type)</span>
+        );
+  }
+
+
+  private static TypeEnum mapType(Descriptors.FieldDescriptor.Type type) {
+<span class="pc bpc" id="L219" title="4 of 7 branches missed.">    return switch (type) {</span>
+<span class="fc" id="L220">      case INT32, INT64, SINT32, SFIXED32, SINT64, UINT32, UINT64, FIXED32, FIXED64, SFIXED64 -&gt; TypeEnum.INTEGER;</span>
+<span class="nc" id="L221">      case FLOAT, DOUBLE -&gt; TypeEnum.NUMBER;</span>
+<span class="fc" id="L222">      case STRING, ENUM -&gt; TypeEnum.STRING;</span>
+<span class="fc" id="L223">      case BOOL -&gt; TypeEnum.BOOLEAN;</span>
+<span class="nc" id="L224">      case BYTES -&gt; TypeEnum.BINARY;</span>
+<span class="nc" id="L225">      case MESSAGE, GROUP -&gt; TypeEnum.STRUCT;</span>
+    };
+  }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

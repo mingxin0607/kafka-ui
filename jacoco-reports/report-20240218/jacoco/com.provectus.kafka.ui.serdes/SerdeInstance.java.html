@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SerdeInstance.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">kafka-ui-api</a> &gt; <a href="index.source.html" class="el_package">com.provectus.kafka.ui.serdes</a> &gt; <span class="el_source">SerdeInstance.java</span></div><h1>SerdeInstance.java</h1><pre class="source lang-java linenums">package com.provectus.kafka.ui.serdes;
+
+import com.provectus.kafka.ui.serde.api.SchemaDescription;
+import com.provectus.kafka.ui.serde.api.Serde;
+import java.io.Closeable;
+import java.util.Optional;
+import java.util.function.Supplier;
+import java.util.regex.Pattern;
+import javax.annotation.Nullable;
+import lombok.Getter;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+
+<span class="fc" id="L14">@Slf4j</span>
+<span class="fc" id="L15">@RequiredArgsConstructor</span>
+public class SerdeInstance implements Closeable {
+
+<span class="fc" id="L18">  @Getter</span>
+  final String name;
+
+  final Serde serde;
+
+  @Nullable
+  final Pattern topicKeyPattern;
+
+  @Nullable
+  final Pattern topicValuePattern;
+
+  @Nullable // will be set for custom serdes
+  final ClassLoader classLoader;
+
+  private &lt;T&gt; T wrapWithClassloader(Supplier&lt;T&gt; call) {
+<span class="pc bpc" id="L33" title="1 of 2 branches missed.">    if (classLoader == null) {</span>
+<span class="fc" id="L34">      return call.get();</span>
+    }
+<span class="nc" id="L36">    var origCl = ClassloaderUtil.compareAndSwapLoaders(classLoader);</span>
+    try {
+<span class="nc" id="L38">      return call.get();</span>
+    } finally {
+<span class="nc" id="L40">      ClassloaderUtil.compareAndSwapLoaders(origCl);</span>
+    }
+  }
+
+  public Optional&lt;SchemaDescription&gt; getSchema(String topic, Serde.Target type) {
+    try {
+<span class="nc" id="L46">      return wrapWithClassloader(() -&gt; serde.getSchema(topic, type));</span>
+<span class="nc" id="L47">    } catch (Exception e) {</span>
+<span class="nc" id="L48">      log.warn(&quot;Error getting schema for '{}'({}) with serde '{}'&quot;, topic, type, name, e);</span>
+<span class="nc" id="L49">      return Optional.empty();</span>
+    }
+  }
+
+  public Optional&lt;String&gt; description() {
+    try {
+<span class="nc" id="L55">      return wrapWithClassloader(serde::getDescription);</span>
+<span class="nc" id="L56">    } catch (Exception e) {</span>
+<span class="nc" id="L57">      log.warn(&quot;Error getting description serde '{}'&quot;, name, e);</span>
+<span class="nc" id="L58">      return Optional.empty();</span>
+    }
+  }
+
+  public boolean canSerialize(String topic, Serde.Target type) {
+    try {
+<span class="fc" id="L64">      return wrapWithClassloader(() -&gt; serde.canSerialize(topic, type));</span>
+<span class="nc" id="L65">    } catch (Exception e) {</span>
+<span class="nc" id="L66">      log.warn(&quot;Error calling canSerialize for '{}'({}) with serde '{}'&quot;, topic, type, name, e);</span>
+<span class="nc" id="L67">      return false;</span>
+    }
+  }
+
+  public boolean canDeserialize(String topic, Serde.Target type) {
+    try {
+<span class="fc" id="L73">      return wrapWithClassloader(() -&gt; serde.canDeserialize(topic, type));</span>
+<span class="nc" id="L74">    } catch (Exception e) {</span>
+<span class="nc" id="L75">      log.warn(&quot;Error calling canDeserialize for '{}'({}) with serde '{}'&quot;, topic, type, name, e);</span>
+<span class="nc" id="L76">      return false;</span>
+    }
+  }
+
+  public Serde.Serializer serializer(String topic, Serde.Target type) {
+<span class="fc" id="L81">    return wrapWithClassloader(() -&gt; {</span>
+<span class="fc" id="L82">      var serializer = serde.serializer(topic, type);</span>
+<span class="fc" id="L83">      return input -&gt; wrapWithClassloader(() -&gt; serializer.serialize(input));</span>
+    });
+  }
+
+  public Serde.Deserializer deserializer(String topic, Serde.Target type) {
+<span class="fc" id="L88">    return wrapWithClassloader(() -&gt; {</span>
+<span class="fc" id="L89">      var deserializer = serde.deserializer(topic, type);</span>
+<span class="fc" id="L90">      return (headers, data) -&gt; wrapWithClassloader(() -&gt; deserializer.deserialize(headers, data));</span>
+    });
+  }
+
+  @Override
+  public void close() {
+<span class="nc" id="L96">    wrapWithClassloader(() -&gt; {</span>
+      try {
+<span class="nc" id="L98">        serde.close();</span>
+<span class="nc" id="L99">      } catch (Exception e) {</span>
+<span class="nc" id="L100">        log.error(&quot;Error closing serde &quot; + name, e);</span>
+<span class="nc" id="L101">      }</span>
+<span class="nc" id="L102">      return null;</span>
+    });
+<span class="nc" id="L104">  }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

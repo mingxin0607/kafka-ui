@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AbstractProviderCondition.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">kafka-ui-api</a> &gt; <a href="index.source.html" class="el_package">com.provectus.kafka.ui.service.rbac</a> &gt; <span class="el_source">AbstractProviderCondition.java</span></div><h1>AbstractProviderCondition.java</h1><pre class="source lang-java linenums">package com.provectus.kafka.ui.service.rbac;
+
+import com.provectus.kafka.ui.config.auth.OAuthProperties;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.function.Predicate;
+import java.util.stream.Collectors;
+import org.apache.commons.lang3.StringUtils;
+import org.springframework.boot.context.properties.bind.Bindable;
+import org.springframework.boot.context.properties.bind.Binder;
+import org.springframework.core.env.Environment;
+
+<span class="fc" id="L14">public abstract class AbstractProviderCondition {</span>
+<span class="fc" id="L15">  private static final Bindable&lt;Map&lt;String, OAuthProperties.OAuth2Provider&gt;&gt; OAUTH2_PROPERTIES = Bindable</span>
+<span class="fc" id="L16">      .mapOf(String.class, OAuthProperties.OAuth2Provider.class);</span>
+
+  protected Set&lt;String&gt; getRegisteredProvidersTypes(final Environment env) {
+<span class="fc" id="L19">    final Map&lt;String, OAuthProperties.OAuth2Provider&gt; properties = Binder.get(env)</span>
+<span class="fc" id="L20">        .bind(&quot;auth.oauth2.client&quot;, OAUTH2_PROPERTIES)</span>
+<span class="fc" id="L21">        .orElse(Map.of());</span>
+<span class="fc" id="L22">    return properties.values().stream()</span>
+<span class="fc" id="L23">        .map(OAuthProperties.OAuth2Provider::getCustomParams)</span>
+<span class="fc" id="L24">        .filter(Objects::nonNull)</span>
+<span class="fc" id="L25">        .filter(Predicate.not(Map::isEmpty))</span>
+<span class="pc" id="L26">        .map(params -&gt; params.get(&quot;type&quot;))</span>
+<span class="fc" id="L27">        .filter(Objects::nonNull)</span>
+<span class="fc" id="L28">        .filter(StringUtils::isNotEmpty)</span>
+<span class="fc" id="L29">        .collect(Collectors.toSet());</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

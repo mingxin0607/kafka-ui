@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DataSetFieldsExtractors.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">kafka-ui-api</a> &gt; <a href="index.source.html" class="el_package">com.provectus.kafka.ui.service.integration.odd.schema</a> &gt; <span class="el_source">DataSetFieldsExtractors.java</span></div><h1>DataSetFieldsExtractors.java</h1><pre class="source lang-java linenums">package com.provectus.kafka.ui.service.integration.odd.schema;
+
+import com.provectus.kafka.ui.sr.model.SchemaSubject;
+import com.provectus.kafka.ui.sr.model.SchemaType;
+import io.confluent.kafka.schemaregistry.avro.AvroSchema;
+import io.confluent.kafka.schemaregistry.json.JsonSchema;
+import io.confluent.kafka.schemaregistry.protobuf.ProtobufSchema;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import org.opendatadiscovery.client.model.DataSetField;
+import org.opendatadiscovery.client.model.DataSetFieldType;
+import org.opendatadiscovery.oddrn.model.KafkaPath;
+
+<span class="nc" id="L15">public final class DataSetFieldsExtractors {</span>
+
+  public static List&lt;DataSetField&gt; extract(SchemaSubject subject,
+                                           Map&lt;String, String&gt; resolvedRefs,
+                                           KafkaPath topicOddrn,
+                                           boolean isKey) {
+<span class="fc" id="L21">    SchemaType schemaType = Optional.ofNullable(subject.getSchemaType()).orElse(SchemaType.AVRO);</span>
+<span class="pc bpc" id="L22" title="3 of 4 branches missed.">    return switch (schemaType) {</span>
+<span class="fc" id="L23">      case AVRO -&gt; AvroExtractor.extract(</span>
+<span class="fc" id="L24">          new AvroSchema(subject.getSchema(), List.of(), resolvedRefs, null), topicOddrn, isKey);</span>
+<span class="nc" id="L25">      case JSON -&gt; JsonSchemaExtractor.extract(</span>
+<span class="nc" id="L26">          new JsonSchema(subject.getSchema(), List.of(), resolvedRefs, null), topicOddrn, isKey);</span>
+<span class="nc" id="L27">      case PROTOBUF -&gt; ProtoExtractor.extract(</span>
+<span class="nc" id="L28">          new ProtobufSchema(subject.getSchema(), List.of(), resolvedRefs, null, null), topicOddrn, isKey);</span>
+    };
+  }
+
+
+  static DataSetField rootField(KafkaPath topicOddrn, boolean isKey) {
+<span class="fc bfc" id="L34" title="All 2 branches covered.">    var rootOddrn = topicOddrn.oddrn() + &quot;/columns/&quot; + (isKey ? &quot;key&quot; : &quot;value&quot;);</span>
+<span class="fc" id="L35">    return new DataSetField()</span>
+<span class="fc bfc" id="L36" title="All 2 branches covered.">        .name(isKey ? &quot;key&quot; : &quot;value&quot;)</span>
+<span class="fc bfc" id="L37" title="All 2 branches covered.">        .description(&quot;Topic's &quot; + (isKey ? &quot;key&quot; : &quot;value&quot;) + &quot; schema&quot;)</span>
+<span class="fc" id="L38">        .parentFieldOddrn(topicOddrn.oddrn())</span>
+<span class="fc" id="L39">        .oddrn(rootOddrn)</span>
+<span class="fc" id="L40">        .type(new DataSetFieldType()</span>
+<span class="fc" id="L41">            .type(DataSetFieldType.TypeEnum.STRUCT)</span>
+<span class="fc" id="L42">            .isNullable(true));</span>
+  }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

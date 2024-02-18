@@ -1,0 +1,168 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ConnectorInfo.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">kafka-ui-api</a> &gt; <a href="index.source.html" class="el_package">com.provectus.kafka.ui.service.integration.odd</a> &gt; <span class="el_source">ConnectorInfo.java</span></div><h1>ConnectorInfo.java</h1><pre class="source lang-java linenums">package com.provectus.kafka.ui.service.integration.odd;
+
+import com.provectus.kafka.ui.model.ConnectorTypeDTO;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.function.Function;
+import java.util.stream.Stream;
+import javax.annotation.Nullable;
+import org.apache.commons.collections.CollectionUtils;
+import org.opendatadiscovery.oddrn.JdbcUrlParser;
+import org.opendatadiscovery.oddrn.model.HivePath;
+import org.opendatadiscovery.oddrn.model.MysqlPath;
+import org.opendatadiscovery.oddrn.model.PostgreSqlPath;
+import org.opendatadiscovery.oddrn.model.SnowflakePath;
+
+<span class="fc" id="L18">record ConnectorInfo(List&lt;String&gt; inputs,</span>
+                     List&lt;String&gt; outputs) {
+
+  static ConnectorInfo extract(String className,
+                               ConnectorTypeDTO type,
+                               Map&lt;String, Object&gt; config,
+                               List&lt;String&gt; topicsFromApi, // can be empty for old Connect API versions
+                               Function&lt;String, String&gt; topicOddrnBuilder) {
+<span class="pc bpc" id="L26" title="5 of 6 branches missed.">    return switch (className) {</span>
+      case &quot;org.apache.kafka.connect.file.FileStreamSinkConnector&quot;,
+          &quot;org.apache.kafka.connect.file.FileStreamSourceConnector&quot;,
+          &quot;FileStreamSource&quot;,
+<span class="fc" id="L30">          &quot;FileStreamSink&quot; -&gt; extractFileIoConnector(type, topicsFromApi, config, topicOddrnBuilder);</span>
+<span class="nc" id="L31">      case &quot;io.confluent.connect.s3.S3SinkConnector&quot; -&gt; extractS3Sink(type, topicsFromApi, config, topicOddrnBuilder);</span>
+      case &quot;io.confluent.connect.jdbc.JdbcSinkConnector&quot; -&gt;
+<span class="nc" id="L33">          extractJdbcSink(type, topicsFromApi, config, topicOddrnBuilder);</span>
+<span class="nc" id="L34">      case &quot;io.debezium.connector.postgresql.PostgresConnector&quot; -&gt; extractDebeziumPg(config);</span>
+<span class="nc" id="L35">      case &quot;io.debezium.connector.mysql.MySqlConnector&quot; -&gt; extractDebeziumMysql(config);</span>
+<span class="nc" id="L36">      default -&gt; new ConnectorInfo(</span>
+<span class="nc" id="L37">          extractInputs(type, topicsFromApi, config, topicOddrnBuilder),</span>
+<span class="nc" id="L38">          extractOutputs(type, topicsFromApi, config, topicOddrnBuilder)</span>
+      );
+    };
+  }
+
+  private static ConnectorInfo extractFileIoConnector(ConnectorTypeDTO type,
+                                                      List&lt;String&gt; topics,
+                                                      Map&lt;String, Object&gt; config,
+                                                      Function&lt;String, String&gt; topicOddrnBuilder) {
+<span class="fc" id="L47">    return new ConnectorInfo(</span>
+<span class="fc" id="L48">        extractInputs(type, topics, config, topicOddrnBuilder),</span>
+<span class="fc" id="L49">        extractOutputs(type, topics, config, topicOddrnBuilder)</span>
+    );
+  }
+
+  private static ConnectorInfo extractJdbcSink(ConnectorTypeDTO type,
+                                               List&lt;String&gt; topics,
+                                               Map&lt;String, Object&gt; config,
+                                               Function&lt;String, String&gt; topicOddrnBuilder) {
+<span class="nc" id="L57">    String tableNameFormat = (String) config.getOrDefault(&quot;table.name.format&quot;, &quot;${topic}&quot;);</span>
+<span class="nc" id="L58">    List&lt;String&gt; targetTables = extractTopicNamesBestEffort(topics, config)</span>
+<span class="nc" id="L59">        .map(topic -&gt; tableNameFormat.replace(&quot;${kafka}&quot;, topic))</span>
+<span class="nc" id="L60">        .toList();</span>
+
+<span class="nc" id="L62">    String connectionUrl = (String) config.get(&quot;connection.url&quot;);</span>
+<span class="nc" id="L63">    List&lt;String&gt; outputs = new ArrayList&lt;&gt;();</span>
+<span class="nc" id="L64">    @Nullable var knownJdbcPath = new JdbcUrlParser().parse(connectionUrl);</span>
+<span class="nc bnc" id="L65" title="All 2 branches missed.">    if (knownJdbcPath instanceof PostgreSqlPath p) {</span>
+<span class="nc" id="L66">      targetTables.forEach(t -&gt; outputs.add(p.toBuilder().table(t).build().oddrn()));</span>
+    }
+<span class="nc bnc" id="L68" title="All 2 branches missed.">    if (knownJdbcPath instanceof MysqlPath p) {</span>
+<span class="nc" id="L69">      targetTables.forEach(t -&gt; outputs.add(p.toBuilder().table(t).build().oddrn()));</span>
+    }
+<span class="nc bnc" id="L71" title="All 2 branches missed.">    if (knownJdbcPath instanceof HivePath p) {</span>
+<span class="nc" id="L72">      targetTables.forEach(t -&gt; outputs.add(p.toBuilder().table(t).build().oddrn()));</span>
+    }
+<span class="nc bnc" id="L74" title="All 2 branches missed.">    if (knownJdbcPath instanceof SnowflakePath p) {</span>
+<span class="nc" id="L75">      targetTables.forEach(t -&gt; outputs.add(p.toBuilder().table(t).build().oddrn()));</span>
+    }
+<span class="nc" id="L77">    return new ConnectorInfo(</span>
+<span class="nc" id="L78">        extractInputs(type, topics, config, topicOddrnBuilder),</span>
+        outputs
+    );
+  }
+
+  private static ConnectorInfo extractDebeziumPg(Map&lt;String, Object&gt; config) {
+<span class="nc" id="L84">    String host = (String) config.get(&quot;database.hostname&quot;);</span>
+<span class="nc" id="L85">    String dbName = (String) config.get(&quot;database.dbname&quot;);</span>
+<span class="nc" id="L86">    var inputs = List.of(</span>
+<span class="nc" id="L87">        PostgreSqlPath.builder()</span>
+<span class="nc" id="L88">            .host(host)</span>
+<span class="nc" id="L89">            .database(dbName)</span>
+<span class="nc" id="L90">            .build().oddrn()</span>
+    );
+<span class="nc" id="L92">    return new ConnectorInfo(inputs, List.of());</span>
+  }
+
+  private static ConnectorInfo extractDebeziumMysql(Map&lt;String, Object&gt; config) {
+<span class="nc" id="L96">    String host = (String) config.get(&quot;database.hostname&quot;);</span>
+<span class="nc" id="L97">    var inputs = List.of(</span>
+<span class="nc" id="L98">        MysqlPath.builder()</span>
+<span class="nc" id="L99">            .host(host)</span>
+<span class="nc" id="L100">            .build()</span>
+<span class="nc" id="L101">            .oddrn()</span>
+    );
+<span class="nc" id="L103">    return new ConnectorInfo(inputs, List.of());</span>
+  }
+
+  private static ConnectorInfo extractS3Sink(ConnectorTypeDTO type,
+                                             List&lt;String&gt; topics,
+                                             Map&lt;String, Object&gt; config,
+                                             Function&lt;String, String&gt; topicOrrdnBuilder) {
+<span class="nc" id="L110">    String bucketName = (String) config.get(&quot;s3.bucket.name&quot;);</span>
+<span class="nc" id="L111">    String topicsDir = (String) config.getOrDefault(&quot;topics.dir&quot;, &quot;topics&quot;);</span>
+<span class="nc" id="L112">    String directoryDelim = (String) config.getOrDefault(&quot;directory.delim&quot;, &quot;/&quot;);</span>
+<span class="nc" id="L113">    List&lt;String&gt; outputs = extractTopicNamesBestEffort(topics, config)</span>
+<span class="nc" id="L114">        .map(topic -&gt; Oddrn.awsS3Oddrn(bucketName, topicsDir + directoryDelim + topic))</span>
+<span class="nc" id="L115">        .toList();</span>
+<span class="nc" id="L116">    return new ConnectorInfo(</span>
+<span class="nc" id="L117">        extractInputs(type, topics, config, topicOrrdnBuilder),</span>
+        outputs
+    );
+  }
+
+  private static List&lt;String&gt; extractInputs(ConnectorTypeDTO type,
+                                            List&lt;String&gt; topicsFromApi,
+                                            Map&lt;String, Object&gt; config,
+                                            Function&lt;String, String&gt; topicOrrdnBuilder) {
+<span class="fc bfc" id="L126" title="All 2 branches covered.">    return type == ConnectorTypeDTO.SINK</span>
+<span class="fc" id="L127">        ? extractTopicsOddrns(config, topicsFromApi, topicOrrdnBuilder)</span>
+<span class="fc" id="L128">        : List.of();</span>
+  }
+
+  private static List&lt;String&gt; extractOutputs(ConnectorTypeDTO type,
+                                             List&lt;String&gt; topicsFromApi,
+                                             Map&lt;String, Object&gt; config,
+                                             Function&lt;String, String&gt; topicOrrdnBuilder) {
+<span class="fc bfc" id="L135" title="All 2 branches covered.">    return type == ConnectorTypeDTO.SOURCE</span>
+<span class="fc" id="L136">        ? extractTopicsOddrns(config, topicsFromApi, topicOrrdnBuilder)</span>
+<span class="fc" id="L137">        : List.of();</span>
+  }
+
+  private static Stream&lt;String&gt; extractTopicNamesBestEffort(
+      // topic list can be empty for old Connect API versions
+      List&lt;String&gt; topicsFromApi,
+      Map&lt;String, Object&gt; config
+  ) {
+<span class="pc bpc" id="L145" title="1 of 2 branches missed.">    if (CollectionUtils.isNotEmpty(topicsFromApi)) {</span>
+<span class="fc" id="L146">      return topicsFromApi.stream();</span>
+    }
+
+    // trying to extract topic names from config
+<span class="nc" id="L150">    String topicsString = (String) config.get(&quot;topics&quot;);</span>
+<span class="nc" id="L151">    String topicString = (String) config.get(&quot;topic&quot;);</span>
+<span class="nc" id="L152">    return Stream.of(topicsString, topicString)</span>
+<span class="nc" id="L153">        .filter(Objects::nonNull)</span>
+<span class="nc" id="L154">        .flatMap(str -&gt; Stream.of(str.split(&quot;,&quot;)))</span>
+<span class="nc" id="L155">        .map(String::trim)</span>
+<span class="nc bnc" id="L156" title="All 2 branches missed.">        .filter(s -&gt; !s.isBlank());</span>
+  }
+
+  private static List&lt;String&gt; extractTopicsOddrns(Map&lt;String, Object&gt; config,
+                                                  List&lt;String&gt; topicsFromApi,
+                                                  Function&lt;String, String&gt; topicOrrdnBuilder) {
+<span class="fc" id="L162">    return extractTopicNamesBestEffort(topicsFromApi, config)</span>
+<span class="fc" id="L163">        .map(topicOrrdnBuilder)</span>
+<span class="fc" id="L164">        .toList();</span>
+  }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

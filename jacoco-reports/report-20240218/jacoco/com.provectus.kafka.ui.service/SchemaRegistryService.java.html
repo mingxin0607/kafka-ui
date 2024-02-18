@@ -1,0 +1,174 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SchemaRegistryService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">kafka-ui-api</a> &gt; <a href="index.source.html" class="el_package">com.provectus.kafka.ui.service</a> &gt; <span class="el_source">SchemaRegistryService.java</span></div><h1>SchemaRegistryService.java</h1><pre class="source lang-java linenums">package com.provectus.kafka.ui.service;
+
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.json.JsonMapper;
+import com.provectus.kafka.ui.exception.SchemaCompatibilityException;
+import com.provectus.kafka.ui.exception.SchemaNotFoundException;
+import com.provectus.kafka.ui.exception.ValidationException;
+import com.provectus.kafka.ui.model.KafkaCluster;
+import com.provectus.kafka.ui.sr.api.KafkaSrClientApi;
+import com.provectus.kafka.ui.sr.model.Compatibility;
+import com.provectus.kafka.ui.sr.model.CompatibilityCheckResponse;
+import com.provectus.kafka.ui.sr.model.CompatibilityConfig;
+import com.provectus.kafka.ui.sr.model.CompatibilityLevelChange;
+import com.provectus.kafka.ui.sr.model.NewSubject;
+import com.provectus.kafka.ui.sr.model.SchemaSubject;
+import com.provectus.kafka.ui.util.ReactiveFailover;
+import java.nio.charset.Charset;
+import java.util.List;
+import java.util.stream.Collectors;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.RequiredArgsConstructor;
+import lombok.SneakyThrows;
+import lombok.experimental.Delegate;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+import org.springframework.web.reactive.function.client.WebClientResponseException;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
+
+@Service
+<span class="fc" id="L32">@Slf4j</span>
+<span class="fc" id="L33">@RequiredArgsConstructor</span>
+public class SchemaRegistryService {
+
+  private static final String LATEST = &quot;latest&quot;;
+
+<span class="fc" id="L38">  @AllArgsConstructor</span>
+  public static class SubjectWithCompatibilityLevel {
+<span class="pc" id="L40">    @Delegate</span>
+    SchemaSubject subject;
+<span class="fc" id="L42">    @Getter</span>
+    Compatibility compatibility;
+  }
+
+  private ReactiveFailover&lt;KafkaSrClientApi&gt; api(KafkaCluster cluster) {
+<span class="fc" id="L47">    return cluster.getSchemaRegistryClient();</span>
+  }
+
+  public Mono&lt;List&lt;SubjectWithCompatibilityLevel&gt;&gt; getAllLatestVersionSchemas(KafkaCluster cluster,
+                                                                              List&lt;String&gt; subjects) {
+<span class="fc" id="L52">    return Flux.fromIterable(subjects)</span>
+<span class="fc" id="L53">        .concatMap(subject -&gt; getLatestSchemaVersionBySubject(cluster, subject))</span>
+<span class="fc" id="L54">        .collect(Collectors.toList());</span>
+  }
+
+  public Mono&lt;List&lt;String&gt;&gt; getAllSubjectNames(KafkaCluster cluster) {
+<span class="fc" id="L58">    return api(cluster)</span>
+<span class="fc" id="L59">        .mono(c -&gt; c.getAllSubjectNames(null, false))</span>
+<span class="fc" id="L60">        .flatMapIterable(this::parseSubjectListString)</span>
+<span class="fc" id="L61">        .collectList();</span>
+  }
+
+<span class="nc" id="L64">  @SneakyThrows</span>
+  private List&lt;String&gt; parseSubjectListString(String subjectNamesStr) {
+    //workaround for https://github.com/spring-projects/spring-framework/issues/24734
+<span class="fc" id="L67">    return new JsonMapper().readValue(subjectNamesStr, new TypeReference&lt;List&lt;String&gt;&gt;() {</span>
+    });
+  }
+
+  public Flux&lt;SubjectWithCompatibilityLevel&gt; getAllVersionsBySubject(KafkaCluster cluster, String subject) {
+<span class="nc" id="L72">    Flux&lt;Integer&gt; versions = getSubjectVersions(cluster, subject);</span>
+<span class="nc" id="L73">    return versions.flatMap(version -&gt; getSchemaSubjectByVersion(cluster, subject, version));</span>
+  }
+
+  private Flux&lt;Integer&gt; getSubjectVersions(KafkaCluster cluster, String schemaName) {
+<span class="nc" id="L77">    return api(cluster).flux(c -&gt; c.getSubjectVersions(schemaName));</span>
+  }
+
+  public Mono&lt;SubjectWithCompatibilityLevel&gt; getSchemaSubjectByVersion(KafkaCluster cluster,
+                                                                       String schemaName,
+                                                                       Integer version) {
+<span class="nc" id="L83">    return getSchemaSubject(cluster, schemaName, String.valueOf(version));</span>
+  }
+
+  public Mono&lt;SubjectWithCompatibilityLevel&gt; getLatestSchemaVersionBySubject(KafkaCluster cluster,
+                                                                             String schemaName) {
+<span class="fc" id="L88">    return getSchemaSubject(cluster, schemaName, LATEST);</span>
+  }
+
+  private Mono&lt;SubjectWithCompatibilityLevel&gt; getSchemaSubject(KafkaCluster cluster, String schemaName,
+                                                               String version) {
+<span class="fc" id="L93">    return api(cluster)</span>
+<span class="fc" id="L94">        .mono(c -&gt; c.getSubjectVersion(schemaName, version, false))</span>
+<span class="fc" id="L95">        .zipWith(getSchemaCompatibilityInfoOrGlobal(cluster, schemaName))</span>
+<span class="fc" id="L96">        .map(t -&gt; new SubjectWithCompatibilityLevel(t.getT1(), t.getT2()))</span>
+<span class="fc" id="L97">        .onErrorResume(WebClientResponseException.NotFound.class, th -&gt; Mono.error(new SchemaNotFoundException()));</span>
+  }
+
+  public Mono&lt;Void&gt; deleteSchemaSubjectByVersion(KafkaCluster cluster, String schemaName, Integer version) {
+<span class="nc" id="L101">    return deleteSchemaSubject(cluster, schemaName, String.valueOf(version));</span>
+  }
+
+  public Mono&lt;Void&gt; deleteLatestSchemaSubject(KafkaCluster cluster, String schemaName) {
+<span class="nc" id="L105">    return deleteSchemaSubject(cluster, schemaName, LATEST);</span>
+  }
+
+  private Mono&lt;Void&gt; deleteSchemaSubject(KafkaCluster cluster, String schemaName, String version) {
+<span class="nc" id="L109">    return api(cluster).mono(c -&gt; c.deleteSubjectVersion(schemaName, version, false));</span>
+  }
+
+  public Mono&lt;Void&gt; deleteSchemaSubjectEntirely(KafkaCluster cluster, String schemaName) {
+<span class="nc" id="L113">    return api(cluster).mono(c -&gt; c.deleteAllSubjectVersions(schemaName, false));</span>
+  }
+
+  /**
+   * Checks whether the provided schema duplicates the previous or not, creates a new schema
+   * and then returns the whole content by requesting its latest version.
+   */
+  public Mono&lt;SubjectWithCompatibilityLevel&gt; registerNewSchema(KafkaCluster cluster,
+                                                               String subject,
+                                                               NewSubject newSchemaSubject) {
+<span class="fc" id="L123">    return api(cluster)</span>
+<span class="fc" id="L124">        .mono(c -&gt; c.registerNewSchema(subject, newSchemaSubject))</span>
+<span class="fc" id="L125">        .onErrorMap(WebClientResponseException.Conflict.class,</span>
+<span class="fc" id="L126">            th -&gt; new SchemaCompatibilityException())</span>
+<span class="fc" id="L127">        .onErrorMap(WebClientResponseException.UnprocessableEntity.class,</span>
+<span class="nc" id="L128">            th -&gt; new ValidationException(&quot;Invalid schema. Error from registry: &quot; + th.getResponseBodyAsString()))</span>
+<span class="fc" id="L129">        .then(getLatestSchemaVersionBySubject(cluster, subject));</span>
+  }
+
+  public Mono&lt;Void&gt; updateSchemaCompatibility(KafkaCluster cluster,
+                                              String schemaName,
+                                              Compatibility compatibility) {
+<span class="fc" id="L135">    return api(cluster)</span>
+<span class="fc" id="L136">        .mono(c -&gt; c.updateSubjectCompatibilityLevel(</span>
+<span class="fc" id="L137">            schemaName, new CompatibilityLevelChange().compatibility(compatibility)))</span>
+<span class="fc" id="L138">        .then();</span>
+  }
+
+  public Mono&lt;Void&gt; updateGlobalSchemaCompatibility(KafkaCluster cluster,
+                                                    Compatibility compatibility) {
+<span class="nc" id="L143">    return api(cluster)</span>
+<span class="nc" id="L144">        .mono(c -&gt; c.updateGlobalCompatibilityLevel(new CompatibilityLevelChange().compatibility(compatibility)))</span>
+<span class="nc" id="L145">        .then();</span>
+  }
+
+  public Mono&lt;Compatibility&gt; getSchemaCompatibilityLevel(KafkaCluster cluster,
+                                                         String schemaName) {
+<span class="fc" id="L150">    return api(cluster)</span>
+<span class="fc" id="L151">        .mono(c -&gt; c.getSubjectCompatibilityLevel(schemaName, true))</span>
+<span class="fc" id="L152">        .map(CompatibilityConfig::getCompatibilityLevel)</span>
+<span class="pc" id="L153">        .onErrorResume(error -&gt; Mono.empty());</span>
+  }
+
+  public Mono&lt;Compatibility&gt; getGlobalSchemaCompatibilityLevel(KafkaCluster cluster) {
+<span class="fc" id="L157">    return api(cluster)</span>
+<span class="fc" id="L158">        .mono(KafkaSrClientApi::getGlobalCompatibilityLevel)</span>
+<span class="fc" id="L159">        .map(CompatibilityConfig::getCompatibilityLevel);</span>
+  }
+
+  private Mono&lt;Compatibility&gt; getSchemaCompatibilityInfoOrGlobal(KafkaCluster cluster,
+                                                                 String schemaName) {
+<span class="fc" id="L164">    return getSchemaCompatibilityLevel(cluster, schemaName)</span>
+<span class="fc" id="L165">        .switchIfEmpty(this.getGlobalSchemaCompatibilityLevel(cluster));</span>
+  }
+
+  public Mono&lt;CompatibilityCheckResponse&gt; checksSchemaCompatibility(KafkaCluster cluster,
+                                                                    String schemaName,
+                                                                    NewSubject newSchemaSubject) {
+<span class="nc" id="L171">    return api(cluster).mono(c -&gt; c.checkSchemaCompatibility(schemaName, LATEST, true, newSchemaSubject));</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

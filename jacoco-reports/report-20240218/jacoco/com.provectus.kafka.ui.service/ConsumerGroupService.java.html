@@ -1,0 +1,274 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ConsumerGroupService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">kafka-ui-api</a> &gt; <a href="index.source.html" class="el_package">com.provectus.kafka.ui.service</a> &gt; <span class="el_source">ConsumerGroupService.java</span></div><h1>ConsumerGroupService.java</h1><pre class="source lang-java linenums">package com.provectus.kafka.ui.service;
+
+import com.google.common.collect.Streams;
+import com.google.common.collect.Table;
+import com.provectus.kafka.ui.emitter.EnhancedConsumer;
+import com.provectus.kafka.ui.model.ConsumerGroupOrderingDTO;
+import com.provectus.kafka.ui.model.InternalConsumerGroup;
+import com.provectus.kafka.ui.model.InternalTopicConsumerGroup;
+import com.provectus.kafka.ui.model.KafkaCluster;
+import com.provectus.kafka.ui.model.SortOrderDTO;
+import com.provectus.kafka.ui.service.rbac.AccessControlService;
+import com.provectus.kafka.ui.util.ApplicationMetrics;
+import com.provectus.kafka.ui.util.SslPropertiesUtil;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Properties;
+import java.util.function.ToIntFunction;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+import javax.annotation.Nullable;
+import lombok.RequiredArgsConstructor;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.kafka.clients.admin.ConsumerGroupDescription;
+import org.apache.kafka.clients.admin.ConsumerGroupListing;
+import org.apache.kafka.clients.admin.OffsetSpec;
+import org.apache.kafka.clients.consumer.ConsumerConfig;
+import org.apache.kafka.common.ConsumerGroupState;
+import org.apache.kafka.common.TopicPartition;
+import org.springframework.stereotype.Service;
+import reactor.core.publisher.Mono;
+
+@Service
+<span class="fc" id="L37">@RequiredArgsConstructor</span>
+public class ConsumerGroupService {
+
+  private final AdminClientService adminClientService;
+  private final AccessControlService accessControlService;
+
+  private Mono&lt;List&lt;InternalConsumerGroup&gt;&gt; getConsumerGroups(
+      ReactiveAdminClient ac,
+      List&lt;ConsumerGroupDescription&gt; descriptions) {
+<span class="fc" id="L46">    var groupNames = descriptions.stream().map(ConsumerGroupDescription::groupId).toList();</span>
+    // 1. getting committed offsets for all groups
+<span class="fc" id="L48">    return ac.listConsumerGroupOffsets(groupNames, null)</span>
+<span class="fc" id="L49">        .flatMap((Table&lt;String, TopicPartition, Long&gt; committedOffsets) -&gt; {</span>
+          // 2. getting end offsets for partitions with committed offsets
+<span class="fc" id="L51">          return ac.listOffsets(committedOffsets.columnKeySet(), OffsetSpec.latest(), false)</span>
+<span class="fc" id="L52">              .map(endOffsets -&gt;</span>
+<span class="fc" id="L53">                  descriptions.stream()</span>
+<span class="fc" id="L54">                      .map(desc -&gt; {</span>
+<span class="fc" id="L55">                        var groupOffsets = committedOffsets.row(desc.groupId());</span>
+<span class="fc" id="L56">                        var endOffsetsForGroup = new HashMap&lt;&gt;(endOffsets);</span>
+<span class="fc" id="L57">                        endOffsetsForGroup.keySet().retainAll(groupOffsets.keySet());</span>
+                        // 3. gathering description &amp; offsets
+<span class="fc" id="L59">                        return InternalConsumerGroup.create(desc, groupOffsets, endOffsetsForGroup);</span>
+                      })
+<span class="fc" id="L61">                      .collect(Collectors.toList()));</span>
+        });
+  }
+
+  public Mono&lt;List&lt;InternalTopicConsumerGroup&gt;&gt; getConsumerGroupsForTopic(KafkaCluster cluster,
+                                                                          String topic) {
+<span class="nc" id="L67">    return adminClientService.get(cluster)</span>
+        // 1. getting topic's end offsets
+<span class="nc" id="L69">        .flatMap(ac -&gt; ac.listTopicOffsets(topic, OffsetSpec.latest(), false)</span>
+<span class="nc" id="L70">            .flatMap(endOffsets -&gt; {</span>
+<span class="nc" id="L71">              var tps = new ArrayList&lt;&gt;(endOffsets.keySet());</span>
+              // 2. getting all consumer groups
+<span class="nc" id="L73">              return describeConsumerGroups(ac)</span>
+<span class="nc" id="L74">                  .flatMap((List&lt;ConsumerGroupDescription&gt; groups) -&gt; {</span>
+                        // 3. trying to find committed offsets for topic
+<span class="nc" id="L76">                        var groupNames = groups.stream().map(ConsumerGroupDescription::groupId).toList();</span>
+<span class="nc" id="L77">                        return ac.listConsumerGroupOffsets(groupNames, tps).map(offsets -&gt;</span>
+<span class="nc" id="L78">                            groups.stream()</span>
+                                // 4. keeping only groups that relates to topic
+<span class="nc" id="L80">                                .filter(g -&gt; isConsumerGroupRelatesToTopic(topic, g, offsets.containsRow(g.groupId())))</span>
+<span class="nc" id="L81">                                .map(g -&gt;</span>
+                                    // 5. constructing results
+<span class="nc" id="L83">                                    InternalTopicConsumerGroup.create(topic, g, offsets.row(g.groupId()), endOffsets))</span>
+<span class="nc" id="L84">                                .toList()</span>
+                        );
+                      }
+                  );
+            }));
+  }
+
+  private boolean isConsumerGroupRelatesToTopic(String topic,
+                                                ConsumerGroupDescription description,
+                                                boolean hasCommittedOffsets) {
+<span class="nc" id="L94">    boolean hasActiveMembersForTopic = description.members()</span>
+<span class="nc" id="L95">        .stream()</span>
+<span class="nc" id="L96">        .anyMatch(m -&gt; m.assignment().topicPartitions().stream().anyMatch(tp -&gt; tp.topic().equals(topic)));</span>
+<span class="nc bnc" id="L97" title="All 4 branches missed.">    return hasActiveMembersForTopic || hasCommittedOffsets;</span>
+  }
+
+<span class="fc" id="L100">  public record ConsumerGroupsPage(List&lt;InternalConsumerGroup&gt; consumerGroups, int totalPages) {</span>
+  }
+
+<span class="nc" id="L103">  private record GroupWithDescr(InternalConsumerGroup icg, ConsumerGroupDescription cgd) {</span>
+  }
+
+  public Mono&lt;ConsumerGroupsPage&gt; getConsumerGroupsPage(
+      KafkaCluster cluster,
+      int pageNum,
+      int perPage,
+      @Nullable String search,
+      ConsumerGroupOrderingDTO orderBy,
+      SortOrderDTO sortOrderDto) {
+<span class="fc" id="L113">    return adminClientService.get(cluster).flatMap(ac -&gt;</span>
+<span class="fc" id="L114">        ac.listConsumerGroups()</span>
+<span class="pc bpc" id="L115" title="1 of 2 branches missed.">            .map(listing -&gt; search == null</span>
+<span class="nc" id="L116">                ? listing</span>
+<span class="fc" id="L117">                : listing.stream()</span>
+<span class="fc" id="L118">                .filter(g -&gt; StringUtils.containsIgnoreCase(g.groupId(), search))</span>
+<span class="fc" id="L119">                .toList()</span>
+            )
+<span class="fc" id="L121">            .flatMapIterable(lst -&gt; lst)</span>
+<span class="fc" id="L122">            .filterWhen(cg -&gt; accessControlService.isConsumerGroupAccessible(cg.groupId(), cluster.getName()))</span>
+<span class="fc" id="L123">            .collectList()</span>
+<span class="fc" id="L124">            .flatMap(allGroups -&gt;</span>
+<span class="fc" id="L125">                loadSortedDescriptions(ac, allGroups, pageNum, perPage, orderBy, sortOrderDto)</span>
+<span class="fc" id="L126">                    .flatMap(descriptions -&gt; getConsumerGroups(ac, descriptions)</span>
+<span class="fc" id="L127">                        .map(page -&gt; new ConsumerGroupsPage(</span>
+                            page,
+<span class="pc bpc" id="L129" title="1 of 2 branches missed.">                            (allGroups.size() / perPage) + (allGroups.size() % perPage == 0 ? 0 : 1))))));</span>
+  }
+
+  private Mono&lt;List&lt;ConsumerGroupDescription&gt;&gt; loadSortedDescriptions(ReactiveAdminClient ac,
+                                                                      List&lt;ConsumerGroupListing&gt; groups,
+                                                                      int pageNum,
+                                                                      int perPage,
+                                                                      ConsumerGroupOrderingDTO orderBy,
+                                                                      SortOrderDTO sortOrderDto) {
+<span class="pc bpc" id="L138" title="4 of 6 branches missed.">    return switch (orderBy) {</span>
+      case NAME -&gt; {
+<span class="fc" id="L140">        Comparator&lt;ConsumerGroupListing&gt; comparator = Comparator.comparing(ConsumerGroupListing::groupId);</span>
+<span class="fc" id="L141">        yield loadDescriptionsByListings(ac, groups, comparator, pageNum, perPage, sortOrderDto);</span>
+      }
+      case STATE -&gt; {
+<span class="nc" id="L144">        ToIntFunction&lt;ConsumerGroupListing&gt; statesPriorities =</span>
+<span class="nc bnc" id="L145" title="All 7 branches missed.">            cg -&gt; switch (cg.state().orElse(ConsumerGroupState.UNKNOWN)) {</span>
+<span class="nc" id="L146">              case STABLE -&gt; 0;</span>
+<span class="nc" id="L147">              case COMPLETING_REBALANCE -&gt; 1;</span>
+<span class="nc" id="L148">              case PREPARING_REBALANCE -&gt; 2;</span>
+<span class="nc" id="L149">              case EMPTY -&gt; 3;</span>
+<span class="nc" id="L150">              case DEAD -&gt; 4;</span>
+<span class="nc" id="L151">              case UNKNOWN -&gt; 5;</span>
+            };
+<span class="nc" id="L153">        var comparator = Comparator.comparingInt(statesPriorities);</span>
+<span class="nc" id="L154">        yield loadDescriptionsByListings(ac, groups, comparator, pageNum, perPage, sortOrderDto);</span>
+      }
+      case MEMBERS -&gt; {
+<span class="fc" id="L157">        var comparator = Comparator.&lt;ConsumerGroupDescription&gt;comparingInt(cg -&gt; cg.members().size());</span>
+<span class="fc" id="L158">        var groupNames = groups.stream().map(ConsumerGroupListing::groupId).toList();</span>
+<span class="fc" id="L159">        yield ac.describeConsumerGroups(groupNames)</span>
+<span class="fc" id="L160">            .map(descriptions -&gt;</span>
+<span class="fc" id="L161">                sortAndPaginate(descriptions.values(), comparator, pageNum, perPage, sortOrderDto).toList());</span>
+      }
+      case MESSAGES_BEHIND -&gt; {
+
+<span class="nc" id="L165">        Comparator&lt;GroupWithDescr&gt; comparator = Comparator.comparingLong(gwd -&gt;</span>
+<span class="nc bnc" id="L166" title="All 2 branches missed.">            gwd.icg.getConsumerLag() == null ? 0L : gwd.icg.getConsumerLag());</span>
+
+<span class="nc" id="L168">        yield loadDescriptionsByInternalConsumerGroups(ac, groups, comparator, pageNum, perPage, sortOrderDto);</span>
+      }
+
+      case TOPIC_NUM -&gt; {
+
+<span class="nc" id="L173">        Comparator&lt;GroupWithDescr&gt; comparator = Comparator.comparingInt(gwd -&gt; gwd.icg.getTopicNum());</span>
+
+<span class="nc" id="L175">        yield loadDescriptionsByInternalConsumerGroups(ac, groups, comparator, pageNum, perPage, sortOrderDto);</span>
+
+      }
+    };
+  }
+
+  private Mono&lt;List&lt;ConsumerGroupDescription&gt;&gt; loadDescriptionsByListings(ReactiveAdminClient ac,
+                                                                          List&lt;ConsumerGroupListing&gt; listings,
+                                                                          Comparator&lt;ConsumerGroupListing&gt; comparator,
+                                                                          int pageNum,
+                                                                          int perPage,
+                                                                          SortOrderDTO sortOrderDto) {
+<span class="fc" id="L187">    List&lt;String&gt; sortedGroups = sortAndPaginate(listings, comparator, pageNum, perPage, sortOrderDto)</span>
+<span class="fc" id="L188">        .map(ConsumerGroupListing::groupId)</span>
+<span class="fc" id="L189">        .toList();</span>
+<span class="fc" id="L190">    return ac.describeConsumerGroups(sortedGroups)</span>
+<span class="fc" id="L191">        .map(descrMap -&gt; sortedGroups.stream().map(descrMap::get).toList());</span>
+  }
+
+  private &lt;T&gt; Stream&lt;T&gt; sortAndPaginate(Collection&lt;T&gt; collection,
+                                        Comparator&lt;T&gt; comparator,
+                                        int pageNum,
+                                        int perPage,
+                                        SortOrderDTO sortOrderDto) {
+<span class="fc" id="L199">    return collection.stream()</span>
+<span class="fc bfc" id="L200" title="All 2 branches covered.">        .sorted(sortOrderDto == SortOrderDTO.ASC ? comparator : comparator.reversed())</span>
+<span class="fc" id="L201">        .skip((long) (pageNum - 1) * perPage)</span>
+<span class="fc" id="L202">        .limit(perPage);</span>
+  }
+
+  private Mono&lt;List&lt;ConsumerGroupDescription&gt;&gt; describeConsumerGroups(ReactiveAdminClient ac) {
+<span class="nc" id="L206">    return ac.listConsumerGroupNames()</span>
+<span class="nc" id="L207">        .flatMap(ac::describeConsumerGroups)</span>
+<span class="nc" id="L208">        .map(cgs -&gt; new ArrayList&lt;&gt;(cgs.values()));</span>
+  }
+
+
+  private Mono&lt;List&lt;ConsumerGroupDescription&gt;&gt; loadDescriptionsByInternalConsumerGroups(ReactiveAdminClient ac,
+                                                                                  List&lt;ConsumerGroupListing&gt; groups,
+                                                                                  Comparator&lt;GroupWithDescr&gt; comparator,
+                                                                                  int pageNum,
+                                                                                  int perPage,
+                                                                                  SortOrderDTO sortOrderDto) {
+<span class="nc" id="L218">    var groupNames = groups.stream().map(ConsumerGroupListing::groupId).toList();</span>
+
+<span class="nc" id="L220">    return ac.describeConsumerGroups(groupNames)</span>
+<span class="nc" id="L221">        .flatMap(descriptionsMap -&gt; {</span>
+<span class="nc" id="L222">              List&lt;ConsumerGroupDescription&gt; descriptions = descriptionsMap.values().stream().toList();</span>
+<span class="nc" id="L223">              return getConsumerGroups(ac, descriptions)</span>
+<span class="nc" id="L224">                  .map(icg -&gt; Streams.zip(icg.stream(), descriptions.stream(), GroupWithDescr::new).toList())</span>
+<span class="nc" id="L225">                  .map(gwd -&gt; sortAndPaginate(gwd, comparator, pageNum, perPage, sortOrderDto)</span>
+<span class="nc" id="L226">                      .map(GroupWithDescr::cgd).toList());</span>
+            }
+        );
+
+  }
+
+  public Mono&lt;InternalConsumerGroup&gt; getConsumerGroupDetail(KafkaCluster cluster,
+                                                            String consumerGroupId) {
+<span class="nc" id="L234">    return adminClientService.get(cluster)</span>
+<span class="nc" id="L235">        .flatMap(ac -&gt; ac.describeConsumerGroups(List.of(consumerGroupId))</span>
+<span class="nc" id="L236">            .filter(m -&gt; m.containsKey(consumerGroupId))</span>
+<span class="nc" id="L237">            .map(r -&gt; r.get(consumerGroupId))</span>
+<span class="nc" id="L238">            .flatMap(descr -&gt;</span>
+<span class="nc" id="L239">                getConsumerGroups(ac, List.of(descr))</span>
+<span class="nc bnc" id="L240" title="All 2 branches missed.">                    .filter(groups -&gt; !groups.isEmpty())</span>
+<span class="nc" id="L241">                    .map(groups -&gt; groups.get(0))));</span>
+  }
+
+  public Mono&lt;Void&gt; deleteConsumerGroupById(KafkaCluster cluster,
+                                            String groupId) {
+<span class="fc" id="L246">    return adminClientService.get(cluster)</span>
+<span class="fc" id="L247">        .flatMap(adminClient -&gt; adminClient.deleteConsumerGroups(List.of(groupId)));</span>
+  }
+
+  public EnhancedConsumer createConsumer(KafkaCluster cluster) {
+<span class="fc" id="L251">    return createConsumer(cluster, Map.of());</span>
+  }
+
+  public EnhancedConsumer createConsumer(KafkaCluster cluster,
+                                         Map&lt;String, Object&gt; properties) {
+<span class="fc" id="L256">    Properties props = new Properties();</span>
+<span class="fc" id="L257">    SslPropertiesUtil.addKafkaSslProperties(cluster.getOriginalProperties().getSsl(), props);</span>
+<span class="fc" id="L258">    props.putAll(cluster.getProperties());</span>
+<span class="fc" id="L259">    props.put(ConsumerConfig.CLIENT_ID_CONFIG, &quot;kafka-ui-consumer-&quot; + System.currentTimeMillis());</span>
+<span class="fc" id="L260">    props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, cluster.getBootstrapServers());</span>
+<span class="fc" id="L261">    props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, &quot;earliest&quot;);</span>
+<span class="fc" id="L262">    props.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, &quot;false&quot;);</span>
+<span class="fc" id="L263">    props.put(ConsumerConfig.ALLOW_AUTO_CREATE_TOPICS_CONFIG, &quot;false&quot;);</span>
+<span class="fc" id="L264">    props.putAll(properties);</span>
+
+<span class="fc" id="L266">    return new EnhancedConsumer(</span>
+        props,
+<span class="fc" id="L268">        cluster.getPollingSettings().getPollingThrottler(),</span>
+<span class="fc" id="L269">        ApplicationMetrics.forCluster(cluster)</span>
+    );
+  }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

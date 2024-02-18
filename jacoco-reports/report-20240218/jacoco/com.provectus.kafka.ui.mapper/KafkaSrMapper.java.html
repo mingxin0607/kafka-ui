@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>KafkaSrMapper.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">kafka-ui-api</a> &gt; <a href="index.source.html" class="el_package">com.provectus.kafka.ui.mapper</a> &gt; <span class="el_source">KafkaSrMapper.java</span></div><h1>KafkaSrMapper.java</h1><pre class="source lang-java linenums">package com.provectus.kafka.ui.mapper;
+
+import com.provectus.kafka.ui.model.CompatibilityCheckResponseDTO;
+import com.provectus.kafka.ui.model.CompatibilityLevelDTO;
+import com.provectus.kafka.ui.model.NewSchemaSubjectDTO;
+import com.provectus.kafka.ui.model.SchemaReferenceDTO;
+import com.provectus.kafka.ui.model.SchemaSubjectDTO;
+import com.provectus.kafka.ui.model.SchemaTypeDTO;
+import com.provectus.kafka.ui.service.SchemaRegistryService;
+import com.provectus.kafka.ui.sr.model.Compatibility;
+import com.provectus.kafka.ui.sr.model.CompatibilityCheckResponse;
+import com.provectus.kafka.ui.sr.model.NewSubject;
+import com.provectus.kafka.ui.sr.model.SchemaReference;
+import com.provectus.kafka.ui.sr.model.SchemaType;
+import java.util.List;
+import java.util.Optional;
+import org.mapstruct.Mapper;
+
+
+@Mapper
+public interface KafkaSrMapper {
+
+  default SchemaSubjectDTO toDto(SchemaRegistryService.SubjectWithCompatibilityLevel s) {
+<span class="fc" id="L24">    return new SchemaSubjectDTO()</span>
+<span class="fc" id="L25">        .id(s.getId())</span>
+<span class="fc" id="L26">        .version(s.getVersion())</span>
+<span class="fc" id="L27">        .subject(s.getSubject())</span>
+<span class="fc" id="L28">        .schema(s.getSchema())</span>
+<span class="fc" id="L29">        .schemaType(SchemaTypeDTO.fromValue(Optional.ofNullable(s.getSchemaType()).orElse(SchemaType.AVRO).getValue()))</span>
+<span class="fc" id="L30">        .references(toDto(s.getReferences()))</span>
+<span class="fc" id="L31">        .compatibilityLevel(s.getCompatibility().toString());</span>
+  }
+
+  List&lt;SchemaReferenceDTO&gt; toDto(List&lt;SchemaReference&gt; references);
+
+  CompatibilityCheckResponseDTO toDto(CompatibilityCheckResponse ccr);
+
+  CompatibilityLevelDTO.CompatibilityEnum toDto(Compatibility compatibility);
+
+  NewSubject fromDto(NewSchemaSubjectDTO subjectDto);
+
+  Compatibility fromDto(CompatibilityLevelDTO.CompatibilityEnum dtoEnum);
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

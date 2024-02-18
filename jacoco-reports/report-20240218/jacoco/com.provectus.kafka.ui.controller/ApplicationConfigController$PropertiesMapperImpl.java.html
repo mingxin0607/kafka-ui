@@ -1,0 +1,1118 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ApplicationConfigController$PropertiesMapperImpl.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">kafka-ui-api</a> &gt; <a href="index.source.html" class="el_package">com.provectus.kafka.ui.controller</a> &gt; <span class="el_source">ApplicationConfigController$PropertiesMapperImpl.java</span></div><h1>ApplicationConfigController$PropertiesMapperImpl.java</h1><pre class="source lang-java linenums">package com.provectus.kafka.ui.controller;
+
+import com.provectus.kafka.ui.config.ClustersProperties;
+import com.provectus.kafka.ui.config.WebclientProperties;
+import com.provectus.kafka.ui.config.auth.OAuthProperties;
+import com.provectus.kafka.ui.config.auth.RoleBasedAccessControlProperties;
+import com.provectus.kafka.ui.model.ActionDTO;
+import com.provectus.kafka.ui.model.ApplicationConfigPropertiesAuthDTO;
+import com.provectus.kafka.ui.model.ApplicationConfigPropertiesAuthOauth2ClientValueDTO;
+import com.provectus.kafka.ui.model.ApplicationConfigPropertiesAuthOauth2DTO;
+import com.provectus.kafka.ui.model.ApplicationConfigPropertiesDTO;
+import com.provectus.kafka.ui.model.ApplicationConfigPropertiesKafkaClustersInnerAuditDTO;
+import com.provectus.kafka.ui.model.ApplicationConfigPropertiesKafkaClustersInnerDTO;
+import com.provectus.kafka.ui.model.ApplicationConfigPropertiesKafkaClustersInnerKafkaConnectInnerDTO;
+import com.provectus.kafka.ui.model.ApplicationConfigPropertiesKafkaClustersInnerMaskingInnerDTO;
+import com.provectus.kafka.ui.model.ApplicationConfigPropertiesKafkaClustersInnerMetricsDTO;
+import com.provectus.kafka.ui.model.ApplicationConfigPropertiesKafkaClustersInnerSchemaRegistryAuthDTO;
+import com.provectus.kafka.ui.model.ApplicationConfigPropertiesKafkaClustersInnerSchemaRegistrySslDTO;
+import com.provectus.kafka.ui.model.ApplicationConfigPropertiesKafkaClustersInnerSerdeInnerDTO;
+import com.provectus.kafka.ui.model.ApplicationConfigPropertiesKafkaClustersInnerSslDTO;
+import com.provectus.kafka.ui.model.ApplicationConfigPropertiesKafkaDTO;
+import com.provectus.kafka.ui.model.ApplicationConfigPropertiesKafkaPollingDTO;
+import com.provectus.kafka.ui.model.ApplicationConfigPropertiesRbacDTO;
+import com.provectus.kafka.ui.model.ApplicationConfigPropertiesRbacRolesInnerDTO;
+import com.provectus.kafka.ui.model.ApplicationConfigPropertiesRbacRolesInnerPermissionsInnerDTO;
+import com.provectus.kafka.ui.model.ApplicationConfigPropertiesRbacRolesInnerSubjectsInnerDTO;
+import com.provectus.kafka.ui.model.ApplicationConfigPropertiesWebclientDTO;
+import com.provectus.kafka.ui.model.ResourceTypeDTO;
+import com.provectus.kafka.ui.model.rbac.Permission;
+import com.provectus.kafka.ui.model.rbac.Resource;
+import com.provectus.kafka.ui.model.rbac.Role;
+import com.provectus.kafka.ui.model.rbac.Subject;
+import com.provectus.kafka.ui.util.DynamicConfigOperations;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import javax.annotation.processing.Generated;
+
+@Generated(
+    value = &quot;org.mapstruct.ap.MappingProcessor&quot;,
+    date = &quot;2024-02-17T18:26:53-0800&quot;,
+    comments = &quot;version: 1.5.5.Final, compiler: javac, environment: Java 17.0.9 (Private Build)&quot;
+)
+<span class="fc" id="L47">class ApplicationConfigController$PropertiesMapperImpl implements ApplicationConfigController.PropertiesMapper {</span>
+
+    @Override
+    public DynamicConfigOperations.PropertiesStructure fromDto(ApplicationConfigPropertiesDTO dto) {
+<span class="nc bnc" id="L51" title="All 2 branches missed.">        if ( dto == null ) {</span>
+<span class="nc" id="L52">            return null;</span>
+        }
+
+<span class="nc" id="L55">        DynamicConfigOperations.PropertiesStructure.PropertiesStructureBuilder propertiesStructure = DynamicConfigOperations.PropertiesStructure.builder();</span>
+
+<span class="nc" id="L57">        propertiesStructure.kafka( applicationConfigPropertiesKafkaDTOToClustersProperties( dto.getKafka() ) );</span>
+<span class="nc" id="L58">        propertiesStructure.rbac( applicationConfigPropertiesRbacDTOToRoleBasedAccessControlProperties( dto.getRbac() ) );</span>
+<span class="nc" id="L59">        propertiesStructure.auth( applicationConfigPropertiesAuthDTOToAuth( dto.getAuth() ) );</span>
+<span class="nc" id="L60">        propertiesStructure.webclient( applicationConfigPropertiesWebclientDTOToWebclientProperties( dto.getWebclient() ) );</span>
+
+<span class="nc" id="L62">        return propertiesStructure.build();</span>
+    }
+
+    @Override
+    public ApplicationConfigPropertiesDTO toDto(DynamicConfigOperations.PropertiesStructure propertiesStructure) {
+<span class="nc bnc" id="L67" title="All 2 branches missed.">        if ( propertiesStructure == null ) {</span>
+<span class="nc" id="L68">            return null;</span>
+        }
+
+<span class="nc" id="L71">        ApplicationConfigPropertiesDTO applicationConfigPropertiesDTO = new ApplicationConfigPropertiesDTO();</span>
+
+<span class="nc" id="L73">        applicationConfigPropertiesDTO.setAuth( authToApplicationConfigPropertiesAuthDTO( propertiesStructure.getAuth() ) );</span>
+<span class="nc" id="L74">        applicationConfigPropertiesDTO.setRbac( roleBasedAccessControlPropertiesToApplicationConfigPropertiesRbacDTO( propertiesStructure.getRbac() ) );</span>
+<span class="nc" id="L75">        applicationConfigPropertiesDTO.setWebclient( webclientPropertiesToApplicationConfigPropertiesWebclientDTO( propertiesStructure.getWebclient() ) );</span>
+<span class="nc" id="L76">        applicationConfigPropertiesDTO.setKafka( clustersPropertiesToApplicationConfigPropertiesKafkaDTO( propertiesStructure.getKafka() ) );</span>
+
+<span class="nc" id="L78">        return applicationConfigPropertiesDTO;</span>
+    }
+
+    protected ClustersProperties.SchemaRegistryAuth applicationConfigPropertiesKafkaClustersInnerSchemaRegistryAuthDTOToSchemaRegistryAuth(ApplicationConfigPropertiesKafkaClustersInnerSchemaRegistryAuthDTO applicationConfigPropertiesKafkaClustersInnerSchemaRegistryAuthDTO) {
+<span class="nc bnc" id="L82" title="All 2 branches missed.">        if ( applicationConfigPropertiesKafkaClustersInnerSchemaRegistryAuthDTO == null ) {</span>
+<span class="nc" id="L83">            return null;</span>
+        }
+
+<span class="nc" id="L86">        ClustersProperties.SchemaRegistryAuth schemaRegistryAuth = new ClustersProperties.SchemaRegistryAuth();</span>
+
+<span class="nc" id="L88">        schemaRegistryAuth.setUsername( applicationConfigPropertiesKafkaClustersInnerSchemaRegistryAuthDTO.getUsername() );</span>
+<span class="nc" id="L89">        schemaRegistryAuth.setPassword( applicationConfigPropertiesKafkaClustersInnerSchemaRegistryAuthDTO.getPassword() );</span>
+
+<span class="nc" id="L91">        return schemaRegistryAuth;</span>
+    }
+
+    protected ClustersProperties.KeystoreConfig applicationConfigPropertiesKafkaClustersInnerSchemaRegistrySslDTOToKeystoreConfig(ApplicationConfigPropertiesKafkaClustersInnerSchemaRegistrySslDTO applicationConfigPropertiesKafkaClustersInnerSchemaRegistrySslDTO) {
+<span class="nc bnc" id="L95" title="All 2 branches missed.">        if ( applicationConfigPropertiesKafkaClustersInnerSchemaRegistrySslDTO == null ) {</span>
+<span class="nc" id="L96">            return null;</span>
+        }
+
+<span class="nc" id="L99">        ClustersProperties.KeystoreConfig keystoreConfig = new ClustersProperties.KeystoreConfig();</span>
+
+<span class="nc" id="L101">        keystoreConfig.setKeystoreLocation( applicationConfigPropertiesKafkaClustersInnerSchemaRegistrySslDTO.getKeystoreLocation() );</span>
+<span class="nc" id="L102">        keystoreConfig.setKeystorePassword( applicationConfigPropertiesKafkaClustersInnerSchemaRegistrySslDTO.getKeystorePassword() );</span>
+
+<span class="nc" id="L104">        return keystoreConfig;</span>
+    }
+
+    protected ClustersProperties.KsqldbServerAuth applicationConfigPropertiesKafkaClustersInnerSchemaRegistryAuthDTOToKsqldbServerAuth(ApplicationConfigPropertiesKafkaClustersInnerSchemaRegistryAuthDTO applicationConfigPropertiesKafkaClustersInnerSchemaRegistryAuthDTO) {
+<span class="nc bnc" id="L108" title="All 2 branches missed.">        if ( applicationConfigPropertiesKafkaClustersInnerSchemaRegistryAuthDTO == null ) {</span>
+<span class="nc" id="L109">            return null;</span>
+        }
+
+<span class="nc" id="L112">        ClustersProperties.KsqldbServerAuth ksqldbServerAuth = new ClustersProperties.KsqldbServerAuth();</span>
+
+<span class="nc" id="L114">        ksqldbServerAuth.setUsername( applicationConfigPropertiesKafkaClustersInnerSchemaRegistryAuthDTO.getUsername() );</span>
+<span class="nc" id="L115">        ksqldbServerAuth.setPassword( applicationConfigPropertiesKafkaClustersInnerSchemaRegistryAuthDTO.getPassword() );</span>
+
+<span class="nc" id="L117">        return ksqldbServerAuth;</span>
+    }
+
+    protected ClustersProperties.ConnectCluster applicationConfigPropertiesKafkaClustersInnerKafkaConnectInnerDTOToConnectCluster(ApplicationConfigPropertiesKafkaClustersInnerKafkaConnectInnerDTO applicationConfigPropertiesKafkaClustersInnerKafkaConnectInnerDTO) {
+<span class="nc bnc" id="L121" title="All 2 branches missed.">        if ( applicationConfigPropertiesKafkaClustersInnerKafkaConnectInnerDTO == null ) {</span>
+<span class="nc" id="L122">            return null;</span>
+        }
+
+<span class="nc" id="L125">        ClustersProperties.ConnectCluster.ConnectClusterBuilder connectCluster = ClustersProperties.ConnectCluster.builder();</span>
+
+<span class="nc" id="L127">        connectCluster.name( applicationConfigPropertiesKafkaClustersInnerKafkaConnectInnerDTO.getName() );</span>
+<span class="nc" id="L128">        connectCluster.address( applicationConfigPropertiesKafkaClustersInnerKafkaConnectInnerDTO.getAddress() );</span>
+<span class="nc" id="L129">        connectCluster.username( applicationConfigPropertiesKafkaClustersInnerKafkaConnectInnerDTO.getUsername() );</span>
+<span class="nc" id="L130">        connectCluster.password( applicationConfigPropertiesKafkaClustersInnerKafkaConnectInnerDTO.getPassword() );</span>
+<span class="nc" id="L131">        connectCluster.keystoreLocation( applicationConfigPropertiesKafkaClustersInnerKafkaConnectInnerDTO.getKeystoreLocation() );</span>
+<span class="nc" id="L132">        connectCluster.keystorePassword( applicationConfigPropertiesKafkaClustersInnerKafkaConnectInnerDTO.getKeystorePassword() );</span>
+
+<span class="nc" id="L134">        return connectCluster.build();</span>
+    }
+
+    protected List&lt;ClustersProperties.ConnectCluster&gt; applicationConfigPropertiesKafkaClustersInnerKafkaConnectInnerDTOListToConnectClusterList(List&lt;ApplicationConfigPropertiesKafkaClustersInnerKafkaConnectInnerDTO&gt; list) {
+<span class="nc bnc" id="L138" title="All 2 branches missed.">        if ( list == null ) {</span>
+<span class="nc" id="L139">            return null;</span>
+        }
+
+<span class="nc" id="L142">        List&lt;ClustersProperties.ConnectCluster&gt; list1 = new ArrayList&lt;ClustersProperties.ConnectCluster&gt;( list.size() );</span>
+<span class="nc bnc" id="L143" title="All 2 branches missed.">        for ( ApplicationConfigPropertiesKafkaClustersInnerKafkaConnectInnerDTO applicationConfigPropertiesKafkaClustersInnerKafkaConnectInnerDTO : list ) {</span>
+<span class="nc" id="L144">            list1.add( applicationConfigPropertiesKafkaClustersInnerKafkaConnectInnerDTOToConnectCluster( applicationConfigPropertiesKafkaClustersInnerKafkaConnectInnerDTO ) );</span>
+<span class="nc" id="L145">        }</span>
+
+<span class="nc" id="L147">        return list1;</span>
+    }
+
+    protected ClustersProperties.MetricsConfigData applicationConfigPropertiesKafkaClustersInnerMetricsDTOToMetricsConfigData(ApplicationConfigPropertiesKafkaClustersInnerMetricsDTO applicationConfigPropertiesKafkaClustersInnerMetricsDTO) {
+<span class="nc bnc" id="L151" title="All 2 branches missed.">        if ( applicationConfigPropertiesKafkaClustersInnerMetricsDTO == null ) {</span>
+<span class="nc" id="L152">            return null;</span>
+        }
+
+<span class="nc" id="L155">        ClustersProperties.MetricsConfigData metricsConfigData = new ClustersProperties.MetricsConfigData();</span>
+
+<span class="nc" id="L157">        metricsConfigData.setType( applicationConfigPropertiesKafkaClustersInnerMetricsDTO.getType() );</span>
+<span class="nc" id="L158">        metricsConfigData.setPort( applicationConfigPropertiesKafkaClustersInnerMetricsDTO.getPort() );</span>
+<span class="nc" id="L159">        metricsConfigData.setSsl( applicationConfigPropertiesKafkaClustersInnerMetricsDTO.getSsl() );</span>
+<span class="nc" id="L160">        metricsConfigData.setUsername( applicationConfigPropertiesKafkaClustersInnerMetricsDTO.getUsername() );</span>
+<span class="nc" id="L161">        metricsConfigData.setPassword( applicationConfigPropertiesKafkaClustersInnerMetricsDTO.getPassword() );</span>
+<span class="nc" id="L162">        metricsConfigData.setKeystoreLocation( applicationConfigPropertiesKafkaClustersInnerMetricsDTO.getKeystoreLocation() );</span>
+<span class="nc" id="L163">        metricsConfigData.setKeystorePassword( applicationConfigPropertiesKafkaClustersInnerMetricsDTO.getKeystorePassword() );</span>
+
+<span class="nc" id="L165">        return metricsConfigData;</span>
+    }
+
+    protected ClustersProperties.SerdeConfig applicationConfigPropertiesKafkaClustersInnerSerdeInnerDTOToSerdeConfig(ApplicationConfigPropertiesKafkaClustersInnerSerdeInnerDTO applicationConfigPropertiesKafkaClustersInnerSerdeInnerDTO) {
+<span class="nc bnc" id="L169" title="All 2 branches missed.">        if ( applicationConfigPropertiesKafkaClustersInnerSerdeInnerDTO == null ) {</span>
+<span class="nc" id="L170">            return null;</span>
+        }
+
+<span class="nc" id="L173">        ClustersProperties.SerdeConfig serdeConfig = new ClustersProperties.SerdeConfig();</span>
+
+<span class="nc" id="L175">        serdeConfig.setName( applicationConfigPropertiesKafkaClustersInnerSerdeInnerDTO.getName() );</span>
+<span class="nc" id="L176">        serdeConfig.setClassName( applicationConfigPropertiesKafkaClustersInnerSerdeInnerDTO.getClassName() );</span>
+<span class="nc" id="L177">        serdeConfig.setFilePath( applicationConfigPropertiesKafkaClustersInnerSerdeInnerDTO.getFilePath() );</span>
+<span class="nc" id="L178">        Map&lt;String, Object&gt; map = applicationConfigPropertiesKafkaClustersInnerSerdeInnerDTO.getProperties();</span>
+<span class="nc bnc" id="L179" title="All 2 branches missed.">        if ( map != null ) {</span>
+<span class="nc" id="L180">            serdeConfig.setProperties( new LinkedHashMap&lt;String, Object&gt;( map ) );</span>
+        }
+<span class="nc" id="L182">        serdeConfig.setTopicKeysPattern( applicationConfigPropertiesKafkaClustersInnerSerdeInnerDTO.getTopicKeysPattern() );</span>
+<span class="nc" id="L183">        serdeConfig.setTopicValuesPattern( applicationConfigPropertiesKafkaClustersInnerSerdeInnerDTO.getTopicValuesPattern() );</span>
+
+<span class="nc" id="L185">        return serdeConfig;</span>
+    }
+
+    protected List&lt;ClustersProperties.SerdeConfig&gt; applicationConfigPropertiesKafkaClustersInnerSerdeInnerDTOListToSerdeConfigList(List&lt;ApplicationConfigPropertiesKafkaClustersInnerSerdeInnerDTO&gt; list) {
+<span class="nc bnc" id="L189" title="All 2 branches missed.">        if ( list == null ) {</span>
+<span class="nc" id="L190">            return null;</span>
+        }
+
+<span class="nc" id="L193">        List&lt;ClustersProperties.SerdeConfig&gt; list1 = new ArrayList&lt;ClustersProperties.SerdeConfig&gt;( list.size() );</span>
+<span class="nc bnc" id="L194" title="All 2 branches missed.">        for ( ApplicationConfigPropertiesKafkaClustersInnerSerdeInnerDTO applicationConfigPropertiesKafkaClustersInnerSerdeInnerDTO : list ) {</span>
+<span class="nc" id="L195">            list1.add( applicationConfigPropertiesKafkaClustersInnerSerdeInnerDTOToSerdeConfig( applicationConfigPropertiesKafkaClustersInnerSerdeInnerDTO ) );</span>
+<span class="nc" id="L196">        }</span>
+
+<span class="nc" id="L198">        return list1;</span>
+    }
+
+    protected ClustersProperties.Masking.Type typeEnumToType(ApplicationConfigPropertiesKafkaClustersInnerMaskingInnerDTO.TypeEnum typeEnum) {
+<span class="nc bnc" id="L202" title="All 2 branches missed.">        if ( typeEnum == null ) {</span>
+<span class="nc" id="L203">            return null;</span>
+        }
+
+        ClustersProperties.Masking.Type type;
+
+<span class="nc bnc" id="L208" title="All 4 branches missed.">        switch ( typeEnum ) {</span>
+<span class="nc" id="L209">            case REMOVE: type = ClustersProperties.Masking.Type.REMOVE;</span>
+<span class="nc" id="L210">            break;</span>
+<span class="nc" id="L211">            case MASK: type = ClustersProperties.Masking.Type.MASK;</span>
+<span class="nc" id="L212">            break;</span>
+<span class="nc" id="L213">            case REPLACE: type = ClustersProperties.Masking.Type.REPLACE;</span>
+<span class="nc" id="L214">            break;</span>
+<span class="nc" id="L215">            default: throw new IllegalArgumentException( &quot;Unexpected enum constant: &quot; + typeEnum );</span>
+        }
+
+<span class="nc" id="L218">        return type;</span>
+    }
+
+    protected ClustersProperties.Masking applicationConfigPropertiesKafkaClustersInnerMaskingInnerDTOToMasking(ApplicationConfigPropertiesKafkaClustersInnerMaskingInnerDTO applicationConfigPropertiesKafkaClustersInnerMaskingInnerDTO) {
+<span class="nc bnc" id="L222" title="All 2 branches missed.">        if ( applicationConfigPropertiesKafkaClustersInnerMaskingInnerDTO == null ) {</span>
+<span class="nc" id="L223">            return null;</span>
+        }
+
+<span class="nc" id="L226">        ClustersProperties.Masking masking = new ClustersProperties.Masking();</span>
+
+<span class="nc" id="L228">        masking.setType( typeEnumToType( applicationConfigPropertiesKafkaClustersInnerMaskingInnerDTO.getType() ) );</span>
+<span class="nc" id="L229">        List&lt;String&gt; list = applicationConfigPropertiesKafkaClustersInnerMaskingInnerDTO.getFields();</span>
+<span class="nc bnc" id="L230" title="All 2 branches missed.">        if ( list != null ) {</span>
+<span class="nc" id="L231">            masking.setFields( new ArrayList&lt;String&gt;( list ) );</span>
+        }
+<span class="nc" id="L233">        masking.setFieldsNamePattern( applicationConfigPropertiesKafkaClustersInnerMaskingInnerDTO.getFieldsNamePattern() );</span>
+<span class="nc" id="L234">        List&lt;String&gt; list1 = applicationConfigPropertiesKafkaClustersInnerMaskingInnerDTO.getMaskingCharsReplacement();</span>
+<span class="nc bnc" id="L235" title="All 2 branches missed.">        if ( list1 != null ) {</span>
+<span class="nc" id="L236">            masking.setMaskingCharsReplacement( new ArrayList&lt;String&gt;( list1 ) );</span>
+        }
+<span class="nc" id="L238">        masking.setReplacement( applicationConfigPropertiesKafkaClustersInnerMaskingInnerDTO.getReplacement() );</span>
+<span class="nc" id="L239">        masking.setTopicKeysPattern( applicationConfigPropertiesKafkaClustersInnerMaskingInnerDTO.getTopicKeysPattern() );</span>
+<span class="nc" id="L240">        masking.setTopicValuesPattern( applicationConfigPropertiesKafkaClustersInnerMaskingInnerDTO.getTopicValuesPattern() );</span>
+
+<span class="nc" id="L242">        return masking;</span>
+    }
+
+    protected List&lt;ClustersProperties.Masking&gt; applicationConfigPropertiesKafkaClustersInnerMaskingInnerDTOListToMaskingList(List&lt;ApplicationConfigPropertiesKafkaClustersInnerMaskingInnerDTO&gt; list) {
+<span class="nc bnc" id="L246" title="All 2 branches missed.">        if ( list == null ) {</span>
+<span class="nc" id="L247">            return null;</span>
+        }
+
+<span class="nc" id="L250">        List&lt;ClustersProperties.Masking&gt; list1 = new ArrayList&lt;ClustersProperties.Masking&gt;( list.size() );</span>
+<span class="nc bnc" id="L251" title="All 2 branches missed.">        for ( ApplicationConfigPropertiesKafkaClustersInnerMaskingInnerDTO applicationConfigPropertiesKafkaClustersInnerMaskingInnerDTO : list ) {</span>
+<span class="nc" id="L252">            list1.add( applicationConfigPropertiesKafkaClustersInnerMaskingInnerDTOToMasking( applicationConfigPropertiesKafkaClustersInnerMaskingInnerDTO ) );</span>
+<span class="nc" id="L253">        }</span>
+
+<span class="nc" id="L255">        return list1;</span>
+    }
+
+    protected ClustersProperties.TruststoreConfig applicationConfigPropertiesKafkaClustersInnerSslDTOToTruststoreConfig(ApplicationConfigPropertiesKafkaClustersInnerSslDTO applicationConfigPropertiesKafkaClustersInnerSslDTO) {
+<span class="nc bnc" id="L259" title="All 2 branches missed.">        if ( applicationConfigPropertiesKafkaClustersInnerSslDTO == null ) {</span>
+<span class="nc" id="L260">            return null;</span>
+        }
+
+<span class="nc" id="L263">        ClustersProperties.TruststoreConfig truststoreConfig = new ClustersProperties.TruststoreConfig();</span>
+
+<span class="nc" id="L265">        truststoreConfig.setTruststoreLocation( applicationConfigPropertiesKafkaClustersInnerSslDTO.getTruststoreLocation() );</span>
+<span class="nc" id="L266">        truststoreConfig.setTruststorePassword( applicationConfigPropertiesKafkaClustersInnerSslDTO.getTruststorePassword() );</span>
+
+<span class="nc" id="L268">        return truststoreConfig;</span>
+    }
+
+    protected ClustersProperties.AuditProperties.LogLevel levelEnumToLogLevel(ApplicationConfigPropertiesKafkaClustersInnerAuditDTO.LevelEnum levelEnum) {
+<span class="nc bnc" id="L272" title="All 2 branches missed.">        if ( levelEnum == null ) {</span>
+<span class="nc" id="L273">            return null;</span>
+        }
+
+        ClustersProperties.AuditProperties.LogLevel logLevel;
+
+<span class="nc bnc" id="L278" title="All 3 branches missed.">        switch ( levelEnum ) {</span>
+<span class="nc" id="L279">            case ALL: logLevel = ClustersProperties.AuditProperties.LogLevel.ALL;</span>
+<span class="nc" id="L280">            break;</span>
+<span class="nc" id="L281">            case ALTER_ONLY: logLevel = ClustersProperties.AuditProperties.LogLevel.ALTER_ONLY;</span>
+<span class="nc" id="L282">            break;</span>
+<span class="nc" id="L283">            default: throw new IllegalArgumentException( &quot;Unexpected enum constant: &quot; + levelEnum );</span>
+        }
+
+<span class="nc" id="L286">        return logLevel;</span>
+    }
+
+    protected ClustersProperties.AuditProperties applicationConfigPropertiesKafkaClustersInnerAuditDTOToAuditProperties(ApplicationConfigPropertiesKafkaClustersInnerAuditDTO applicationConfigPropertiesKafkaClustersInnerAuditDTO) {
+<span class="nc bnc" id="L290" title="All 2 branches missed.">        if ( applicationConfigPropertiesKafkaClustersInnerAuditDTO == null ) {</span>
+<span class="nc" id="L291">            return null;</span>
+        }
+
+<span class="nc" id="L294">        ClustersProperties.AuditProperties auditProperties = new ClustersProperties.AuditProperties();</span>
+
+<span class="nc" id="L296">        auditProperties.setTopic( applicationConfigPropertiesKafkaClustersInnerAuditDTO.getTopic() );</span>
+<span class="nc" id="L297">        auditProperties.setAuditTopicsPartitions( applicationConfigPropertiesKafkaClustersInnerAuditDTO.getAuditTopicsPartitions() );</span>
+<span class="nc" id="L298">        auditProperties.setTopicAuditEnabled( applicationConfigPropertiesKafkaClustersInnerAuditDTO.getTopicAuditEnabled() );</span>
+<span class="nc" id="L299">        auditProperties.setConsoleAuditEnabled( applicationConfigPropertiesKafkaClustersInnerAuditDTO.getConsoleAuditEnabled() );</span>
+<span class="nc" id="L300">        auditProperties.setLevel( levelEnumToLogLevel( applicationConfigPropertiesKafkaClustersInnerAuditDTO.getLevel() ) );</span>
+<span class="nc" id="L301">        Map&lt;String, String&gt; map = applicationConfigPropertiesKafkaClustersInnerAuditDTO.getAuditTopicProperties();</span>
+<span class="nc bnc" id="L302" title="All 2 branches missed.">        if ( map != null ) {</span>
+<span class="nc" id="L303">            auditProperties.setAuditTopicProperties( new LinkedHashMap&lt;String, String&gt;( map ) );</span>
+        }
+
+<span class="nc" id="L306">        return auditProperties;</span>
+    }
+
+    protected ClustersProperties.Cluster applicationConfigPropertiesKafkaClustersInnerDTOToCluster(ApplicationConfigPropertiesKafkaClustersInnerDTO applicationConfigPropertiesKafkaClustersInnerDTO) {
+<span class="nc bnc" id="L310" title="All 2 branches missed.">        if ( applicationConfigPropertiesKafkaClustersInnerDTO == null ) {</span>
+<span class="nc" id="L311">            return null;</span>
+        }
+
+<span class="nc" id="L314">        ClustersProperties.Cluster cluster = new ClustersProperties.Cluster();</span>
+
+<span class="nc" id="L316">        cluster.setName( applicationConfigPropertiesKafkaClustersInnerDTO.getName() );</span>
+<span class="nc" id="L317">        cluster.setBootstrapServers( applicationConfigPropertiesKafkaClustersInnerDTO.getBootstrapServers() );</span>
+<span class="nc" id="L318">        cluster.setSchemaRegistry( applicationConfigPropertiesKafkaClustersInnerDTO.getSchemaRegistry() );</span>
+<span class="nc" id="L319">        cluster.setSchemaRegistryAuth( applicationConfigPropertiesKafkaClustersInnerSchemaRegistryAuthDTOToSchemaRegistryAuth( applicationConfigPropertiesKafkaClustersInnerDTO.getSchemaRegistryAuth() ) );</span>
+<span class="nc" id="L320">        cluster.setSchemaRegistrySsl( applicationConfigPropertiesKafkaClustersInnerSchemaRegistrySslDTOToKeystoreConfig( applicationConfigPropertiesKafkaClustersInnerDTO.getSchemaRegistrySsl() ) );</span>
+<span class="nc" id="L321">        cluster.setKsqldbServer( applicationConfigPropertiesKafkaClustersInnerDTO.getKsqldbServer() );</span>
+<span class="nc" id="L322">        cluster.setKsqldbServerAuth( applicationConfigPropertiesKafkaClustersInnerSchemaRegistryAuthDTOToKsqldbServerAuth( applicationConfigPropertiesKafkaClustersInnerDTO.getKsqldbServerAuth() ) );</span>
+<span class="nc" id="L323">        cluster.setKsqldbServerSsl( applicationConfigPropertiesKafkaClustersInnerSchemaRegistrySslDTOToKeystoreConfig( applicationConfigPropertiesKafkaClustersInnerDTO.getKsqldbServerSsl() ) );</span>
+<span class="nc" id="L324">        cluster.setKafkaConnect( applicationConfigPropertiesKafkaClustersInnerKafkaConnectInnerDTOListToConnectClusterList( applicationConfigPropertiesKafkaClustersInnerDTO.getKafkaConnect() ) );</span>
+<span class="nc" id="L325">        cluster.setMetrics( applicationConfigPropertiesKafkaClustersInnerMetricsDTOToMetricsConfigData( applicationConfigPropertiesKafkaClustersInnerDTO.getMetrics() ) );</span>
+<span class="nc" id="L326">        Map&lt;String, Object&gt; map = applicationConfigPropertiesKafkaClustersInnerDTO.getProperties();</span>
+<span class="nc bnc" id="L327" title="All 2 branches missed.">        if ( map != null ) {</span>
+<span class="nc" id="L328">            cluster.setProperties( new LinkedHashMap&lt;String, Object&gt;( map ) );</span>
+        }
+<span class="nc bnc" id="L330" title="All 2 branches missed.">        if ( applicationConfigPropertiesKafkaClustersInnerDTO.getReadOnly() != null ) {</span>
+<span class="nc" id="L331">            cluster.setReadOnly( applicationConfigPropertiesKafkaClustersInnerDTO.getReadOnly() );</span>
+        }
+<span class="nc" id="L333">        cluster.setSerde( applicationConfigPropertiesKafkaClustersInnerSerdeInnerDTOListToSerdeConfigList( applicationConfigPropertiesKafkaClustersInnerDTO.getSerde() ) );</span>
+<span class="nc" id="L334">        cluster.setDefaultKeySerde( applicationConfigPropertiesKafkaClustersInnerDTO.getDefaultKeySerde() );</span>
+<span class="nc" id="L335">        cluster.setDefaultValueSerde( applicationConfigPropertiesKafkaClustersInnerDTO.getDefaultValueSerde() );</span>
+<span class="nc" id="L336">        cluster.setMasking( applicationConfigPropertiesKafkaClustersInnerMaskingInnerDTOListToMaskingList( applicationConfigPropertiesKafkaClustersInnerDTO.getMasking() ) );</span>
+<span class="nc" id="L337">        cluster.setPollingThrottleRate( applicationConfigPropertiesKafkaClustersInnerDTO.getPollingThrottleRate() );</span>
+<span class="nc" id="L338">        cluster.setSsl( applicationConfigPropertiesKafkaClustersInnerSslDTOToTruststoreConfig( applicationConfigPropertiesKafkaClustersInnerDTO.getSsl() ) );</span>
+<span class="nc" id="L339">        cluster.setAudit( applicationConfigPropertiesKafkaClustersInnerAuditDTOToAuditProperties( applicationConfigPropertiesKafkaClustersInnerDTO.getAudit() ) );</span>
+
+<span class="nc" id="L341">        return cluster;</span>
+    }
+
+    protected List&lt;ClustersProperties.Cluster&gt; applicationConfigPropertiesKafkaClustersInnerDTOListToClusterList(List&lt;ApplicationConfigPropertiesKafkaClustersInnerDTO&gt; list) {
+<span class="nc bnc" id="L345" title="All 2 branches missed.">        if ( list == null ) {</span>
+<span class="nc" id="L346">            return null;</span>
+        }
+
+<span class="nc" id="L349">        List&lt;ClustersProperties.Cluster&gt; list1 = new ArrayList&lt;ClustersProperties.Cluster&gt;( list.size() );</span>
+<span class="nc bnc" id="L350" title="All 2 branches missed.">        for ( ApplicationConfigPropertiesKafkaClustersInnerDTO applicationConfigPropertiesKafkaClustersInnerDTO : list ) {</span>
+<span class="nc" id="L351">            list1.add( applicationConfigPropertiesKafkaClustersInnerDTOToCluster( applicationConfigPropertiesKafkaClustersInnerDTO ) );</span>
+<span class="nc" id="L352">        }</span>
+
+<span class="nc" id="L354">        return list1;</span>
+    }
+
+    protected ClustersProperties.PollingProperties applicationConfigPropertiesKafkaPollingDTOToPollingProperties(ApplicationConfigPropertiesKafkaPollingDTO applicationConfigPropertiesKafkaPollingDTO) {
+<span class="nc bnc" id="L358" title="All 2 branches missed.">        if ( applicationConfigPropertiesKafkaPollingDTO == null ) {</span>
+<span class="nc" id="L359">            return null;</span>
+        }
+
+<span class="nc" id="L362">        ClustersProperties.PollingProperties pollingProperties = new ClustersProperties.PollingProperties();</span>
+
+<span class="nc" id="L364">        pollingProperties.setPollTimeoutMs( applicationConfigPropertiesKafkaPollingDTO.getPollTimeoutMs() );</span>
+<span class="nc" id="L365">        pollingProperties.setMaxPageSize( applicationConfigPropertiesKafkaPollingDTO.getMaxPageSize() );</span>
+<span class="nc" id="L366">        pollingProperties.setDefaultPageSize( applicationConfigPropertiesKafkaPollingDTO.getDefaultPageSize() );</span>
+
+<span class="nc" id="L368">        return pollingProperties;</span>
+    }
+
+    protected ClustersProperties applicationConfigPropertiesKafkaDTOToClustersProperties(ApplicationConfigPropertiesKafkaDTO applicationConfigPropertiesKafkaDTO) {
+<span class="nc bnc" id="L372" title="All 2 branches missed.">        if ( applicationConfigPropertiesKafkaDTO == null ) {</span>
+<span class="nc" id="L373">            return null;</span>
+        }
+
+<span class="nc" id="L376">        ClustersProperties clustersProperties = new ClustersProperties();</span>
+
+<span class="nc" id="L378">        clustersProperties.setClusters( applicationConfigPropertiesKafkaClustersInnerDTOListToClusterList( applicationConfigPropertiesKafkaDTO.getClusters() ) );</span>
+<span class="nc" id="L379">        clustersProperties.setInternalTopicPrefix( applicationConfigPropertiesKafkaDTO.getInternalTopicPrefix() );</span>
+<span class="nc" id="L380">        clustersProperties.setAdminClientTimeout( applicationConfigPropertiesKafkaDTO.getAdminClientTimeout() );</span>
+<span class="nc" id="L381">        clustersProperties.setPolling( applicationConfigPropertiesKafkaPollingDTOToPollingProperties( applicationConfigPropertiesKafkaDTO.getPolling() ) );</span>
+
+<span class="nc" id="L383">        return clustersProperties;</span>
+    }
+
+    protected Subject applicationConfigPropertiesRbacRolesInnerSubjectsInnerDTOToSubject(ApplicationConfigPropertiesRbacRolesInnerSubjectsInnerDTO applicationConfigPropertiesRbacRolesInnerSubjectsInnerDTO) {
+<span class="nc bnc" id="L387" title="All 2 branches missed.">        if ( applicationConfigPropertiesRbacRolesInnerSubjectsInnerDTO == null ) {</span>
+<span class="nc" id="L388">            return null;</span>
+        }
+
+<span class="nc" id="L391">        Subject subject = new Subject();</span>
+
+<span class="nc" id="L393">        subject.setProvider( applicationConfigPropertiesRbacRolesInnerSubjectsInnerDTO.getProvider() );</span>
+<span class="nc" id="L394">        subject.setType( applicationConfigPropertiesRbacRolesInnerSubjectsInnerDTO.getType() );</span>
+<span class="nc" id="L395">        subject.setValue( applicationConfigPropertiesRbacRolesInnerSubjectsInnerDTO.getValue() );</span>
+
+<span class="nc" id="L397">        return subject;</span>
+    }
+
+    protected List&lt;Subject&gt; applicationConfigPropertiesRbacRolesInnerSubjectsInnerDTOListToSubjectList(List&lt;ApplicationConfigPropertiesRbacRolesInnerSubjectsInnerDTO&gt; list) {
+<span class="nc bnc" id="L401" title="All 2 branches missed.">        if ( list == null ) {</span>
+<span class="nc" id="L402">            return null;</span>
+        }
+
+<span class="nc" id="L405">        List&lt;Subject&gt; list1 = new ArrayList&lt;Subject&gt;( list.size() );</span>
+<span class="nc bnc" id="L406" title="All 2 branches missed.">        for ( ApplicationConfigPropertiesRbacRolesInnerSubjectsInnerDTO applicationConfigPropertiesRbacRolesInnerSubjectsInnerDTO : list ) {</span>
+<span class="nc" id="L407">            list1.add( applicationConfigPropertiesRbacRolesInnerSubjectsInnerDTOToSubject( applicationConfigPropertiesRbacRolesInnerSubjectsInnerDTO ) );</span>
+<span class="nc" id="L408">        }</span>
+
+<span class="nc" id="L410">        return list1;</span>
+    }
+
+    protected List&lt;String&gt; actionDTOListToStringList(List&lt;ActionDTO&gt; list) {
+<span class="nc bnc" id="L414" title="All 2 branches missed.">        if ( list == null ) {</span>
+<span class="nc" id="L415">            return null;</span>
+        }
+
+<span class="nc" id="L418">        List&lt;String&gt; list1 = new ArrayList&lt;String&gt;( list.size() );</span>
+<span class="nc bnc" id="L419" title="All 2 branches missed.">        for ( ActionDTO actionDTO : list ) {</span>
+<span class="nc" id="L420">            list1.add( actionDTO.name() );</span>
+<span class="nc" id="L421">        }</span>
+
+<span class="nc" id="L423">        return list1;</span>
+    }
+
+    protected Permission applicationConfigPropertiesRbacRolesInnerPermissionsInnerDTOToPermission(ApplicationConfigPropertiesRbacRolesInnerPermissionsInnerDTO applicationConfigPropertiesRbacRolesInnerPermissionsInnerDTO) {
+<span class="nc bnc" id="L427" title="All 2 branches missed.">        if ( applicationConfigPropertiesRbacRolesInnerPermissionsInnerDTO == null ) {</span>
+<span class="nc" id="L428">            return null;</span>
+        }
+
+<span class="nc" id="L431">        Permission permission = new Permission();</span>
+
+<span class="nc bnc" id="L433" title="All 2 branches missed.">        if ( applicationConfigPropertiesRbacRolesInnerPermissionsInnerDTO.getResource() != null ) {</span>
+<span class="nc" id="L434">            permission.setResource( applicationConfigPropertiesRbacRolesInnerPermissionsInnerDTO.getResource().name() );</span>
+        }
+<span class="nc" id="L436">        permission.setValue( applicationConfigPropertiesRbacRolesInnerPermissionsInnerDTO.getValue() );</span>
+<span class="nc" id="L437">        permission.setActions( actionDTOListToStringList( applicationConfigPropertiesRbacRolesInnerPermissionsInnerDTO.getActions() ) );</span>
+
+<span class="nc" id="L439">        return permission;</span>
+    }
+
+    protected List&lt;Permission&gt; applicationConfigPropertiesRbacRolesInnerPermissionsInnerDTOListToPermissionList(List&lt;ApplicationConfigPropertiesRbacRolesInnerPermissionsInnerDTO&gt; list) {
+<span class="nc bnc" id="L443" title="All 2 branches missed.">        if ( list == null ) {</span>
+<span class="nc" id="L444">            return null;</span>
+        }
+
+<span class="nc" id="L447">        List&lt;Permission&gt; list1 = new ArrayList&lt;Permission&gt;( list.size() );</span>
+<span class="nc bnc" id="L448" title="All 2 branches missed.">        for ( ApplicationConfigPropertiesRbacRolesInnerPermissionsInnerDTO applicationConfigPropertiesRbacRolesInnerPermissionsInnerDTO : list ) {</span>
+<span class="nc" id="L449">            list1.add( applicationConfigPropertiesRbacRolesInnerPermissionsInnerDTOToPermission( applicationConfigPropertiesRbacRolesInnerPermissionsInnerDTO ) );</span>
+<span class="nc" id="L450">        }</span>
+
+<span class="nc" id="L452">        return list1;</span>
+    }
+
+    protected Role applicationConfigPropertiesRbacRolesInnerDTOToRole(ApplicationConfigPropertiesRbacRolesInnerDTO applicationConfigPropertiesRbacRolesInnerDTO) {
+<span class="nc bnc" id="L456" title="All 2 branches missed.">        if ( applicationConfigPropertiesRbacRolesInnerDTO == null ) {</span>
+<span class="nc" id="L457">            return null;</span>
+        }
+
+<span class="nc" id="L460">        Role role = new Role();</span>
+
+<span class="nc" id="L462">        role.setName( applicationConfigPropertiesRbacRolesInnerDTO.getName() );</span>
+<span class="nc" id="L463">        List&lt;String&gt; list = applicationConfigPropertiesRbacRolesInnerDTO.getClusters();</span>
+<span class="nc bnc" id="L464" title="All 2 branches missed.">        if ( list != null ) {</span>
+<span class="nc" id="L465">            role.setClusters( new ArrayList&lt;String&gt;( list ) );</span>
+        }
+<span class="nc" id="L467">        role.setSubjects( applicationConfigPropertiesRbacRolesInnerSubjectsInnerDTOListToSubjectList( applicationConfigPropertiesRbacRolesInnerDTO.getSubjects() ) );</span>
+<span class="nc" id="L468">        role.setPermissions( applicationConfigPropertiesRbacRolesInnerPermissionsInnerDTOListToPermissionList( applicationConfigPropertiesRbacRolesInnerDTO.getPermissions() ) );</span>
+
+<span class="nc" id="L470">        return role;</span>
+    }
+
+    protected List&lt;Role&gt; applicationConfigPropertiesRbacRolesInnerDTOListToRoleList(List&lt;ApplicationConfigPropertiesRbacRolesInnerDTO&gt; list) {
+<span class="nc bnc" id="L474" title="All 2 branches missed.">        if ( list == null ) {</span>
+<span class="nc" id="L475">            return null;</span>
+        }
+
+<span class="nc" id="L478">        List&lt;Role&gt; list1 = new ArrayList&lt;Role&gt;( list.size() );</span>
+<span class="nc bnc" id="L479" title="All 2 branches missed.">        for ( ApplicationConfigPropertiesRbacRolesInnerDTO applicationConfigPropertiesRbacRolesInnerDTO : list ) {</span>
+<span class="nc" id="L480">            list1.add( applicationConfigPropertiesRbacRolesInnerDTOToRole( applicationConfigPropertiesRbacRolesInnerDTO ) );</span>
+<span class="nc" id="L481">        }</span>
+
+<span class="nc" id="L483">        return list1;</span>
+    }
+
+    protected RoleBasedAccessControlProperties applicationConfigPropertiesRbacDTOToRoleBasedAccessControlProperties(ApplicationConfigPropertiesRbacDTO applicationConfigPropertiesRbacDTO) {
+<span class="nc bnc" id="L487" title="All 2 branches missed.">        if ( applicationConfigPropertiesRbacDTO == null ) {</span>
+<span class="nc" id="L488">            return null;</span>
+        }
+
+<span class="nc" id="L491">        RoleBasedAccessControlProperties roleBasedAccessControlProperties = new RoleBasedAccessControlProperties();</span>
+
+<span class="nc bnc" id="L493" title="All 2 branches missed.">        if ( roleBasedAccessControlProperties.getRoles() != null ) {</span>
+<span class="nc" id="L494">            List&lt;Role&gt; list = applicationConfigPropertiesRbacRolesInnerDTOListToRoleList( applicationConfigPropertiesRbacDTO.getRoles() );</span>
+<span class="nc bnc" id="L495" title="All 2 branches missed.">            if ( list != null ) {</span>
+<span class="nc" id="L496">                roleBasedAccessControlProperties.getRoles().addAll( list );</span>
+            }
+        }
+
+<span class="nc" id="L500">        return roleBasedAccessControlProperties;</span>
+    }
+
+    protected OAuthProperties.OAuth2Provider applicationConfigPropertiesAuthOauth2ClientValueDTOToOAuth2Provider(ApplicationConfigPropertiesAuthOauth2ClientValueDTO applicationConfigPropertiesAuthOauth2ClientValueDTO) {
+<span class="nc bnc" id="L504" title="All 2 branches missed.">        if ( applicationConfigPropertiesAuthOauth2ClientValueDTO == null ) {</span>
+<span class="nc" id="L505">            return null;</span>
+        }
+
+<span class="nc" id="L508">        OAuthProperties.OAuth2Provider oAuth2Provider = new OAuthProperties.OAuth2Provider();</span>
+
+<span class="nc" id="L510">        oAuth2Provider.setProvider( applicationConfigPropertiesAuthOauth2ClientValueDTO.getProvider() );</span>
+<span class="nc" id="L511">        oAuth2Provider.setClientId( applicationConfigPropertiesAuthOauth2ClientValueDTO.getClientId() );</span>
+<span class="nc" id="L512">        oAuth2Provider.setClientSecret( applicationConfigPropertiesAuthOauth2ClientValueDTO.getClientSecret() );</span>
+<span class="nc" id="L513">        oAuth2Provider.setClientName( applicationConfigPropertiesAuthOauth2ClientValueDTO.getClientName() );</span>
+<span class="nc" id="L514">        oAuth2Provider.setRedirectUri( applicationConfigPropertiesAuthOauth2ClientValueDTO.getRedirectUri() );</span>
+<span class="nc" id="L515">        oAuth2Provider.setAuthorizationGrantType( applicationConfigPropertiesAuthOauth2ClientValueDTO.getAuthorizationGrantType() );</span>
+<span class="nc" id="L516">        List&lt;String&gt; list = applicationConfigPropertiesAuthOauth2ClientValueDTO.getScope();</span>
+<span class="nc bnc" id="L517" title="All 2 branches missed.">        if ( list != null ) {</span>
+<span class="nc" id="L518">            oAuth2Provider.setScope( new LinkedHashSet&lt;String&gt;( list ) );</span>
+        }
+<span class="nc" id="L520">        oAuth2Provider.setIssuerUri( applicationConfigPropertiesAuthOauth2ClientValueDTO.getIssuerUri() );</span>
+<span class="nc" id="L521">        oAuth2Provider.setAuthorizationUri( applicationConfigPropertiesAuthOauth2ClientValueDTO.getAuthorizationUri() );</span>
+<span class="nc" id="L522">        oAuth2Provider.setTokenUri( applicationConfigPropertiesAuthOauth2ClientValueDTO.getTokenUri() );</span>
+<span class="nc" id="L523">        oAuth2Provider.setUserInfoUri( applicationConfigPropertiesAuthOauth2ClientValueDTO.getUserInfoUri() );</span>
+<span class="nc" id="L524">        oAuth2Provider.setJwkSetUri( applicationConfigPropertiesAuthOauth2ClientValueDTO.getJwkSetUri() );</span>
+<span class="nc" id="L525">        oAuth2Provider.setUserNameAttribute( applicationConfigPropertiesAuthOauth2ClientValueDTO.getUserNameAttribute() );</span>
+<span class="nc" id="L526">        Map&lt;String, String&gt; map = applicationConfigPropertiesAuthOauth2ClientValueDTO.getCustomParams();</span>
+<span class="nc bnc" id="L527" title="All 2 branches missed.">        if ( map != null ) {</span>
+<span class="nc" id="L528">            oAuth2Provider.setCustomParams( new LinkedHashMap&lt;String, String&gt;( map ) );</span>
+        }
+
+<span class="nc" id="L531">        return oAuth2Provider;</span>
+    }
+
+    protected Map&lt;String, OAuthProperties.OAuth2Provider&gt; stringApplicationConfigPropertiesAuthOauth2ClientValueDTOMapToStringOAuth2ProviderMap(Map&lt;String, ApplicationConfigPropertiesAuthOauth2ClientValueDTO&gt; map) {
+<span class="nc bnc" id="L535" title="All 2 branches missed.">        if ( map == null ) {</span>
+<span class="nc" id="L536">            return null;</span>
+        }
+
+<span class="nc" id="L539">        Map&lt;String, OAuthProperties.OAuth2Provider&gt; map1 = new LinkedHashMap&lt;String, OAuthProperties.OAuth2Provider&gt;( Math.max( (int) ( map.size() / .75f ) + 1, 16 ) );</span>
+
+<span class="nc bnc" id="L541" title="All 2 branches missed.">        for ( java.util.Map.Entry&lt;String, ApplicationConfigPropertiesAuthOauth2ClientValueDTO&gt; entry : map.entrySet() ) {</span>
+<span class="nc" id="L542">            String key = entry.getKey();</span>
+<span class="nc" id="L543">            OAuthProperties.OAuth2Provider value = applicationConfigPropertiesAuthOauth2ClientValueDTOToOAuth2Provider( entry.getValue() );</span>
+<span class="nc" id="L544">            map1.put( key, value );</span>
+<span class="nc" id="L545">        }</span>
+
+<span class="nc" id="L547">        return map1;</span>
+    }
+
+    protected OAuthProperties applicationConfigPropertiesAuthOauth2DTOToOAuthProperties(ApplicationConfigPropertiesAuthOauth2DTO applicationConfigPropertiesAuthOauth2DTO) {
+<span class="nc bnc" id="L551" title="All 2 branches missed.">        if ( applicationConfigPropertiesAuthOauth2DTO == null ) {</span>
+<span class="nc" id="L552">            return null;</span>
+        }
+
+<span class="nc" id="L555">        OAuthProperties oAuthProperties = new OAuthProperties();</span>
+
+<span class="nc" id="L557">        oAuthProperties.setClient( stringApplicationConfigPropertiesAuthOauth2ClientValueDTOMapToStringOAuth2ProviderMap( applicationConfigPropertiesAuthOauth2DTO.getClient() ) );</span>
+
+<span class="nc" id="L559">        return oAuthProperties;</span>
+    }
+
+    protected DynamicConfigOperations.PropertiesStructure.Auth applicationConfigPropertiesAuthDTOToAuth(ApplicationConfigPropertiesAuthDTO applicationConfigPropertiesAuthDTO) {
+<span class="nc bnc" id="L563" title="All 2 branches missed.">        if ( applicationConfigPropertiesAuthDTO == null ) {</span>
+<span class="nc" id="L564">            return null;</span>
+        }
+
+<span class="nc" id="L567">        DynamicConfigOperations.PropertiesStructure.Auth.AuthBuilder auth = DynamicConfigOperations.PropertiesStructure.Auth.builder();</span>
+
+<span class="nc" id="L569">        auth.type( applicationConfigPropertiesAuthDTO.getType() );</span>
+<span class="nc" id="L570">        auth.oauth2( applicationConfigPropertiesAuthOauth2DTOToOAuthProperties( applicationConfigPropertiesAuthDTO.getOauth2() ) );</span>
+
+<span class="nc" id="L572">        return auth.build();</span>
+    }
+
+    protected WebclientProperties applicationConfigPropertiesWebclientDTOToWebclientProperties(ApplicationConfigPropertiesWebclientDTO applicationConfigPropertiesWebclientDTO) {
+<span class="nc bnc" id="L576" title="All 2 branches missed.">        if ( applicationConfigPropertiesWebclientDTO == null ) {</span>
+<span class="nc" id="L577">            return null;</span>
+        }
+
+<span class="nc" id="L580">        WebclientProperties webclientProperties = new WebclientProperties();</span>
+
+<span class="nc" id="L582">        webclientProperties.setMaxInMemoryBufferSize( applicationConfigPropertiesWebclientDTO.getMaxInMemoryBufferSize() );</span>
+
+<span class="nc" id="L584">        return webclientProperties;</span>
+    }
+
+    protected ApplicationConfigPropertiesAuthOauth2ClientValueDTO oAuth2ProviderToApplicationConfigPropertiesAuthOauth2ClientValueDTO(OAuthProperties.OAuth2Provider oAuth2Provider) {
+<span class="nc bnc" id="L588" title="All 2 branches missed.">        if ( oAuth2Provider == null ) {</span>
+<span class="nc" id="L589">            return null;</span>
+        }
+
+<span class="nc" id="L592">        ApplicationConfigPropertiesAuthOauth2ClientValueDTO applicationConfigPropertiesAuthOauth2ClientValueDTO = new ApplicationConfigPropertiesAuthOauth2ClientValueDTO();</span>
+
+<span class="nc" id="L594">        applicationConfigPropertiesAuthOauth2ClientValueDTO.setProvider( oAuth2Provider.getProvider() );</span>
+<span class="nc" id="L595">        applicationConfigPropertiesAuthOauth2ClientValueDTO.setClientId( oAuth2Provider.getClientId() );</span>
+<span class="nc" id="L596">        applicationConfigPropertiesAuthOauth2ClientValueDTO.setClientSecret( oAuth2Provider.getClientSecret() );</span>
+<span class="nc" id="L597">        applicationConfigPropertiesAuthOauth2ClientValueDTO.setClientName( oAuth2Provider.getClientName() );</span>
+<span class="nc" id="L598">        applicationConfigPropertiesAuthOauth2ClientValueDTO.setRedirectUri( oAuth2Provider.getRedirectUri() );</span>
+<span class="nc" id="L599">        applicationConfigPropertiesAuthOauth2ClientValueDTO.setAuthorizationGrantType( oAuth2Provider.getAuthorizationGrantType() );</span>
+<span class="nc" id="L600">        applicationConfigPropertiesAuthOauth2ClientValueDTO.setIssuerUri( oAuth2Provider.getIssuerUri() );</span>
+<span class="nc" id="L601">        applicationConfigPropertiesAuthOauth2ClientValueDTO.setAuthorizationUri( oAuth2Provider.getAuthorizationUri() );</span>
+<span class="nc" id="L602">        applicationConfigPropertiesAuthOauth2ClientValueDTO.setTokenUri( oAuth2Provider.getTokenUri() );</span>
+<span class="nc" id="L603">        applicationConfigPropertiesAuthOauth2ClientValueDTO.setUserInfoUri( oAuth2Provider.getUserInfoUri() );</span>
+<span class="nc" id="L604">        applicationConfigPropertiesAuthOauth2ClientValueDTO.setJwkSetUri( oAuth2Provider.getJwkSetUri() );</span>
+<span class="nc" id="L605">        applicationConfigPropertiesAuthOauth2ClientValueDTO.setUserNameAttribute( oAuth2Provider.getUserNameAttribute() );</span>
+<span class="nc" id="L606">        Set&lt;String&gt; set = oAuth2Provider.getScope();</span>
+<span class="nc bnc" id="L607" title="All 2 branches missed.">        if ( set != null ) {</span>
+<span class="nc" id="L608">            applicationConfigPropertiesAuthOauth2ClientValueDTO.setScope( new ArrayList&lt;String&gt;( set ) );</span>
+        }
+<span class="nc" id="L610">        Map&lt;String, String&gt; map = oAuth2Provider.getCustomParams();</span>
+<span class="nc bnc" id="L611" title="All 2 branches missed.">        if ( map != null ) {</span>
+<span class="nc" id="L612">            applicationConfigPropertiesAuthOauth2ClientValueDTO.setCustomParams( new LinkedHashMap&lt;String, String&gt;( map ) );</span>
+        }
+
+<span class="nc" id="L615">        return applicationConfigPropertiesAuthOauth2ClientValueDTO;</span>
+    }
+
+    protected Map&lt;String, ApplicationConfigPropertiesAuthOauth2ClientValueDTO&gt; stringOAuth2ProviderMapToStringApplicationConfigPropertiesAuthOauth2ClientValueDTOMap(Map&lt;String, OAuthProperties.OAuth2Provider&gt; map) {
+<span class="nc bnc" id="L619" title="All 2 branches missed.">        if ( map == null ) {</span>
+<span class="nc" id="L620">            return null;</span>
+        }
+
+<span class="nc" id="L623">        Map&lt;String, ApplicationConfigPropertiesAuthOauth2ClientValueDTO&gt; map1 = new LinkedHashMap&lt;String, ApplicationConfigPropertiesAuthOauth2ClientValueDTO&gt;( Math.max( (int) ( map.size() / .75f ) + 1, 16 ) );</span>
+
+<span class="nc bnc" id="L625" title="All 2 branches missed.">        for ( java.util.Map.Entry&lt;String, OAuthProperties.OAuth2Provider&gt; entry : map.entrySet() ) {</span>
+<span class="nc" id="L626">            String key = entry.getKey();</span>
+<span class="nc" id="L627">            ApplicationConfigPropertiesAuthOauth2ClientValueDTO value = oAuth2ProviderToApplicationConfigPropertiesAuthOauth2ClientValueDTO( entry.getValue() );</span>
+<span class="nc" id="L628">            map1.put( key, value );</span>
+<span class="nc" id="L629">        }</span>
+
+<span class="nc" id="L631">        return map1;</span>
+    }
+
+    protected ApplicationConfigPropertiesAuthOauth2DTO oAuthPropertiesToApplicationConfigPropertiesAuthOauth2DTO(OAuthProperties oAuthProperties) {
+<span class="nc bnc" id="L635" title="All 2 branches missed.">        if ( oAuthProperties == null ) {</span>
+<span class="nc" id="L636">            return null;</span>
+        }
+
+<span class="nc" id="L639">        ApplicationConfigPropertiesAuthOauth2DTO applicationConfigPropertiesAuthOauth2DTO = new ApplicationConfigPropertiesAuthOauth2DTO();</span>
+
+<span class="nc" id="L641">        applicationConfigPropertiesAuthOauth2DTO.setClient( stringOAuth2ProviderMapToStringApplicationConfigPropertiesAuthOauth2ClientValueDTOMap( oAuthProperties.getClient() ) );</span>
+
+<span class="nc" id="L643">        return applicationConfigPropertiesAuthOauth2DTO;</span>
+    }
+
+    protected ApplicationConfigPropertiesAuthDTO authToApplicationConfigPropertiesAuthDTO(DynamicConfigOperations.PropertiesStructure.Auth auth) {
+<span class="nc bnc" id="L647" title="All 2 branches missed.">        if ( auth == null ) {</span>
+<span class="nc" id="L648">            return null;</span>
+        }
+
+<span class="nc" id="L651">        ApplicationConfigPropertiesAuthDTO applicationConfigPropertiesAuthDTO = new ApplicationConfigPropertiesAuthDTO();</span>
+
+<span class="nc" id="L653">        applicationConfigPropertiesAuthDTO.setType( auth.getType() );</span>
+<span class="nc" id="L654">        applicationConfigPropertiesAuthDTO.setOauth2( oAuthPropertiesToApplicationConfigPropertiesAuthOauth2DTO( auth.getOauth2() ) );</span>
+
+<span class="nc" id="L656">        return applicationConfigPropertiesAuthDTO;</span>
+    }
+
+    protected ApplicationConfigPropertiesRbacRolesInnerSubjectsInnerDTO subjectToApplicationConfigPropertiesRbacRolesInnerSubjectsInnerDTO(Subject subject) {
+<span class="nc bnc" id="L660" title="All 2 branches missed.">        if ( subject == null ) {</span>
+<span class="nc" id="L661">            return null;</span>
+        }
+
+<span class="nc" id="L664">        ApplicationConfigPropertiesRbacRolesInnerSubjectsInnerDTO applicationConfigPropertiesRbacRolesInnerSubjectsInnerDTO = new ApplicationConfigPropertiesRbacRolesInnerSubjectsInnerDTO();</span>
+
+<span class="nc bnc" id="L666" title="All 2 branches missed.">        if ( subject.getProvider() != null ) {</span>
+<span class="nc" id="L667">            applicationConfigPropertiesRbacRolesInnerSubjectsInnerDTO.setProvider( subject.getProvider().name() );</span>
+        }
+<span class="nc" id="L669">        applicationConfigPropertiesRbacRolesInnerSubjectsInnerDTO.setType( subject.getType() );</span>
+<span class="nc" id="L670">        applicationConfigPropertiesRbacRolesInnerSubjectsInnerDTO.setValue( subject.getValue() );</span>
+
+<span class="nc" id="L672">        return applicationConfigPropertiesRbacRolesInnerSubjectsInnerDTO;</span>
+    }
+
+    protected List&lt;ApplicationConfigPropertiesRbacRolesInnerSubjectsInnerDTO&gt; subjectListToApplicationConfigPropertiesRbacRolesInnerSubjectsInnerDTOList(List&lt;Subject&gt; list) {
+<span class="nc bnc" id="L676" title="All 2 branches missed.">        if ( list == null ) {</span>
+<span class="nc" id="L677">            return null;</span>
+        }
+
+<span class="nc" id="L680">        List&lt;ApplicationConfigPropertiesRbacRolesInnerSubjectsInnerDTO&gt; list1 = new ArrayList&lt;ApplicationConfigPropertiesRbacRolesInnerSubjectsInnerDTO&gt;( list.size() );</span>
+<span class="nc bnc" id="L681" title="All 2 branches missed.">        for ( Subject subject : list ) {</span>
+<span class="nc" id="L682">            list1.add( subjectToApplicationConfigPropertiesRbacRolesInnerSubjectsInnerDTO( subject ) );</span>
+<span class="nc" id="L683">        }</span>
+
+<span class="nc" id="L685">        return list1;</span>
+    }
+
+    protected ResourceTypeDTO resourceToResourceTypeDTO(Resource resource) {
+<span class="nc bnc" id="L689" title="All 2 branches missed.">        if ( resource == null ) {</span>
+<span class="nc" id="L690">            return null;</span>
+        }
+
+        ResourceTypeDTO resourceTypeDTO;
+
+<span class="nc bnc" id="L695" title="All 10 branches missed.">        switch ( resource ) {</span>
+<span class="nc" id="L696">            case APPLICATIONCONFIG: resourceTypeDTO = ResourceTypeDTO.APPLICATIONCONFIG;</span>
+<span class="nc" id="L697">            break;</span>
+<span class="nc" id="L698">            case CLUSTERCONFIG: resourceTypeDTO = ResourceTypeDTO.CLUSTERCONFIG;</span>
+<span class="nc" id="L699">            break;</span>
+<span class="nc" id="L700">            case TOPIC: resourceTypeDTO = ResourceTypeDTO.TOPIC;</span>
+<span class="nc" id="L701">            break;</span>
+<span class="nc" id="L702">            case CONSUMER: resourceTypeDTO = ResourceTypeDTO.CONSUMER;</span>
+<span class="nc" id="L703">            break;</span>
+<span class="nc" id="L704">            case SCHEMA: resourceTypeDTO = ResourceTypeDTO.SCHEMA;</span>
+<span class="nc" id="L705">            break;</span>
+<span class="nc" id="L706">            case CONNECT: resourceTypeDTO = ResourceTypeDTO.CONNECT;</span>
+<span class="nc" id="L707">            break;</span>
+<span class="nc" id="L708">            case KSQL: resourceTypeDTO = ResourceTypeDTO.KSQL;</span>
+<span class="nc" id="L709">            break;</span>
+<span class="nc" id="L710">            case ACL: resourceTypeDTO = ResourceTypeDTO.ACL;</span>
+<span class="nc" id="L711">            break;</span>
+<span class="nc" id="L712">            case AUDIT: resourceTypeDTO = ResourceTypeDTO.AUDIT;</span>
+<span class="nc" id="L713">            break;</span>
+<span class="nc" id="L714">            default: throw new IllegalArgumentException( &quot;Unexpected enum constant: &quot; + resource );</span>
+        }
+
+<span class="nc" id="L717">        return resourceTypeDTO;</span>
+    }
+
+    protected List&lt;ActionDTO&gt; stringListToActionDTOList(List&lt;String&gt; list) {
+<span class="nc bnc" id="L721" title="All 2 branches missed.">        if ( list == null ) {</span>
+<span class="nc" id="L722">            return null;</span>
+        }
+
+<span class="nc" id="L725">        List&lt;ActionDTO&gt; list1 = new ArrayList&lt;ActionDTO&gt;( list.size() );</span>
+<span class="nc bnc" id="L726" title="All 2 branches missed.">        for ( String string : list ) {</span>
+<span class="nc" id="L727">            list1.add( Enum.valueOf( ActionDTO.class, string ) );</span>
+<span class="nc" id="L728">        }</span>
+
+<span class="nc" id="L730">        return list1;</span>
+    }
+
+    protected ApplicationConfigPropertiesRbacRolesInnerPermissionsInnerDTO permissionToApplicationConfigPropertiesRbacRolesInnerPermissionsInnerDTO(Permission permission) {
+<span class="nc bnc" id="L734" title="All 2 branches missed.">        if ( permission == null ) {</span>
+<span class="nc" id="L735">            return null;</span>
+        }
+
+<span class="nc" id="L738">        ApplicationConfigPropertiesRbacRolesInnerPermissionsInnerDTO applicationConfigPropertiesRbacRolesInnerPermissionsInnerDTO = new ApplicationConfigPropertiesRbacRolesInnerPermissionsInnerDTO();</span>
+
+<span class="nc" id="L740">        applicationConfigPropertiesRbacRolesInnerPermissionsInnerDTO.setResource( resourceToResourceTypeDTO( permission.getResource() ) );</span>
+<span class="nc" id="L741">        applicationConfigPropertiesRbacRolesInnerPermissionsInnerDTO.setValue( permission.getValue() );</span>
+<span class="nc" id="L742">        applicationConfigPropertiesRbacRolesInnerPermissionsInnerDTO.setActions( stringListToActionDTOList( permission.getActions() ) );</span>
+
+<span class="nc" id="L744">        return applicationConfigPropertiesRbacRolesInnerPermissionsInnerDTO;</span>
+    }
+
+    protected List&lt;ApplicationConfigPropertiesRbacRolesInnerPermissionsInnerDTO&gt; permissionListToApplicationConfigPropertiesRbacRolesInnerPermissionsInnerDTOList(List&lt;Permission&gt; list) {
+<span class="nc bnc" id="L748" title="All 2 branches missed.">        if ( list == null ) {</span>
+<span class="nc" id="L749">            return null;</span>
+        }
+
+<span class="nc" id="L752">        List&lt;ApplicationConfigPropertiesRbacRolesInnerPermissionsInnerDTO&gt; list1 = new ArrayList&lt;ApplicationConfigPropertiesRbacRolesInnerPermissionsInnerDTO&gt;( list.size() );</span>
+<span class="nc bnc" id="L753" title="All 2 branches missed.">        for ( Permission permission : list ) {</span>
+<span class="nc" id="L754">            list1.add( permissionToApplicationConfigPropertiesRbacRolesInnerPermissionsInnerDTO( permission ) );</span>
+<span class="nc" id="L755">        }</span>
+
+<span class="nc" id="L757">        return list1;</span>
+    }
+
+    protected ApplicationConfigPropertiesRbacRolesInnerDTO roleToApplicationConfigPropertiesRbacRolesInnerDTO(Role role) {
+<span class="nc bnc" id="L761" title="All 2 branches missed.">        if ( role == null ) {</span>
+<span class="nc" id="L762">            return null;</span>
+        }
+
+<span class="nc" id="L765">        ApplicationConfigPropertiesRbacRolesInnerDTO applicationConfigPropertiesRbacRolesInnerDTO = new ApplicationConfigPropertiesRbacRolesInnerDTO();</span>
+
+<span class="nc" id="L767">        applicationConfigPropertiesRbacRolesInnerDTO.setName( role.getName() );</span>
+<span class="nc" id="L768">        List&lt;String&gt; list = role.getClusters();</span>
+<span class="nc bnc" id="L769" title="All 2 branches missed.">        if ( list != null ) {</span>
+<span class="nc" id="L770">            applicationConfigPropertiesRbacRolesInnerDTO.setClusters( new ArrayList&lt;String&gt;( list ) );</span>
+        }
+<span class="nc" id="L772">        applicationConfigPropertiesRbacRolesInnerDTO.setSubjects( subjectListToApplicationConfigPropertiesRbacRolesInnerSubjectsInnerDTOList( role.getSubjects() ) );</span>
+<span class="nc" id="L773">        applicationConfigPropertiesRbacRolesInnerDTO.setPermissions( permissionListToApplicationConfigPropertiesRbacRolesInnerPermissionsInnerDTOList( role.getPermissions() ) );</span>
+
+<span class="nc" id="L775">        return applicationConfigPropertiesRbacRolesInnerDTO;</span>
+    }
+
+    protected List&lt;ApplicationConfigPropertiesRbacRolesInnerDTO&gt; roleListToApplicationConfigPropertiesRbacRolesInnerDTOList(List&lt;Role&gt; list) {
+<span class="nc bnc" id="L779" title="All 2 branches missed.">        if ( list == null ) {</span>
+<span class="nc" id="L780">            return null;</span>
+        }
+
+<span class="nc" id="L783">        List&lt;ApplicationConfigPropertiesRbacRolesInnerDTO&gt; list1 = new ArrayList&lt;ApplicationConfigPropertiesRbacRolesInnerDTO&gt;( list.size() );</span>
+<span class="nc bnc" id="L784" title="All 2 branches missed.">        for ( Role role : list ) {</span>
+<span class="nc" id="L785">            list1.add( roleToApplicationConfigPropertiesRbacRolesInnerDTO( role ) );</span>
+<span class="nc" id="L786">        }</span>
+
+<span class="nc" id="L788">        return list1;</span>
+    }
+
+    protected ApplicationConfigPropertiesRbacDTO roleBasedAccessControlPropertiesToApplicationConfigPropertiesRbacDTO(RoleBasedAccessControlProperties roleBasedAccessControlProperties) {
+<span class="nc bnc" id="L792" title="All 2 branches missed.">        if ( roleBasedAccessControlProperties == null ) {</span>
+<span class="nc" id="L793">            return null;</span>
+        }
+
+<span class="nc" id="L796">        ApplicationConfigPropertiesRbacDTO applicationConfigPropertiesRbacDTO = new ApplicationConfigPropertiesRbacDTO();</span>
+
+<span class="nc" id="L798">        applicationConfigPropertiesRbacDTO.setRoles( roleListToApplicationConfigPropertiesRbacRolesInnerDTOList( roleBasedAccessControlProperties.getRoles() ) );</span>
+
+<span class="nc" id="L800">        return applicationConfigPropertiesRbacDTO;</span>
+    }
+
+    protected ApplicationConfigPropertiesWebclientDTO webclientPropertiesToApplicationConfigPropertiesWebclientDTO(WebclientProperties webclientProperties) {
+<span class="nc bnc" id="L804" title="All 2 branches missed.">        if ( webclientProperties == null ) {</span>
+<span class="nc" id="L805">            return null;</span>
+        }
+
+<span class="nc" id="L808">        ApplicationConfigPropertiesWebclientDTO applicationConfigPropertiesWebclientDTO = new ApplicationConfigPropertiesWebclientDTO();</span>
+
+<span class="nc" id="L810">        applicationConfigPropertiesWebclientDTO.setMaxInMemoryBufferSize( webclientProperties.getMaxInMemoryBufferSize() );</span>
+
+<span class="nc" id="L812">        return applicationConfigPropertiesWebclientDTO;</span>
+    }
+
+    protected ApplicationConfigPropertiesKafkaPollingDTO pollingPropertiesToApplicationConfigPropertiesKafkaPollingDTO(ClustersProperties.PollingProperties pollingProperties) {
+<span class="nc bnc" id="L816" title="All 2 branches missed.">        if ( pollingProperties == null ) {</span>
+<span class="nc" id="L817">            return null;</span>
+        }
+
+<span class="nc" id="L820">        ApplicationConfigPropertiesKafkaPollingDTO applicationConfigPropertiesKafkaPollingDTO = new ApplicationConfigPropertiesKafkaPollingDTO();</span>
+
+<span class="nc" id="L822">        applicationConfigPropertiesKafkaPollingDTO.setPollTimeoutMs( pollingProperties.getPollTimeoutMs() );</span>
+<span class="nc" id="L823">        applicationConfigPropertiesKafkaPollingDTO.setMaxPageSize( pollingProperties.getMaxPageSize() );</span>
+<span class="nc" id="L824">        applicationConfigPropertiesKafkaPollingDTO.setDefaultPageSize( pollingProperties.getDefaultPageSize() );</span>
+
+<span class="nc" id="L826">        return applicationConfigPropertiesKafkaPollingDTO;</span>
+    }
+
+    protected ApplicationConfigPropertiesKafkaClustersInnerSslDTO truststoreConfigToApplicationConfigPropertiesKafkaClustersInnerSslDTO(ClustersProperties.TruststoreConfig truststoreConfig) {
+<span class="nc bnc" id="L830" title="All 2 branches missed.">        if ( truststoreConfig == null ) {</span>
+<span class="nc" id="L831">            return null;</span>
+        }
+
+<span class="nc" id="L834">        ApplicationConfigPropertiesKafkaClustersInnerSslDTO applicationConfigPropertiesKafkaClustersInnerSslDTO = new ApplicationConfigPropertiesKafkaClustersInnerSslDTO();</span>
+
+<span class="nc" id="L836">        applicationConfigPropertiesKafkaClustersInnerSslDTO.setTruststoreLocation( truststoreConfig.getTruststoreLocation() );</span>
+<span class="nc" id="L837">        applicationConfigPropertiesKafkaClustersInnerSslDTO.setTruststorePassword( truststoreConfig.getTruststorePassword() );</span>
+
+<span class="nc" id="L839">        return applicationConfigPropertiesKafkaClustersInnerSslDTO;</span>
+    }
+
+    protected ApplicationConfigPropertiesKafkaClustersInnerSchemaRegistryAuthDTO schemaRegistryAuthToApplicationConfigPropertiesKafkaClustersInnerSchemaRegistryAuthDTO(ClustersProperties.SchemaRegistryAuth schemaRegistryAuth) {
+<span class="nc bnc" id="L843" title="All 2 branches missed.">        if ( schemaRegistryAuth == null ) {</span>
+<span class="nc" id="L844">            return null;</span>
+        }
+
+<span class="nc" id="L847">        ApplicationConfigPropertiesKafkaClustersInnerSchemaRegistryAuthDTO applicationConfigPropertiesKafkaClustersInnerSchemaRegistryAuthDTO = new ApplicationConfigPropertiesKafkaClustersInnerSchemaRegistryAuthDTO();</span>
+
+<span class="nc" id="L849">        applicationConfigPropertiesKafkaClustersInnerSchemaRegistryAuthDTO.setUsername( schemaRegistryAuth.getUsername() );</span>
+<span class="nc" id="L850">        applicationConfigPropertiesKafkaClustersInnerSchemaRegistryAuthDTO.setPassword( schemaRegistryAuth.getPassword() );</span>
+
+<span class="nc" id="L852">        return applicationConfigPropertiesKafkaClustersInnerSchemaRegistryAuthDTO;</span>
+    }
+
+    protected ApplicationConfigPropertiesKafkaClustersInnerSchemaRegistrySslDTO keystoreConfigToApplicationConfigPropertiesKafkaClustersInnerSchemaRegistrySslDTO(ClustersProperties.KeystoreConfig keystoreConfig) {
+<span class="nc bnc" id="L856" title="All 2 branches missed.">        if ( keystoreConfig == null ) {</span>
+<span class="nc" id="L857">            return null;</span>
+        }
+
+<span class="nc" id="L860">        ApplicationConfigPropertiesKafkaClustersInnerSchemaRegistrySslDTO applicationConfigPropertiesKafkaClustersInnerSchemaRegistrySslDTO = new ApplicationConfigPropertiesKafkaClustersInnerSchemaRegistrySslDTO();</span>
+
+<span class="nc" id="L862">        applicationConfigPropertiesKafkaClustersInnerSchemaRegistrySslDTO.setKeystoreLocation( keystoreConfig.getKeystoreLocation() );</span>
+<span class="nc" id="L863">        applicationConfigPropertiesKafkaClustersInnerSchemaRegistrySslDTO.setKeystorePassword( keystoreConfig.getKeystorePassword() );</span>
+
+<span class="nc" id="L865">        return applicationConfigPropertiesKafkaClustersInnerSchemaRegistrySslDTO;</span>
+    }
+
+    protected ApplicationConfigPropertiesKafkaClustersInnerSchemaRegistryAuthDTO ksqldbServerAuthToApplicationConfigPropertiesKafkaClustersInnerSchemaRegistryAuthDTO(ClustersProperties.KsqldbServerAuth ksqldbServerAuth) {
+<span class="nc bnc" id="L869" title="All 2 branches missed.">        if ( ksqldbServerAuth == null ) {</span>
+<span class="nc" id="L870">            return null;</span>
+        }
+
+<span class="nc" id="L873">        ApplicationConfigPropertiesKafkaClustersInnerSchemaRegistryAuthDTO applicationConfigPropertiesKafkaClustersInnerSchemaRegistryAuthDTO = new ApplicationConfigPropertiesKafkaClustersInnerSchemaRegistryAuthDTO();</span>
+
+<span class="nc" id="L875">        applicationConfigPropertiesKafkaClustersInnerSchemaRegistryAuthDTO.setUsername( ksqldbServerAuth.getUsername() );</span>
+<span class="nc" id="L876">        applicationConfigPropertiesKafkaClustersInnerSchemaRegistryAuthDTO.setPassword( ksqldbServerAuth.getPassword() );</span>
+
+<span class="nc" id="L878">        return applicationConfigPropertiesKafkaClustersInnerSchemaRegistryAuthDTO;</span>
+    }
+
+    protected ApplicationConfigPropertiesKafkaClustersInnerKafkaConnectInnerDTO connectClusterToApplicationConfigPropertiesKafkaClustersInnerKafkaConnectInnerDTO(ClustersProperties.ConnectCluster connectCluster) {
+<span class="nc bnc" id="L882" title="All 2 branches missed.">        if ( connectCluster == null ) {</span>
+<span class="nc" id="L883">            return null;</span>
+        }
+
+<span class="nc" id="L886">        ApplicationConfigPropertiesKafkaClustersInnerKafkaConnectInnerDTO applicationConfigPropertiesKafkaClustersInnerKafkaConnectInnerDTO = new ApplicationConfigPropertiesKafkaClustersInnerKafkaConnectInnerDTO();</span>
+
+<span class="nc" id="L888">        applicationConfigPropertiesKafkaClustersInnerKafkaConnectInnerDTO.setName( connectCluster.getName() );</span>
+<span class="nc" id="L889">        applicationConfigPropertiesKafkaClustersInnerKafkaConnectInnerDTO.setAddress( connectCluster.getAddress() );</span>
+<span class="nc" id="L890">        applicationConfigPropertiesKafkaClustersInnerKafkaConnectInnerDTO.setUsername( connectCluster.getUsername() );</span>
+<span class="nc" id="L891">        applicationConfigPropertiesKafkaClustersInnerKafkaConnectInnerDTO.setPassword( connectCluster.getPassword() );</span>
+<span class="nc" id="L892">        applicationConfigPropertiesKafkaClustersInnerKafkaConnectInnerDTO.setKeystoreLocation( connectCluster.getKeystoreLocation() );</span>
+<span class="nc" id="L893">        applicationConfigPropertiesKafkaClustersInnerKafkaConnectInnerDTO.setKeystorePassword( connectCluster.getKeystorePassword() );</span>
+
+<span class="nc" id="L895">        return applicationConfigPropertiesKafkaClustersInnerKafkaConnectInnerDTO;</span>
+    }
+
+    protected List&lt;ApplicationConfigPropertiesKafkaClustersInnerKafkaConnectInnerDTO&gt; connectClusterListToApplicationConfigPropertiesKafkaClustersInnerKafkaConnectInnerDTOList(List&lt;ClustersProperties.ConnectCluster&gt; list) {
+<span class="nc bnc" id="L899" title="All 2 branches missed.">        if ( list == null ) {</span>
+<span class="nc" id="L900">            return null;</span>
+        }
+
+<span class="nc" id="L903">        List&lt;ApplicationConfigPropertiesKafkaClustersInnerKafkaConnectInnerDTO&gt; list1 = new ArrayList&lt;ApplicationConfigPropertiesKafkaClustersInnerKafkaConnectInnerDTO&gt;( list.size() );</span>
+<span class="nc bnc" id="L904" title="All 2 branches missed.">        for ( ClustersProperties.ConnectCluster connectCluster : list ) {</span>
+<span class="nc" id="L905">            list1.add( connectClusterToApplicationConfigPropertiesKafkaClustersInnerKafkaConnectInnerDTO( connectCluster ) );</span>
+<span class="nc" id="L906">        }</span>
+
+<span class="nc" id="L908">        return list1;</span>
+    }
+
+    protected ApplicationConfigPropertiesKafkaClustersInnerMetricsDTO metricsConfigDataToApplicationConfigPropertiesKafkaClustersInnerMetricsDTO(ClustersProperties.MetricsConfigData metricsConfigData) {
+<span class="nc bnc" id="L912" title="All 2 branches missed.">        if ( metricsConfigData == null ) {</span>
+<span class="nc" id="L913">            return null;</span>
+        }
+
+<span class="nc" id="L916">        ApplicationConfigPropertiesKafkaClustersInnerMetricsDTO applicationConfigPropertiesKafkaClustersInnerMetricsDTO = new ApplicationConfigPropertiesKafkaClustersInnerMetricsDTO();</span>
+
+<span class="nc" id="L918">        applicationConfigPropertiesKafkaClustersInnerMetricsDTO.setType( metricsConfigData.getType() );</span>
+<span class="nc" id="L919">        applicationConfigPropertiesKafkaClustersInnerMetricsDTO.setPort( metricsConfigData.getPort() );</span>
+<span class="nc" id="L920">        applicationConfigPropertiesKafkaClustersInnerMetricsDTO.setSsl( metricsConfigData.getSsl() );</span>
+<span class="nc" id="L921">        applicationConfigPropertiesKafkaClustersInnerMetricsDTO.setUsername( metricsConfigData.getUsername() );</span>
+<span class="nc" id="L922">        applicationConfigPropertiesKafkaClustersInnerMetricsDTO.setPassword( metricsConfigData.getPassword() );</span>
+<span class="nc" id="L923">        applicationConfigPropertiesKafkaClustersInnerMetricsDTO.setKeystoreLocation( metricsConfigData.getKeystoreLocation() );</span>
+<span class="nc" id="L924">        applicationConfigPropertiesKafkaClustersInnerMetricsDTO.setKeystorePassword( metricsConfigData.getKeystorePassword() );</span>
+
+<span class="nc" id="L926">        return applicationConfigPropertiesKafkaClustersInnerMetricsDTO;</span>
+    }
+
+    protected ApplicationConfigPropertiesKafkaClustersInnerSerdeInnerDTO serdeConfigToApplicationConfigPropertiesKafkaClustersInnerSerdeInnerDTO(ClustersProperties.SerdeConfig serdeConfig) {
+<span class="nc bnc" id="L930" title="All 2 branches missed.">        if ( serdeConfig == null ) {</span>
+<span class="nc" id="L931">            return null;</span>
+        }
+
+<span class="nc" id="L934">        ApplicationConfigPropertiesKafkaClustersInnerSerdeInnerDTO applicationConfigPropertiesKafkaClustersInnerSerdeInnerDTO = new ApplicationConfigPropertiesKafkaClustersInnerSerdeInnerDTO();</span>
+
+<span class="nc" id="L936">        applicationConfigPropertiesKafkaClustersInnerSerdeInnerDTO.setName( serdeConfig.getName() );</span>
+<span class="nc" id="L937">        applicationConfigPropertiesKafkaClustersInnerSerdeInnerDTO.setClassName( serdeConfig.getClassName() );</span>
+<span class="nc" id="L938">        applicationConfigPropertiesKafkaClustersInnerSerdeInnerDTO.setFilePath( serdeConfig.getFilePath() );</span>
+<span class="nc" id="L939">        Map&lt;String, Object&gt; map = serdeConfig.getProperties();</span>
+<span class="nc bnc" id="L940" title="All 2 branches missed.">        if ( map != null ) {</span>
+<span class="nc" id="L941">            applicationConfigPropertiesKafkaClustersInnerSerdeInnerDTO.setProperties( new LinkedHashMap&lt;String, Object&gt;( map ) );</span>
+        }
+<span class="nc" id="L943">        applicationConfigPropertiesKafkaClustersInnerSerdeInnerDTO.setTopicKeysPattern( serdeConfig.getTopicKeysPattern() );</span>
+<span class="nc" id="L944">        applicationConfigPropertiesKafkaClustersInnerSerdeInnerDTO.setTopicValuesPattern( serdeConfig.getTopicValuesPattern() );</span>
+
+<span class="nc" id="L946">        return applicationConfigPropertiesKafkaClustersInnerSerdeInnerDTO;</span>
+    }
+
+    protected List&lt;ApplicationConfigPropertiesKafkaClustersInnerSerdeInnerDTO&gt; serdeConfigListToApplicationConfigPropertiesKafkaClustersInnerSerdeInnerDTOList(List&lt;ClustersProperties.SerdeConfig&gt; list) {
+<span class="nc bnc" id="L950" title="All 2 branches missed.">        if ( list == null ) {</span>
+<span class="nc" id="L951">            return null;</span>
+        }
+
+<span class="nc" id="L954">        List&lt;ApplicationConfigPropertiesKafkaClustersInnerSerdeInnerDTO&gt; list1 = new ArrayList&lt;ApplicationConfigPropertiesKafkaClustersInnerSerdeInnerDTO&gt;( list.size() );</span>
+<span class="nc bnc" id="L955" title="All 2 branches missed.">        for ( ClustersProperties.SerdeConfig serdeConfig : list ) {</span>
+<span class="nc" id="L956">            list1.add( serdeConfigToApplicationConfigPropertiesKafkaClustersInnerSerdeInnerDTO( serdeConfig ) );</span>
+<span class="nc" id="L957">        }</span>
+
+<span class="nc" id="L959">        return list1;</span>
+    }
+
+    protected ApplicationConfigPropertiesKafkaClustersInnerMaskingInnerDTO.TypeEnum typeToTypeEnum(ClustersProperties.Masking.Type type) {
+<span class="nc bnc" id="L963" title="All 2 branches missed.">        if ( type == null ) {</span>
+<span class="nc" id="L964">            return null;</span>
+        }
+
+        ApplicationConfigPropertiesKafkaClustersInnerMaskingInnerDTO.TypeEnum typeEnum;
+
+<span class="nc bnc" id="L969" title="All 4 branches missed.">        switch ( type ) {</span>
+<span class="nc" id="L970">            case REMOVE: typeEnum = ApplicationConfigPropertiesKafkaClustersInnerMaskingInnerDTO.TypeEnum.REMOVE;</span>
+<span class="nc" id="L971">            break;</span>
+<span class="nc" id="L972">            case MASK: typeEnum = ApplicationConfigPropertiesKafkaClustersInnerMaskingInnerDTO.TypeEnum.MASK;</span>
+<span class="nc" id="L973">            break;</span>
+<span class="nc" id="L974">            case REPLACE: typeEnum = ApplicationConfigPropertiesKafkaClustersInnerMaskingInnerDTO.TypeEnum.REPLACE;</span>
+<span class="nc" id="L975">            break;</span>
+<span class="nc" id="L976">            default: throw new IllegalArgumentException( &quot;Unexpected enum constant: &quot; + type );</span>
+        }
+
+<span class="nc" id="L979">        return typeEnum;</span>
+    }
+
+    protected ApplicationConfigPropertiesKafkaClustersInnerMaskingInnerDTO maskingToApplicationConfigPropertiesKafkaClustersInnerMaskingInnerDTO(ClustersProperties.Masking masking) {
+<span class="nc bnc" id="L983" title="All 2 branches missed.">        if ( masking == null ) {</span>
+<span class="nc" id="L984">            return null;</span>
+        }
+
+<span class="nc" id="L987">        ApplicationConfigPropertiesKafkaClustersInnerMaskingInnerDTO applicationConfigPropertiesKafkaClustersInnerMaskingInnerDTO = new ApplicationConfigPropertiesKafkaClustersInnerMaskingInnerDTO();</span>
+
+<span class="nc" id="L989">        applicationConfigPropertiesKafkaClustersInnerMaskingInnerDTO.setType( typeToTypeEnum( masking.getType() ) );</span>
+<span class="nc" id="L990">        List&lt;String&gt; list = masking.getFields();</span>
+<span class="nc bnc" id="L991" title="All 2 branches missed.">        if ( list != null ) {</span>
+<span class="nc" id="L992">            applicationConfigPropertiesKafkaClustersInnerMaskingInnerDTO.setFields( new ArrayList&lt;String&gt;( list ) );</span>
+        }
+<span class="nc" id="L994">        applicationConfigPropertiesKafkaClustersInnerMaskingInnerDTO.setFieldsNamePattern( masking.getFieldsNamePattern() );</span>
+<span class="nc" id="L995">        List&lt;String&gt; list1 = masking.getMaskingCharsReplacement();</span>
+<span class="nc bnc" id="L996" title="All 2 branches missed.">        if ( list1 != null ) {</span>
+<span class="nc" id="L997">            applicationConfigPropertiesKafkaClustersInnerMaskingInnerDTO.setMaskingCharsReplacement( new ArrayList&lt;String&gt;( list1 ) );</span>
+        }
+<span class="nc" id="L999">        applicationConfigPropertiesKafkaClustersInnerMaskingInnerDTO.setReplacement( masking.getReplacement() );</span>
+<span class="nc" id="L1000">        applicationConfigPropertiesKafkaClustersInnerMaskingInnerDTO.setTopicKeysPattern( masking.getTopicKeysPattern() );</span>
+<span class="nc" id="L1001">        applicationConfigPropertiesKafkaClustersInnerMaskingInnerDTO.setTopicValuesPattern( masking.getTopicValuesPattern() );</span>
+
+<span class="nc" id="L1003">        return applicationConfigPropertiesKafkaClustersInnerMaskingInnerDTO;</span>
+    }
+
+    protected List&lt;ApplicationConfigPropertiesKafkaClustersInnerMaskingInnerDTO&gt; maskingListToApplicationConfigPropertiesKafkaClustersInnerMaskingInnerDTOList(List&lt;ClustersProperties.Masking&gt; list) {
+<span class="nc bnc" id="L1007" title="All 2 branches missed.">        if ( list == null ) {</span>
+<span class="nc" id="L1008">            return null;</span>
+        }
+
+<span class="nc" id="L1011">        List&lt;ApplicationConfigPropertiesKafkaClustersInnerMaskingInnerDTO&gt; list1 = new ArrayList&lt;ApplicationConfigPropertiesKafkaClustersInnerMaskingInnerDTO&gt;( list.size() );</span>
+<span class="nc bnc" id="L1012" title="All 2 branches missed.">        for ( ClustersProperties.Masking masking : list ) {</span>
+<span class="nc" id="L1013">            list1.add( maskingToApplicationConfigPropertiesKafkaClustersInnerMaskingInnerDTO( masking ) );</span>
+<span class="nc" id="L1014">        }</span>
+
+<span class="nc" id="L1016">        return list1;</span>
+    }
+
+    protected ApplicationConfigPropertiesKafkaClustersInnerAuditDTO.LevelEnum logLevelToLevelEnum(ClustersProperties.AuditProperties.LogLevel logLevel) {
+<span class="nc bnc" id="L1020" title="All 2 branches missed.">        if ( logLevel == null ) {</span>
+<span class="nc" id="L1021">            return null;</span>
+        }
+
+        ApplicationConfigPropertiesKafkaClustersInnerAuditDTO.LevelEnum levelEnum;
+
+<span class="nc bnc" id="L1026" title="All 3 branches missed.">        switch ( logLevel ) {</span>
+<span class="nc" id="L1027">            case ALL: levelEnum = ApplicationConfigPropertiesKafkaClustersInnerAuditDTO.LevelEnum.ALL;</span>
+<span class="nc" id="L1028">            break;</span>
+<span class="nc" id="L1029">            case ALTER_ONLY: levelEnum = ApplicationConfigPropertiesKafkaClustersInnerAuditDTO.LevelEnum.ALTER_ONLY;</span>
+<span class="nc" id="L1030">            break;</span>
+<span class="nc" id="L1031">            default: throw new IllegalArgumentException( &quot;Unexpected enum constant: &quot; + logLevel );</span>
+        }
+
+<span class="nc" id="L1034">        return levelEnum;</span>
+    }
+
+    protected ApplicationConfigPropertiesKafkaClustersInnerAuditDTO auditPropertiesToApplicationConfigPropertiesKafkaClustersInnerAuditDTO(ClustersProperties.AuditProperties auditProperties) {
+<span class="nc bnc" id="L1038" title="All 2 branches missed.">        if ( auditProperties == null ) {</span>
+<span class="nc" id="L1039">            return null;</span>
+        }
+
+<span class="nc" id="L1042">        ApplicationConfigPropertiesKafkaClustersInnerAuditDTO applicationConfigPropertiesKafkaClustersInnerAuditDTO = new ApplicationConfigPropertiesKafkaClustersInnerAuditDTO();</span>
+
+<span class="nc" id="L1044">        applicationConfigPropertiesKafkaClustersInnerAuditDTO.setLevel( logLevelToLevelEnum( auditProperties.getLevel() ) );</span>
+<span class="nc" id="L1045">        applicationConfigPropertiesKafkaClustersInnerAuditDTO.setTopic( auditProperties.getTopic() );</span>
+<span class="nc" id="L1046">        applicationConfigPropertiesKafkaClustersInnerAuditDTO.setAuditTopicsPartitions( auditProperties.getAuditTopicsPartitions() );</span>
+<span class="nc" id="L1047">        applicationConfigPropertiesKafkaClustersInnerAuditDTO.setTopicAuditEnabled( auditProperties.getTopicAuditEnabled() );</span>
+<span class="nc" id="L1048">        applicationConfigPropertiesKafkaClustersInnerAuditDTO.setConsoleAuditEnabled( auditProperties.getConsoleAuditEnabled() );</span>
+<span class="nc" id="L1049">        Map&lt;String, String&gt; map = auditProperties.getAuditTopicProperties();</span>
+<span class="nc bnc" id="L1050" title="All 2 branches missed.">        if ( map != null ) {</span>
+<span class="nc" id="L1051">            applicationConfigPropertiesKafkaClustersInnerAuditDTO.setAuditTopicProperties( new LinkedHashMap&lt;String, String&gt;( map ) );</span>
+        }
+
+<span class="nc" id="L1054">        return applicationConfigPropertiesKafkaClustersInnerAuditDTO;</span>
+    }
+
+    protected ApplicationConfigPropertiesKafkaClustersInnerDTO clusterToApplicationConfigPropertiesKafkaClustersInnerDTO(ClustersProperties.Cluster cluster) {
+<span class="nc bnc" id="L1058" title="All 2 branches missed.">        if ( cluster == null ) {</span>
+<span class="nc" id="L1059">            return null;</span>
+        }
+
+<span class="nc" id="L1062">        ApplicationConfigPropertiesKafkaClustersInnerDTO applicationConfigPropertiesKafkaClustersInnerDTO = new ApplicationConfigPropertiesKafkaClustersInnerDTO();</span>
+
+<span class="nc" id="L1064">        applicationConfigPropertiesKafkaClustersInnerDTO.setName( cluster.getName() );</span>
+<span class="nc" id="L1065">        applicationConfigPropertiesKafkaClustersInnerDTO.setBootstrapServers( cluster.getBootstrapServers() );</span>
+<span class="nc" id="L1066">        applicationConfigPropertiesKafkaClustersInnerDTO.setSsl( truststoreConfigToApplicationConfigPropertiesKafkaClustersInnerSslDTO( cluster.getSsl() ) );</span>
+<span class="nc" id="L1067">        applicationConfigPropertiesKafkaClustersInnerDTO.setSchemaRegistry( cluster.getSchemaRegistry() );</span>
+<span class="nc" id="L1068">        applicationConfigPropertiesKafkaClustersInnerDTO.setSchemaRegistryAuth( schemaRegistryAuthToApplicationConfigPropertiesKafkaClustersInnerSchemaRegistryAuthDTO( cluster.getSchemaRegistryAuth() ) );</span>
+<span class="nc" id="L1069">        applicationConfigPropertiesKafkaClustersInnerDTO.setSchemaRegistrySsl( keystoreConfigToApplicationConfigPropertiesKafkaClustersInnerSchemaRegistrySslDTO( cluster.getSchemaRegistrySsl() ) );</span>
+<span class="nc" id="L1070">        applicationConfigPropertiesKafkaClustersInnerDTO.setKsqldbServer( cluster.getKsqldbServer() );</span>
+<span class="nc" id="L1071">        applicationConfigPropertiesKafkaClustersInnerDTO.setKsqldbServerSsl( keystoreConfigToApplicationConfigPropertiesKafkaClustersInnerSchemaRegistrySslDTO( cluster.getKsqldbServerSsl() ) );</span>
+<span class="nc" id="L1072">        applicationConfigPropertiesKafkaClustersInnerDTO.setKsqldbServerAuth( ksqldbServerAuthToApplicationConfigPropertiesKafkaClustersInnerSchemaRegistryAuthDTO( cluster.getKsqldbServerAuth() ) );</span>
+<span class="nc" id="L1073">        applicationConfigPropertiesKafkaClustersInnerDTO.setKafkaConnect( connectClusterListToApplicationConfigPropertiesKafkaClustersInnerKafkaConnectInnerDTOList( cluster.getKafkaConnect() ) );</span>
+<span class="nc" id="L1074">        applicationConfigPropertiesKafkaClustersInnerDTO.setMetrics( metricsConfigDataToApplicationConfigPropertiesKafkaClustersInnerMetricsDTO( cluster.getMetrics() ) );</span>
+<span class="nc" id="L1075">        Map&lt;String, Object&gt; map = cluster.getProperties();</span>
+<span class="nc bnc" id="L1076" title="All 2 branches missed.">        if ( map != null ) {</span>
+<span class="nc" id="L1077">            applicationConfigPropertiesKafkaClustersInnerDTO.setProperties( new LinkedHashMap&lt;String, Object&gt;( map ) );</span>
+        }
+<span class="nc" id="L1079">        applicationConfigPropertiesKafkaClustersInnerDTO.setReadOnly( cluster.isReadOnly() );</span>
+<span class="nc" id="L1080">        applicationConfigPropertiesKafkaClustersInnerDTO.setSerde( serdeConfigListToApplicationConfigPropertiesKafkaClustersInnerSerdeInnerDTOList( cluster.getSerde() ) );</span>
+<span class="nc" id="L1081">        applicationConfigPropertiesKafkaClustersInnerDTO.setDefaultKeySerde( cluster.getDefaultKeySerde() );</span>
+<span class="nc" id="L1082">        applicationConfigPropertiesKafkaClustersInnerDTO.setDefaultValueSerde( cluster.getDefaultValueSerde() );</span>
+<span class="nc" id="L1083">        applicationConfigPropertiesKafkaClustersInnerDTO.setMasking( maskingListToApplicationConfigPropertiesKafkaClustersInnerMaskingInnerDTOList( cluster.getMasking() ) );</span>
+<span class="nc" id="L1084">        applicationConfigPropertiesKafkaClustersInnerDTO.setPollingThrottleRate( cluster.getPollingThrottleRate() );</span>
+<span class="nc" id="L1085">        applicationConfigPropertiesKafkaClustersInnerDTO.setAudit( auditPropertiesToApplicationConfigPropertiesKafkaClustersInnerAuditDTO( cluster.getAudit() ) );</span>
+
+<span class="nc" id="L1087">        return applicationConfigPropertiesKafkaClustersInnerDTO;</span>
+    }
+
+    protected List&lt;ApplicationConfigPropertiesKafkaClustersInnerDTO&gt; clusterListToApplicationConfigPropertiesKafkaClustersInnerDTOList(List&lt;ClustersProperties.Cluster&gt; list) {
+<span class="nc bnc" id="L1091" title="All 2 branches missed.">        if ( list == null ) {</span>
+<span class="nc" id="L1092">            return null;</span>
+        }
+
+<span class="nc" id="L1095">        List&lt;ApplicationConfigPropertiesKafkaClustersInnerDTO&gt; list1 = new ArrayList&lt;ApplicationConfigPropertiesKafkaClustersInnerDTO&gt;( list.size() );</span>
+<span class="nc bnc" id="L1096" title="All 2 branches missed.">        for ( ClustersProperties.Cluster cluster : list ) {</span>
+<span class="nc" id="L1097">            list1.add( clusterToApplicationConfigPropertiesKafkaClustersInnerDTO( cluster ) );</span>
+<span class="nc" id="L1098">        }</span>
+
+<span class="nc" id="L1100">        return list1;</span>
+    }
+
+    protected ApplicationConfigPropertiesKafkaDTO clustersPropertiesToApplicationConfigPropertiesKafkaDTO(ClustersProperties clustersProperties) {
+<span class="nc bnc" id="L1104" title="All 2 branches missed.">        if ( clustersProperties == null ) {</span>
+<span class="nc" id="L1105">            return null;</span>
+        }
+
+<span class="nc" id="L1108">        ApplicationConfigPropertiesKafkaDTO applicationConfigPropertiesKafkaDTO = new ApplicationConfigPropertiesKafkaDTO();</span>
+
+<span class="nc" id="L1110">        applicationConfigPropertiesKafkaDTO.setPolling( pollingPropertiesToApplicationConfigPropertiesKafkaPollingDTO( clustersProperties.getPolling() ) );</span>
+<span class="nc" id="L1111">        applicationConfigPropertiesKafkaDTO.setAdminClientTimeout( clustersProperties.getAdminClientTimeout() );</span>
+<span class="nc" id="L1112">        applicationConfigPropertiesKafkaDTO.setInternalTopicPrefix( clustersProperties.getInternalTopicPrefix() );</span>
+<span class="nc" id="L1113">        applicationConfigPropertiesKafkaDTO.setClusters( clusterListToApplicationConfigPropertiesKafkaClustersInnerDTOList( clustersProperties.getClusters() ) );</span>
+
+<span class="nc" id="L1115">        return applicationConfigPropertiesKafkaDTO;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

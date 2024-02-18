@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ApplicationRestarter.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">kafka-ui-api</a> &gt; <a href="index.source.html" class="el_package">com.provectus.kafka.ui.util</a> &gt; <span class="el_source">ApplicationRestarter.java</span></div><h1>ApplicationRestarter.java</h1><pre class="source lang-java linenums">package com.provectus.kafka.ui.util;
+
+import com.provectus.kafka.ui.KafkaUiApplication;
+import java.io.Closeable;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.context.event.ApplicationStartedEvent;
+import org.springframework.context.ApplicationContext;
+import org.springframework.context.ApplicationListener;
+import org.springframework.stereotype.Component;
+
+<span class="fc" id="L11">@Slf4j</span>
+@Component
+<span class="fc" id="L13">public class ApplicationRestarter implements ApplicationListener&lt;ApplicationStartedEvent&gt; {</span>
+
+  private String[] applicationArgs;
+  private ApplicationContext applicationContext;
+
+  @Override
+  public void onApplicationEvent(ApplicationStartedEvent event) {
+<span class="fc" id="L20">    this.applicationArgs = event.getArgs();</span>
+<span class="fc" id="L21">    this.applicationContext = event.getApplicationContext();</span>
+<span class="fc" id="L22">  }</span>
+
+  public void requestRestart() {
+<span class="nc" id="L25">    log.info(&quot;Restarting application&quot;);</span>
+<span class="nc" id="L26">    Thread thread = new Thread(() -&gt; {</span>
+<span class="nc" id="L27">      closeApplicationContext(applicationContext);</span>
+<span class="nc" id="L28">      KafkaUiApplication.startApplication(applicationArgs);</span>
+<span class="nc" id="L29">    });</span>
+<span class="nc" id="L30">    thread.setName(&quot;restartedMain-&quot; + System.currentTimeMillis());</span>
+<span class="nc" id="L31">    thread.setDaemon(false);</span>
+<span class="nc" id="L32">    thread.start();</span>
+<span class="nc" id="L33">  }</span>
+
+  private void closeApplicationContext(ApplicationContext context) {
+<span class="nc bnc" id="L36" title="All 2 branches missed.">    while (context instanceof Closeable) {</span>
+      try {
+<span class="nc" id="L38">        ((Closeable) context).close();</span>
+<span class="nc" id="L39">      } catch (Exception e) {</span>
+<span class="nc" id="L40">        log.warn(&quot;Error stopping application before restart&quot;, e);</span>
+<span class="nc" id="L41">        throw new RuntimeException(e);</span>
+<span class="nc" id="L42">      }</span>
+<span class="nc" id="L43">      context = context.getParent();</span>
+    }
+<span class="nc" id="L45">  }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

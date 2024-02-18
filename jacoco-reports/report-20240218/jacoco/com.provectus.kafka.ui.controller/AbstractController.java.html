@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AbstractController.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">kafka-ui-api</a> &gt; <a href="index.source.html" class="el_package">com.provectus.kafka.ui.controller</a> &gt; <span class="el_source">AbstractController.java</span></div><h1>AbstractController.java</h1><pre class="source lang-java linenums">package com.provectus.kafka.ui.controller;
+
+import com.provectus.kafka.ui.exception.ClusterNotFoundException;
+import com.provectus.kafka.ui.model.KafkaCluster;
+import com.provectus.kafka.ui.model.rbac.AccessContext;
+import com.provectus.kafka.ui.service.ClustersStorage;
+import com.provectus.kafka.ui.service.audit.AuditService;
+import com.provectus.kafka.ui.service.rbac.AccessControlService;
+import org.springframework.beans.factory.annotation.Autowired;
+import reactor.core.publisher.Mono;
+import reactor.core.publisher.Signal;
+
+<span class="fc" id="L13">public abstract class AbstractController {</span>
+
+  protected ClustersStorage clustersStorage;
+  protected AccessControlService accessControlService;
+  protected AuditService auditService;
+
+  protected KafkaCluster getCluster(String name) {
+<span class="fc" id="L20">    return clustersStorage.getClusterByName(name)</span>
+<span class="fc" id="L21">        .orElseThrow(() -&gt; new ClusterNotFoundException(</span>
+<span class="fc" id="L22">            String.format(&quot;Cluster with name '%s' not found&quot;, name)));</span>
+  }
+
+  protected Mono&lt;Void&gt; validateAccess(AccessContext context) {
+<span class="fc" id="L26">    return accessControlService.validateAccess(context);</span>
+  }
+
+  protected void audit(AccessContext acxt, Signal&lt;?&gt; sig) {
+<span class="fc" id="L30">    auditService.audit(acxt, sig);</span>
+<span class="fc" id="L31">  }</span>
+
+  @Autowired
+  public void setClustersStorage(ClustersStorage clustersStorage) {
+<span class="fc" id="L35">    this.clustersStorage = clustersStorage;</span>
+<span class="fc" id="L36">  }</span>
+
+  @Autowired
+  public void setAccessControlService(AccessControlService accessControlService) {
+<span class="fc" id="L40">    this.accessControlService = accessControlService;</span>
+<span class="fc" id="L41">  }</span>
+
+  @Autowired
+  public void setAuditService(AuditService auditService) {
+<span class="fc" id="L45">    this.auditService = auditService;</span>
+<span class="fc" id="L46">  }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

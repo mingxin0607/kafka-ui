@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PartitionDistributionStats.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">kafka-ui-api</a> &gt; <a href="index.source.html" class="el_package">com.provectus.kafka.ui.model</a> &gt; <span class="el_source">PartitionDistributionStats.java</span></div><h1>PartitionDistributionStats.java</h1><pre class="source lang-java linenums">package com.provectus.kafka.ui.model;
+
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.util.HashMap;
+import java.util.Map;
+import javax.annotation.Nullable;
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.apache.kafka.clients.admin.TopicDescription;
+import org.apache.kafka.common.Node;
+import org.apache.kafka.common.TopicPartitionInfo;
+
+<span class="fc" id="L16">@RequiredArgsConstructor(access = AccessLevel.PRIVATE)</span>
+@Getter
+<span class="fc" id="L18">@Slf4j</span>
+public class PartitionDistributionStats {
+
+  // avg skew will show unuseful results on low number of partitions
+  private static final int MIN_PARTITIONS_FOR_SKEW_CALCULATION = 50;
+
+<span class="fc" id="L24">  private final Map&lt;Node, Integer&gt; partitionLeaders;</span>
+<span class="fc" id="L25">  private final Map&lt;Node, Integer&gt; partitionsCount;</span>
+<span class="fc" id="L26">  private final Map&lt;Node, Integer&gt; inSyncPartitions;</span>
+<span class="nc" id="L27">  private final double avgLeadersCntPerBroker;</span>
+<span class="fc" id="L28">  private final double avgPartitionsPerBroker;</span>
+<span class="nc" id="L29">  private final boolean skewCanBeCalculated;</span>
+
+  public static PartitionDistributionStats create(Statistics stats) {
+<span class="fc" id="L32">    return create(stats, MIN_PARTITIONS_FOR_SKEW_CALCULATION);</span>
+  }
+
+  static PartitionDistributionStats create(Statistics stats, int minPartitionsForSkewCalculation) {
+<span class="fc" id="L36">    var partitionLeaders = new HashMap&lt;Node, Integer&gt;();</span>
+<span class="fc" id="L37">    var partitionsReplicated = new HashMap&lt;Node, Integer&gt;();</span>
+<span class="fc" id="L38">    var isr = new HashMap&lt;Node, Integer&gt;();</span>
+<span class="fc" id="L39">    int partitionsCnt = 0;</span>
+<span class="fc bfc" id="L40" title="All 2 branches covered.">    for (TopicDescription td : stats.getTopicDescriptions().values()) {</span>
+<span class="fc bfc" id="L41" title="All 2 branches covered.">      for (TopicPartitionInfo tp : td.partitions()) {</span>
+<span class="fc" id="L42">        partitionsCnt++;</span>
+<span class="fc" id="L43">        tp.replicas().forEach(r -&gt; incr(partitionsReplicated, r));</span>
+<span class="fc" id="L44">        tp.isr().forEach(r -&gt; incr(isr, r));</span>
+<span class="fc bfc" id="L45" title="All 2 branches covered.">        if (tp.leader() != null) {</span>
+<span class="fc" id="L46">          incr(partitionLeaders, tp.leader());</span>
+        }
+<span class="fc" id="L48">      }</span>
+<span class="fc" id="L49">    }</span>
+<span class="fc" id="L50">    int nodesWithPartitions = partitionsReplicated.size();</span>
+<span class="fc" id="L51">    int partitionReplications = partitionsReplicated.values().stream().mapToInt(i -&gt; i).sum();</span>
+<span class="pc bpc" id="L52" title="1 of 2 branches missed.">    var avgPartitionsPerBroker = nodesWithPartitions == 0 ? 0 : ((double) partitionReplications) / nodesWithPartitions;</span>
+
+<span class="fc" id="L54">    int nodesWithLeaders = partitionLeaders.size();</span>
+<span class="fc" id="L55">    int leadersCnt = partitionLeaders.values().stream().mapToInt(i -&gt; i).sum();</span>
+<span class="pc bpc" id="L56" title="1 of 2 branches missed.">    var avgLeadersCntPerBroker = nodesWithLeaders == 0 ? 0 : ((double) leadersCnt) / nodesWithLeaders;</span>
+
+<span class="pc bpc" id="L58" title="1 of 2 branches missed.">    return new PartitionDistributionStats(</span>
+        partitionLeaders,
+        partitionsReplicated,
+        isr,
+        avgLeadersCntPerBroker,
+        avgPartitionsPerBroker,
+        partitionsCnt &gt;= minPartitionsForSkewCalculation
+    );
+  }
+
+  private static void incr(Map&lt;Node, Integer&gt; map, Node n) {
+<span class="fc bfc" id="L69" title="All 2 branches covered.">    map.compute(n, (k, c) -&gt; c == null ? 1 : ++c);</span>
+<span class="fc" id="L70">  }</span>
+
+  @Nullable
+  public BigDecimal partitionsSkew(Node node) {
+<span class="fc" id="L74">    return calculateAvgSkew(partitionsCount.get(node), avgPartitionsPerBroker);</span>
+  }
+
+  @Nullable
+  public BigDecimal leadersSkew(Node node) {
+<span class="fc" id="L79">    return calculateAvgSkew(partitionLeaders.get(node), avgLeadersCntPerBroker);</span>
+  }
+
+  // Returns difference (in percents) from average value, null if it can't be calculated
+  @Nullable
+  private BigDecimal calculateAvgSkew(@Nullable Integer value, double avgValue) {
+<span class="pc bpc" id="L85" title="2 of 4 branches missed.">    if (avgValue == 0 || !skewCanBeCalculated) {</span>
+<span class="nc" id="L86">      return null;</span>
+    }
+<span class="fc bfc" id="L88" title="All 2 branches covered.">    value = value == null ? 0 : value;</span>
+<span class="fc" id="L89">    return new BigDecimal((value - avgValue) / avgValue * 100.0)</span>
+<span class="fc" id="L90">        .setScale(1, RoundingMode.HALF_UP);</span>
+  }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>
