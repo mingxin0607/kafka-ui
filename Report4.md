@@ -257,7 +257,7 @@ Fig2. Detail1 of GitHub Action1
 
 ![Fig3. GitHub Action1-Detail2](https://github.com/mingxin0607/kafka-ui/blob/840d245bdac5ba1d25486bae1131827532d95002/Fig/Action1-DetailII.png)   
 
-Fig3. Detail1 of GitHub Action2
+Fig3. Detail2 of GitHub Action2
 
 
 
