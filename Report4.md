@@ -201,6 +201,50 @@ jobs:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN_FRONTEND }}
 
 ```
+
+## 3. Adding Code & CI Result
+In an effort to enhance our project's reliability and enforce coding standards, we have integrated a Continuous Integration (CI) process using GitHub Actions. This addition automates the testing of code submissions, ensuring that all changes meet our predefined quality benchmarks before being merged into the main codebase.  
+
+### New GitHub Action 1  
+The newly added GitHub Actions workflow, the`kafkaUI-java-build-test.yml` file, automates our Java build and testing processes.
+- The file below is used to test whether the code pushed is aligned with the test set. So each push will trigger `mvn test` automatically, which ensures that only code that passes all tests can be merged, maintaining the high quality and stability of the project.
+- Setup a Java development environment with JDK 11, utilizing the Temurin distribution for consistency and reliability across all builds.
+- Utilize Maven for building the project (mvn -B package --file pom.xml), taking advantage of Maven's dependency management and build lifecycle capabilities.
+- Cache Maven dependencies between runs to speed up the build process, reducing the time developers wait for feedback from the CI system.
+
+```yml
+name: kafkaUI-java-build-test  
+
+on:
+  push:
+    branches: [ master ]  # Trigger condition: When pushing to the master branch
+  pull_request:
+    branches: [ master ]  # Trigger condition: when a pull request is made for the master branch
+
+jobs:
+  build:
+    runs-on: ubuntu-latest  # Running environment: The latest version of Ubuntu
+
+    steps:
+    - uses: actions/checkout@v3  # Check out code
+    - name: Set up JDK 11  # Setting up JDK 11
+      uses: actions/setup-java@v3
+      with:
+        java-version: '11'
+        distribution: 'temurin'  # Using the Temurin distribution
+        cache: 'maven'  # Cache Maven dependencies to speed up builds
+
+    - name: Build with Maven  # Build the project using Maven
+      run: mvn -B package --file pom.xml
+
+    - name: Run tests  # Run tests
+      run: mvn test
+
+``
+
+
+
+
 # Reference
 [1]_ CircleCI._ (2024, February 16). CircleCI. https://circleci.com/continuous-integration/
 
