@@ -70,7 +70,8 @@ The following directory contains YML files executed by the project.
 └── workflow_linter.yaml
 ```
 
-The following YML files are taken as crucial YML files to explain.
+The following YML files are taken as crucial YML files to explain.  
+
 **1. backend.yml and frontend.yaml:** These are crucial for automating the build, test, and deployment processes for the backend and frontend parts of the application, respectively. They ensure that every change in the codebase is automatically tested and, if specified, deployed to a staging or production environment. This automation helps in identifying integration issues early and reduces manual errors in deployment.
 
 **2. codeql-analysis.yml:** This workflow is essential for maintaining the security and quality of the code. By automatically running CodeQL scans on pull requests and pushes, it helps identify vulnerabilities and coding errors before they are merged into the main codebase, ensuring a higher level of code integrity and security posture.
@@ -139,7 +140,7 @@ jobs:
           -Dsonar.projectKey=com.provectus:kafka-ui_backend
 
 ```
-
+`frontend.yml` file (under the path of `.github/workflows/frontend.yml`) 
 ```yml
 name: "Frontend: PR/master build & test"
 on:  # Triggers for the workflow
