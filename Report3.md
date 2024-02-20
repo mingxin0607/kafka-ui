@@ -158,7 +158,8 @@ The following table is an overview of the test coverage of the project.
 | main(String[])         | 4                   | 0%   | n/a              | n/a  | 1      | 1    | 2            | 2              |
 | KafkaUiApplication()   | 3                   | 100% | n/a              | n/a  | 0      | 1    | 0            | 1              |
 
-0% coverage indicates that the methods are not tested
+0% coverage indicates that the methods are not tested  
+
 **2. ConsumingStats**
 
 | Element                                  | Missed Instructions | Cov. | Missed Branches | Cov. | Missed | Cxty | Missed Lines | Missed Methods |
