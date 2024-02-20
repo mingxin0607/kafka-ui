@@ -247,15 +247,16 @@ jobs:
 
 After adding the new GitHub Action, the `push` action is triggered by pushing the `Report4.md` file. The following result is obtained.
 
-![Fig1. GitHub Action1-Overview]([Fig/Untitled%202.png](https://github.com/mingxin0607/kafka-ui/blob/d1af371d10c6749609e75d2ed9686a362feee3bd/Fig/Action1-Result%20Overview.png))
+![Fig1. GitHub Action1-Overview](https://github.com/mingxin0607/kafka-ui/blob/d1af371d10c6749609e75d2ed9686a362feee3bd/Fig/Action1-Result%20Overview.png)  
 
-Fig1. Overview of GitHub Action1 
+Fig1. Overview of GitHub Action1
 
-![Fig2. GitHub Action1-Detail1]([Fig/Untitled%202.png](https://github.com/mingxin0607/kafka-ui/blob/d1af371d10c6749609e75d2ed9686a362feee3bd/Fig/Action1-Details.png))
+![Fig2. GitHub Action1-Detail1](https://github.com/mingxin0607/kafka-ui/blob/d1af371d10c6749609e75d2ed9686a362feee3bd/Fig/Action1-Details.png)  
 
-Fig2. Detail1 of GitHub Action1 
+Fig2. Detail1 of GitHub Action1
 
-![Fig3. GitHub Action1-Detail2]([Fig/Untitled%202.png](https://github.com/mingxin0607/kafka-ui/blob/840d245bdac5ba1d25486bae1131827532d95002/Fig/Action1-DetailII.png))
+![Fig3. GitHub Action1-Detail2](https://github.com/mingxin0607/kafka-ui/blob/840d245bdac5ba1d25486bae1131827532d95002/Fig/Action1-DetailII.png)   
+
 Fig3. Detail1 of GitHub Action2
 
 
