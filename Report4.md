@@ -1,4 +1,4 @@
-# Part IV: Structural (White Box) Testing  
+# Part IV: Continuous Integration  
 
 ## 1. Continuous Integration 
 ### 1.1 Definition
