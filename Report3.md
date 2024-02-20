@@ -100,8 +100,8 @@ mvn clean test jacoco:report
 ```
 
 ### 2.2 Analysis of Original Coverage
-Original Report is under folder "jacoco-reports/report-20240217".
-The following table is an overview of the test coverage on the project.
+Original Report is under folder "jacoco-reports/report-20240217".  
+The following table is an overview of the test coverage of the project.
 
 | Element | Missed Instructions | Cov. | Missed Branches | Cov. | Missed Cxty | Missed Lines | Missed Methods | Missed Classes |
 |---------|---------------------|------|-----------------|------|-------------|--------------|----------------|----------------|
@@ -139,8 +139,82 @@ The following table is an overview of the test coverage on the project.
 | com.provectus.kafka.ui.model.rbac.permission | 226 | 73% | - | n/a | 14 | 27 | 18 | 63 |
 | com.provectus.kafka.ui.service.masking.policies | 484 | 88% | 43 | 84% | 9 | 62 | 11 | 111 |
 | com.provectus.kafka.ui.model.rbac.provider | - | 0% | - | n/a | 4 | 4 | 13 | 13 |
-| com.provectus.kafka.ui | - | 11% | - | n/a | 2 |
+| com.provectus.kafka.ui | - | 11% | - | n/a | 2 | 3 | 6 | 7 |
 
+
+
+- **Instructions Coverage**: 42% (47,036 of 82,073 instructions missed)
+- **Branch Coverage**: 20% (5,218 of 6,534 branches missed)
+- **Line Coverage**: 2,978 of 14,678 lines missed (20.3%)
+- **Method Coverage**: 207 of 5,113 methods missed (4.04%)
+#### Examples of Untested Methods
+- **1. KafkaUiApplication Class**
+| Element                | Missed Instructions | Cov. | Missed Branches | Cov. | Missed | Cxty | Missed Lines | Missed Methods |
+|------------------------|---------------------|------|------------------|------|--------|------|--------------|----------------|
+| Total                  | 24 of 27            | 11%  | 0 of 0           | n/a  | 2      | 3    | 6            | 7              |
+| startApplication(String[]) | 20                | 0%   | n/a              | n/a  | 1      | 1    | 4            | 4              |
+| main(String[])         | 4                   | 0%   | n/a              | n/a  | 1      | 1    | 2            | 2              |
+| KafkaUiApplication()   | 3                   | 100% | n/a              | n/a  | 0      | 1    | 0            | 1              |
+
+0% coverage indicates that the methods are not tested
+-  **2. ConsumingStats**
+| Element                                  | Missed Instructions | Cov. | Missed Branches | Cov. | Missed | Cxty | Missed Lines | Missed Methods |
+|------------------------------------------|---------------------|------|------------------|------|--------|------|--------------|----------------|
+| Total                                    | 7 of 92             | 92%  | 0 of 0           | n/a  | 1      | 5    | 2            | 24             |
+| incFilterApplyError()                   | 7                   | 0%   | n/a              | n/a  | 1      | 1    | 2            | 1              |
+| sendConsumingEvt(FluxSink, PolledRecords) | 35                | 100% | n/a              | n/a  | 0      | 1    | 0            | 1              |
+| createConsumingStats()                   | 23                  | 100% | n/a              | n/a  | 0      | 1    | 0            | 1              |
+| ConsumingStats()                        | 15                  | 100% | n/a              | n/a  | 0      | 1    | 0            | 1              |
+| sendFinishEvent(FluxSink)               | 12                  | 100% | n/a              | n/a  | 0      | 1    | 0            | 1              |
+
+-  **3. RetryingKafkaConnectClient**
+| Element                                                     | Missed Instructions | Cov. | Missed Branches | Cov. | Missed | Cxty | Missed Lines | Missed Methods |
+|-------------------------------------------------------------|---------------------|------|------------------|------|--------|------|--------------|----------------|
+| Total                                                       | 114 of 231          | 50%  | 0 of 0           | n/a  | 21     | 42   | 22           | 51             |
+| restartConnector(String, Boolean, Boolean)                 | 7                   | 0%   | n/a              | n/a  | 1      | 1    | 1            | 1              |
+| restartConnectorWithHttpInfo(String, Boolean, Boolean)     | 7                   | 0%   | n/a              | n/a  | 1      | 1    | 1            | 1              |
+| lambda$conflictCodeRetry$1(RetryBackoffSpec, Retry.RetrySignal) | 7               | 0%   | n/a              | n/a  | 1      | 1    | 2            | 1              |
+| getConnectorTaskStatusWithHttpInfo(String, Integer)        | 6                   | 0%   | n/a              | n/a  | 1      | 1    | 1            | 1              |
+| restartConnectorTask(String, Integer)                      | 6                   | 0%   | n/a              | n/a  | 1      | 1    | 1            | 1              |
+| restartConnectorTaskWithHttpInfo(String, Integer)          | 6                   | 0%   | n/a              | n/a  | 1      | 1    | 1            | 1              |
+| setConnectorConfigWithHttpInfo(String, Map)                | 6                   | 0%   | n/a              | n/a  | 1      | 1    | 1            | 1              |
+| validateConnectorPluginConfigWithHttpInfo(String, Map)     | 6                   | 0%   | n/a              | n/a  | 1      | 1    | 1            | 1              |
+| createConnectorWithHttpInfo(NewConnector)                  | 5                   | 0%   | n/a              | n/a  | 1      | 1    | 1            | 1              |
+| deleteConnectorWithHttpInfo(String)                        | 5                   | 0%   | n/a              | n/a  | 1      | 1    | 1            | 1              |
+| getConnectorWithHttpInfo(String)                           | 5                   | 0%   | n/a              | n/a  | 1      | 1    | 1            | 1              |
+| getConnectorConfigWithHttpInfo(String)                     | 5                   | 0%   | n/a              | n/a  | 1      | 1    | 1            | 1              |
+| getConnectorStatusWithHttpInfo(String)                     | 5                   | 0%   | n/a              | n/a  | 1      | 1    | 1            | 1              |
+| getConnectorTasksWithHttpInfo(String)                      | 5                   | 0%   | n/a              | n/a  | 1      | 1    | 1            | 1              |
+| getConnectorTopicsWithHttpInfo(String)                     | 5                   | 0%   | n/a              | n/a  | 1      | 1    | 1            | 1              |
+| getConnectorsWithHttpInfo(String)                          | 5                   | 0%   | n/a              | n/a  | 1      | 1    | 1            | 1              |
+| pauseConnector(String)                                     | 5                   | 0%   | n/a              | n/a  | 1      | 1    | 1            | 1              |
+| pauseConnectorWithHttpInfo(String)                         | 5                   | 0%   | n/a              | n/a  | 1      | 1    | 1            | 1              |
+| resumeConnectorWithHttpInfo(String)                        | 5                   | 0%   | n/a              | n/a  | 1      | 1    | 1            | 1              |
+| getConnectorPluginsWithHttpInfo()                          | 4                   | 0%   | n/a              | n/a  | 1      | 1    | 1            | 1              |
+| resumeConnector(String)                                    | 4                   | 0%   | n/a              | n/a  | 1      | 1    | 1            | 1              |
+| RetryingKafkaConnectClient(ClustersProperties.ConnectCluster, ClustersProperties.TruststoreConfig, DataSize) | 9 | 100% | n/a              | n/a  | 0      | 1    | 0            | 1              |
+| conflictCodeRetry()                                        | 8                   | 100% | n/a              | n/a  | 0      | 1    | 0            | 1              |
+| withBadRequestErrorHandling(Mono)                          | 8                   | 100% | n/a              | n/a  | 0      | 1    | 0            | 1              |
+| static {...}                                               | 7                   | 100% | n/a              | n/a  | 0      | 1    | 0            | 1              |
+| setConnectorConfig(String, Map)                            | 6                   | 100% | n/a              | n/a  | 0      | 1    | 0            | 1              |
+| getConnectorTaskStatus(String, Integer)                    | 6                   | 100% | n/a              | n/a  | 0      | 1    | 0            | 1              |
+| validateConnectorPluginConfig(String, Map)                 | 6                   | 100% | n/a              | n/a  | 0      | 1    | 0            | 1              |
+| lambda$withBadRequestErrorHandling$3(WebClientResponseException.InternalServerError) | 6 | 100% | n/a              | n/a  | 0      | 1    | 0            | 1              |
+| lambda$withBadRequestErrorHandling$2(WebClientResponseException.BadRequest) | 6 | 100% | n/a              | n/a  | 0      | 1    | 0            | 1              |
+| createConnector(NewConnector)                              | 5                   | 100% | n/a              | n/a  | 0      | 1    | 0            | 1              |
+| deleteConnector(String)                                    | 5                   | 100% | n/a              | n/a  | 0      | 1    | 0            | 1              |
+| getConnector(String)                                       | 5                   | 100% | n/a              | n/a  | 0      | 1    | 0            | 1              |
+| getConnectorConfig(String)                                 | 5                   | 100% | n/a              | n/a  | 0      | 1    | 0            | 1              |
+| getConnectorStatus(String)                                 | 5                   | 100% | n/a              | n/a  | 0      | 1    | 0            | 1              |
+| getConnectorTasks(String)                                  | 5                   | 100% | n/a              | n/a  | 0      | 1    | 0            | 1              |
+| getConnectorTopics(String)                                 | 5                   | 100% | n/a              | n/a  | 0      | 1    | 0            | 1              |
+| getConnectors(String)                                      | 5                   | 100% | n/a              | n/a  | 0      | 1    | 0            | 1              |
+| withRetryOnConflict(Mono)                                  | 4                   | 100% | n/a              | n/a  | 0      | 1    | 0            | 1              |
+| withRetryOnConflict(Flux)                                  | 4                   | 100% | n/a              | n/a  | 0      | 1    | 0            | 1              |
+| getConnectorPlugins()                                      | 4                   | 100% | n/a              | n/a  | 0      | 1    | 0            | 1              |
+| lambda$conflictCodeRetry$0(Throwable)                      | 3                   | 100% | n/a              | n/a  | 0      | 1    | 0            | 1              |
+
+### Uncovered Code
 
 ## 3. New Test Cases Based on Test Report
 
