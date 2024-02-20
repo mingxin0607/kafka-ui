@@ -42,14 +42,14 @@ public int factorial(int number) {
     }
     return result;
 }
-A structural test case for this method would not only test it with different input values (like a black-box test) but also ensure that the loop inside the method is executed the correct number of times for each input. For instance, input 5 should cause the loop to execute five times, multiplying the result by 2, 3, 4, and 5.  
+A structural test case for this method would not only test it with different input values (like a black-box test) but also ensure that the loop inside the method is executed the correct number of times for each input. For instance, input 5 should cause the loop to execute five times, multiplying the result by 2, 3, 4, and 5.
 
+To have structural testing, the tools we use usually, include JaCoCo, Clover, or Cobertura. Here we choose JaCoCo.
 
 ## 2. Structural Testing with Coverage Tool
+### 2.1 Use `Jacoco` in Maven project  
 
-### 2.1 Use `Jacoco` in maven project  
-
-### 2.1.1 Setup
+#### 2.1.1 Setup
 
 To use `Jacoco` coverage tool in a maven project, we could add the following dependency in each "pom.xml" (We have already done so to our project).
 ```xml
@@ -101,6 +101,46 @@ mvn clean test jacoco:report
 
 ### 2.2 Analysis of Original Coverage
 Original Report is under folder "jacoco-reports/report-20240217".
+The following table is an overview of the test coverage on the project.
+
+| Element | Missed Instructions | Cov. | Missed Branches | Cov. | Missed Cxty | Missed Lines | Missed Methods | Missed Classes |
+|---------|---------------------|------|-----------------|------|-------------|--------------|----------------|----------------|
+| Total   | 47,036 of 82,073    | 42%  | 5,218 of 6,534  | 20%  | 5,933       | 8,548        | 8,288          | 14,678         |
+| ksql    | 16,182 of 5,497     | 25%  | 1,192 of 72     | 5%   | 2,053       | 2,134        | 4,130          | 4,596          |
+| com.provectus.kafka.ui.model | 7,087 of 2,449 | 25% | 1,215 of 39 | 3% | 906 | 1,188 | 196 | 547 |
+| com.provectus.kafka.ui.controller | 4,642 of 2,031 | 30% | 287 of 53 | 15% | 363 | 509 | 1,200 | 1,649 |
+| com.provectus.kafka.ui.config | 2,941 of 751 | 20% | 625 of 31 | 4% | 427 | 564 | 51 | 198 |
+| com.provectus.kafka.ui.service | 2,443 of 5,399 | 68% | 181 of 122 | 40% | 292 | 768 | 383 | 1,423 |
+| com.provectus.kafka.ui.config.auth | 1,912 | 5% | 255 | 0% | 259 | 269 | 217 | 235 |
+| com.provectus.kafka.ui.service.rbac.extractor | 1,110 | 0% | 42 | 0% | 105 | 105 | 261 | 261 |
+| com.provectus.kafka.ui.model.rbac | 1,097 of 406 | 27% | 239 | 2% | 169 | 208 | 61 | 141 |
+| com.provectus.kafka.ui.util | 1,018 of 1,025 | 50% | 104 of 60 | 36% | 127 | 226 | 184 | 416 |
+| com.provectus.kafka.ui.mapper | 922 of 1,376 | 59% | 144 of 92 | 38% | 153 | 239 | 286 | 666 |
+| com.provectus.kafka.ui.service.rbac | 905 | 10% | 119 | 4% | 120 | 131 | 225 | 256 |
+| com.provectus.kafka.ui.service.metrics | 732 of 761 | 50% | 93 of 59 | 38% | 96 | 159 | 148 | 305 |
+| com.provectus.kafka.ui.serdes | 722 of 1,188 | 62% | 81 of 73 | 47% | 85 | 185 | 128 | 366 |
+| com.provectus.kafka.ui.util.jsonschema | 717 of 2,430 | 77% | 112 of 177 | 61% | 97 | 293 | 75 | 544 |
+| com.provectus.kafka.ui.service.integration.odd | 714 of 715 | 50% | 53 of 17 | 24% | 78 | 136 | 124 | 281 |
+| com.provectus.kafka.ui.service.ksql | 698 of 587 | 45% | 11 of 14 | 11% | 97 | 147 | 52 | 171 |
+| com.provectus.kafka.ui.model.schemaregistry | 431 | 0% | 76 | 0% | 77 | 77 | 16 | 16 |
+| com.provectus.kafka.ui.serdes.builtin | 330 of 2,433 | 88% | 26 of 6 | 63% | 66 | 228 | 87 | 428 |
+| com.provectus.kafka.ui.serdes.builtin.sr | 284 of 771 | 73% | 21 of 5 | 54% | 28 | 78 | 42 | 219 |
+| com.provectus.kafka.ui.service.ksql.response | 280 of 218 | 43% | 36 of 5 | 40% | 36 | 59 | 69 | 128 |
+| com.provectus.kafka.ui.service.integration.odd.schema | 258 of 1,221 | 82% | 58 of 139 | 70% | 58 | 150 | 41 | 343 |
+| com.provectus.kafka.ui.exception | 241 of 512 | 67% | - | 66% | 35 | 79 | 76 | 200 |
+| com.provectus.kafka.ui.model.connect | 190 | 25% | 38 | 0% | 25 | 37 | 1 | 6 |
+| com.provectus.kafka.ui.service.analyze | 91 of 0 | 84% | 22 of 6 | 54% | 28 | 79 | 31 | 187 |
+| com.provectus.kafka.ui.config.auth.logout | - | 0% | - | n/a | 9 | 9 | 38 | 38 |
+| com.provectus.kafka.ui.emitter | 1,610 | 91% | 228 | 79% | 28 | 164 | 36 | 389 |
+| com.provectus.kafka.ui.service.audit | 736 | 84% | 134 | 79% | 19 | 80 | 32 | 189 |
+| com.provectus.kafka.ui.service.masking | 193 | 59% | 32 of 18 | 36% | 24 | 42 | 4 | 42 |
+| com.provectus.kafka.ui.client | - | 58% | - | n/a | 21 | 44 | 22 | 65 |
+| com.provectus.kafka.ui.service.acl | 661 | 86% | 28 | 73% | 19 | 59 | 20 | 173 |
+| com.provectus.kafka.ui.model.rbac.permission | 226 | 73% | - | n/a | 14 | 27 | 18 | 63 |
+| com.provectus.kafka.ui.service.masking.policies | 484 | 88% | 43 | 84% | 9 | 62 | 11 | 111 |
+| com.provectus.kafka.ui.model.rbac.provider | - | 0% | - | n/a | 4 | 4 | 13 | 13 |
+| com.provectus.kafka.ui | - | 11% | - | n/a | 2 |
+
 
 ## 3. New Test Cases Based on Test Report
 
