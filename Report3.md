@@ -149,7 +149,7 @@ The following table is an overview of the test coverage of the project.
 - **Method Coverage**: 207 of 5,113 methods missed (4.04%)
 
 #### 2.2.1 Examples of Untested Methods
-- **1. KafkaUiApplication Class**
+**1. KafkaUiApplication Class**
   
 | Element                | Missed Instructions | Cov. | Missed Branches | Cov. | Missed | Cxty | Missed Lines | Missed Methods |
 |------------------------|---------------------|------|------------------|------|--------|------|--------------|----------------|
@@ -159,8 +159,8 @@ The following table is an overview of the test coverage of the project.
 | KafkaUiApplication()   | 3                   | 100% | n/a              | n/a  | 0      | 1    | 0            | 1              |
 
 0% coverage indicates that the methods are not tested
--  **2. ConsumingStats**
--  
+**2. ConsumingStats**
+
 | Element                                  | Missed Instructions | Cov. | Missed Branches | Cov. | Missed | Cxty | Missed Lines | Missed Methods |
 |------------------------------------------|---------------------|------|------------------|------|--------|------|--------------|----------------|
 | Total                                    | 7 of 92             | 92%  | 0 of 0           | n/a  | 1      | 5    | 2            | 24             |
@@ -170,7 +170,7 @@ The following table is an overview of the test coverage of the project.
 | ConsumingStats()                        | 15                  | 100% | n/a              | n/a  | 0      | 1    | 0            | 1              |
 | sendFinishEvent(FluxSink)               | 12                  | 100% | n/a              | n/a  | 0      | 1    | 0            | 1              |
 
--  **3. RetryingKafkaConnectClient**
+**3. RetryingKafkaConnectClient**
   
 | Element                                                     | Missed Instructions | Cov. | Missed Branches | Cov. | Missed | Cxty | Missed Lines | Missed Methods |
 |-------------------------------------------------------------|---------------------|------|------------------|------|--------|------|--------------|----------------|
@@ -219,8 +219,65 @@ The following table is an overview of the test coverage of the project.
 | lambda$conflictCodeRetry$0(Throwable)                      | 3                   | 100% | n/a              | n/a  | 0      | 1    | 0            | 1              |
 
 
-#### 2.2.2 Uncovered Code
+#### 2.2.2 Uncovered/Untested Code
+**1. On `KafkaUiApplication` class**
+```java
+public class KafkaUiApplication {
 
+  public static void main(String[] args) {
+    startApplication(args);
+  }
+
+  public static ConfigurableApplicationContext startApplication(String[] args) {
+    return new SpringApplicationBuilder(KafkaUiApplication.class)
+        .initializers(DynamicConfigOperations.dynamicConfigPropertiesInitializer())
+        .build()
+        .run(args);
+  }
+}
+```
+
+**2. On `ConsumingStats` class**
+```java
+  void incFilterApplyError() {
+    filterApplyErrors++;
+  }
+
+  void sendFinishEvent(FluxSink<TopicMessageEventDTO> sink) {
+    sink.next(
+        new TopicMessageEventDTO()
+            .type(TopicMessageEventDTO.TypeEnum.DONE)
+            .consuming(createConsumingStats())
+    );
+  }
+```
+
+**3. On `RetryingKafkaConnectClient` class**
+```java
+  @Override
+  public Mono<Void> restartConnector(String connectorName, Boolean includeTasks, Boolean onlyFailed)
+      throws WebClientResponseException {
+    return withRetryOnConflict(super.restartConnector(connectorName, includeTasks, onlyFailed));
+  }
+
+  @Override
+  public Mono<ResponseEntity<Void>> restartConnectorWithHttpInfo(String connectorName, Boolean includeTasks,
+                                                                 Boolean onlyFailed) throws WebClientResponseException {
+    return withRetryOnConflict(super.restartConnectorWithHttpInfo(connectorName, includeTasks, onlyFailed));
+  }
+
+  @Override
+  public Mono<Void> restartConnectorTask(String connectorName, Integer taskId) throws WebClientResponseException {
+    return withRetryOnConflict(super.restartConnectorTask(connectorName, taskId));
+  }
+
+  @Override
+  public Mono<ResponseEntity<Void>> restartConnectorTaskWithHttpInfo(String connectorName, Integer taskId)
+      throws WebClientResponseException {
+    return withRetryOnConflict(super.restartConnectorTaskWithHttpInfo(connectorName, taskId));
+  }
+
+```
 ## 3. New Test Cases Based on Test Report
 
 ### 3.1 Overview 
