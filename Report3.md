@@ -147,8 +147,10 @@ The following table is an overview of the test coverage of the project.
 - **Branch Coverage**: 20% (5,218 of 6,534 branches missed)
 - **Line Coverage**: 2,978 of 14,678 lines missed (20.3%)
 - **Method Coverage**: 207 of 5,113 methods missed (4.04%)
-#### Examples of Untested Methods
+
+#### 2.2.1 Examples of Untested Methods
 - **1. KafkaUiApplication Class**
+  
 | Element                | Missed Instructions | Cov. | Missed Branches | Cov. | Missed | Cxty | Missed Lines | Missed Methods |
 |------------------------|---------------------|------|------------------|------|--------|------|--------------|----------------|
 | Total                  | 24 of 27            | 11%  | 0 of 0           | n/a  | 2      | 3    | 6            | 7              |
@@ -158,6 +160,7 @@ The following table is an overview of the test coverage of the project.
 
 0% coverage indicates that the methods are not tested
 -  **2. ConsumingStats**
+-  
 | Element                                  | Missed Instructions | Cov. | Missed Branches | Cov. | Missed | Cxty | Missed Lines | Missed Methods |
 |------------------------------------------|---------------------|------|------------------|------|--------|------|--------------|----------------|
 | Total                                    | 7 of 92             | 92%  | 0 of 0           | n/a  | 1      | 5    | 2            | 24             |
@@ -168,6 +171,7 @@ The following table is an overview of the test coverage of the project.
 | sendFinishEvent(FluxSink)               | 12                  | 100% | n/a              | n/a  | 0      | 1    | 0            | 1              |
 
 -  **3. RetryingKafkaConnectClient**
+  
 | Element                                                     | Missed Instructions | Cov. | Missed Branches | Cov. | Missed | Cxty | Missed Lines | Missed Methods |
 |-------------------------------------------------------------|---------------------|------|------------------|------|--------|------|--------------|----------------|
 | Total                                                       | 114 of 231          | 50%  | 0 of 0           | n/a  | 21     | 42   | 22           | 51             |
@@ -214,7 +218,8 @@ The following table is an overview of the test coverage of the project.
 | getConnectorPlugins()                                      | 4                   | 100% | n/a              | n/a  | 0      | 1    | 0            | 1              |
 | lambda$conflictCodeRetry$0(Throwable)                      | 3                   | 100% | n/a              | n/a  | 0      | 1    | 0            | 1              |
 
-### Uncovered Code
+
+#### 2.2.2 Uncovered Code
 
 ## 3. New Test Cases Based on Test Report
 
