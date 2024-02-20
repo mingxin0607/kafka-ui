@@ -45,11 +45,11 @@ public int factorial(int number) {
 A structural test case for this method would not only test it with different input values (like a black-box test) but also ensure that the loop inside the method is executed the correct number of times for each input. For instance, input 5 should cause the loop to execute five times, multiplying the result by 2, 3, 4, and 5.  
 
 
-
 ## 2. Structural Testing with Coverage Tool
 
-### 2.1 Use `Jacoco` in maven project
-#### 2.1.1 Setup
+### 2.1 Use `Jacoco` in maven project  
+
+### 2.1.1 Setup
 
 To use `Jacoco` coverage tool in a maven project, we could add the following dependency in each "pom.xml" (We have already done so to our project).
 ```xml
@@ -406,6 +406,6 @@ These test cases mainly improve coverage of class "GlobalErrorWebExceptionHandle
 ## Reference
 [1] _Unstop_. (n.d.). Unstop - Competitions, Quizzes, Hackathons, Scholarships and Internships for Students and Corporates. https://unstop.com/blog/structural-testing
 
-[2] _What is White Box Testing? _(n.d.). Check Point. https://www.checkpoint.com/cyber-hub/cyber-security/what-is-white-box-testing/#:~:text=White%20box%20testing%20is%20a,gray%20and%20black%20box%20testing
+[2] _What is White Box Testing?_. (n.d.). Check Point. https://www.checkpoint.com/cyber-hub/cyber-security/what-is-white-box-testing/#:~:text=White%20box%20testing%20is%20a,gray%20and%20black%20box%20testing
 
-[3] _White box testing - Software engineering - GeeksforGeeks._ (2023, December 27). GeeksforGeeks. https://www.geeksforgeeks.org/software-engineering-white-box-testing/
+[3] _White box testing - Software engineering- GeeksforGeeks._ (2023, December 27). GeeksforGeeks. https://www.geeksforgeeks.org/software-engineering-white-box-testing/
