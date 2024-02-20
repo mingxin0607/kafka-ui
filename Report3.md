@@ -5,6 +5,35 @@
 
 ## 1. Structural Testing
 
+Structural testing, also known as white-box testing, is a testing methodology that is based on the internal paths, structure, and implementation of the software. Unlike black-box testing, which focuses on the external functionality and user interface, structural testing dives into the "white" or transparent box, which is the code itself.
+
+### Importance of Structural Testing
+
+Structural testing is critical for several reasons:
+
+1. **Comprehensive Coverage:** It ensures that all the possible paths within the codebase are executed at least once. This is crucial for uncovering hidden bugs that may not be immediately apparent through functional testing.
+
+2. **Logic Verification:** By examining the logical flow of the application, structural testing verifies the correctness of the code logic, which is vital for the application to behave as expected.
+
+3. **Early Detection of Defects:** Since structural testing involves testing the code during the development phase, defects can be detected early, reducing the cost and effort required to fix them later.
+
+4. **Optimization Opportunities:** It provides insights into the performance and optimization opportunities for the code, as testers can see which parts of the code are executed frequently and which are not.
+
+5. **Security Assessments:** Structural testing can uncover security vulnerabilities within the code, such as buffer overflows or logic flaws that could be exploited.
+
+### Example of Structural Testing
+
+Consider a simple Java method that calculates the factorial of a number:
+
+```java
+public int factorial(int number) {
+    int result = 1;
+    for (int factor = 2; factor <= number; factor++) {
+        result *= factor;
+    }
+    return result;
+}
+A structural test case for this method would not only test it with different input values (like a black-box test) but also ensure that the loop inside the method is executed the correct number of times for each input. For instance, input 5 should cause the loop to execute five times, multiplying the result by 2, 3, 4, and 5.
 
 ## 2. Structural Testing with Coverage Tool
 
