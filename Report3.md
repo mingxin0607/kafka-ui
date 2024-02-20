@@ -42,6 +42,7 @@ public int factorial(int number) {
     }
     return result;
 }
+```
 A structural test case for this method would not only test it with different input values (like a black-box test) but also ensure that the loop inside the method is executed the correct number of times for each input. For instance, input 5 should cause the loop to execute five times, multiplying the result by 2, 3, 4, and 5.
 
 To have structural testing, the tools we use usually, include JaCoCo, Clover, or Cobertura. Here we choose JaCoCo.
