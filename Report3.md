@@ -33,12 +33,17 @@ public int factorial(int number) {
     }
     return result;
 }
-A structural test case for this method would not only test it with different input values (like a black-box test) but also ensure that the loop inside the method is executed the correct number of times for each input. For instance, input 5 should cause the loop to execute five times, multiplying the result by 2, 3, 4, and 5.
+A structural test case for this method would not only test it with different input values (like a black-box test) but also ensure that the loop inside the method is executed the correct number of times for each input. For instance, input 5 should cause the loop to execute five times, multiplying the result by 2, 3, 4, and 5.   
+
+
+
+
 
 ## 2. Structural Testing with Coverage Tool
 
 ### 2.1 Use `Jacoco` in maven project
-#### 2.1.1 Setup
+### 2.1.1 Setup
+
 To use `Jacoco` coverage tool in a maven project, we could add the following dependency in each "pom.xml" (We have already done so to our project).
 ```xml
 <build>
