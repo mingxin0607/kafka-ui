@@ -80,7 +80,9 @@ The following YML files are taken as crucial YML files to explain.
 
 **4. release.yaml:** Manages the release process, making it easier to tag releases, create GitHub releases, and publish artifacts. This automation simplifies the process of delivering new versions of the software to end-users and keeps the release process consistent and error-free.
 #### Workflow Analysis
-`backend.yml` file (under the path of `.github/workflows/backend.yml`) is used as an example to explain the workflow process.
+#### 1. `backend.yml` file (under the path of `.github/workflows/backend.yml`) 
+
+The file is used as an example to explain the workflow process.
 ```yml
 name: "Backend: PR/master build & test"
 on:  # Triggers for the workflow
@@ -140,7 +142,8 @@ jobs:
           -Dsonar.projectKey=com.provectus:kafka-ui_backend
 
 ```
-`frontend.yml` file (under the path of `.github/workflows/frontend.yml`) 
+
+#### 2. `frontend.yml` file (under the path of `.github/workflows/frontend.yml`) 
 ```yml
 name: "Frontend: PR/master build & test"
 on:  # Triggers for the workflow
@@ -240,9 +243,24 @@ jobs:
     - name: Run tests  # Run tests
       run: mvn test
 
-``
+```
+
+After adding the new GitHub Action, the `push` action is triggered by pushing the `Report4.md` file. The following result is obtained.
+
+![Fig1. GitHub Action1-Overview]([Fig/Untitled%202.png](https://github.com/mingxin0607/kafka-ui/blob/d1af371d10c6749609e75d2ed9686a362feee3bd/Fig/Action1-Result%20Overview.png))
+
+Fig1. Overview of GitHub Action1 
+
+![Fig2. GitHub Action1-Detail1]([Fig/Untitled%202.png](https://github.com/mingxin0607/kafka-ui/blob/d1af371d10c6749609e75d2ed9686a362feee3bd/Fig/Action1-Details.png))
+
+Fig2. Detail1 of GitHub Action1 
+
+![Fig3. GitHub Action1-Detail2]([Fig/Untitled%202.png](https://github.com/mingxin0607/kafka-ui/blob/840d245bdac5ba1d25486bae1131827532d95002/Fig/Action1-DetailII.png))
+Fig3. Detail1 of GitHub Action2
 
 
+
+By viewing the log given by GitHub, the failure is caused by failing to build with mvn. The error indicates a problem with compiling the `kafka-ui-contract` module using Maven. The message "release version 17 not supported" suggests that the Java version set for the project is not compatible with the compiler's expected version. This can happen if the project is set to use a newer Java version than what the compiler plugin supports or recognizes.
 
 
 # Reference
