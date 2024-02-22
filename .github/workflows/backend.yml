@@ -1,8 +1,8 @@
 name: "Backend: PR/master build & test"
 on:
-  push:
-    branches:
-      - master
+  # push:
+    # branches:
+      # - master
   pull_request_target:
     types: ["opened", "edited", "reopened", "synchronize"]
     paths:
