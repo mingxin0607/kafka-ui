@@ -20,5 +20,5 @@ jobs:
         cache: 'maven'  # Cache Maven dependencies to speed up builds
 
     - name: Build with Maven and Run Tests  # Build the project using Maven
-      run: mvn clean build
+      run: mvn clean install
 
