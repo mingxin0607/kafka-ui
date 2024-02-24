@@ -286,8 +286,8 @@ In an effort to enhance our project's reliability and enforce coding standards, 
 ### New GitHub Action
 The newly added GitHub Actions workflow, the`kafkaUI-java-build-test.yml` file, automates our Java build and testing processes.
 - The file below is used to test whether the code pushed is aligned with the test set. So each push will trigger `mvn test` automatically, which ensures that only code that passes all tests can be merged, maintaining the high quality and stability of the project.
-- Setup a Java development environment with JDK 11, utilizing the Temurin distribution for consistency and reliability across all builds.
-- Utilize Maven for building the project (mvn -B package --file pom.xml), taking advantage of Maven's dependency management and build lifecycle capabilities.
+- Setup a Java development environment with JDK 17, utilizing the Zulu distribution for consistency and reliability across all builds.
+- Utilize Maven for building the project (./mvnw clean install -Pprod), taking advantage of Maven's dependency management and build lifecycle capabilities.
 - Cache Maven dependencies between runs to speed up the build process, reducing the time developers wait for feedback from the CI system.
 
 ```yml
@@ -319,7 +319,7 @@ jobs:
 
 After adding the new GitHub Action, the `push` action is triggered by pushing to the master branch. See below link for more details.
 
-
+https://github.com/mingxin0607/kafka-ui/actions/runs/8028560204
 
 
 # Reference
