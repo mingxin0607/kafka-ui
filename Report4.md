@@ -224,9 +224,6 @@ jobs:
 
 ```
 
-## 3. Adding Code & CI Result
-In an effort to enhance our project's reliability and enforce coding standards, we have integrated a Continuous Integration (CI) process using GitHub Actions. This addition automates the testing of code submissions, ensuring that all changes meet our predefined quality benchmarks before being merged into the main codebase.  
-
 #### 3. `release_drafter.yml` file (under the path of `.github/workflows/release_drafter.yml`) 
 
 This workflow is using the Release Drafter action to automatically draft release notes.
@@ -283,8 +280,10 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
 ```
+## 3. Adding Code & CI Result
+In an effort to enhance our project's reliability and enforce coding standards, we have integrated a Continuous Integration (CI) process using GitHub Actions. This addition automates the testing of code submissions, ensuring that all changes meet our predefined quality benchmarks before being merged into the main codebase.  
 
-### New GitHub Action 1  
+### New GitHub Action
 The newly added GitHub Actions workflow, the`kafkaUI-java-build-test.yml` file, automates our Java build and testing processes.
 - The file below is used to test whether the code pushed is aligned with the test set. So each push will trigger `mvn test` automatically, which ensures that only code that passes all tests can be merged, maintaining the high quality and stability of the project.
 - Setup a Java development environment with JDK 11, utilizing the Temurin distribution for consistency and reliability across all builds.
