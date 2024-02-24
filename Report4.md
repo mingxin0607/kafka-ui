@@ -305,41 +305,22 @@ jobs:
 
     steps:
     - uses: actions/checkout@v3  # Check out code
-    - name: Set up JDK 11  # Setting up JDK 11
+    - name: Set up JDK 17  # Setting up JDK 17
       uses: actions/setup-java@v3
       with:
-        java-version: '11'
-        distribution: 'temurin'  # Using the Temurin distribution
-        cache: 'maven'  # Cache Maven dependencies to speed up builds
+        java-version: '17'
+        distribution: 'zulu'
+        cache: 'maven'
 
-    - name: Build with Maven  # Build the project using Maven
-      run: mvn -B package --file pom.xml
-
-    - name: Run tests  # Run tests
-      run: mvn test
+    - name: Build with Maven and Run Tests  # Build the project using Maven
+      run: ./mvnw clean install -Pprod
 
 ```
 
-After adding the new GitHub Action, the `push` action is triggered by pushing the `Report4.md` file. The following result is obtained.
-
-![Fig1. GitHub Action1-Overview](https://github.com/mingxin0607/kafka-ui/blob/d1af371d10c6749609e75d2ed9686a362feee3bd/Fig/Action1-Result%20Overview.png)  
-
-Fig1. Overview of GitHub Action1
-
-<!--
-
-![Fig2. GitHub Action1-Detail1](https://github.com/mingxin0607/kafka-ui/blob/d1af371d10c6749609e75d2ed9686a362feee3bd/Fig/Action1-Details.png)  
-
-Fig2. Detail1 of GitHub Action1
-
-![Fig3. GitHub Action1-Detail2](https://github.com/mingxin0607/kafka-ui/blob/840d245bdac5ba1d25486bae1131827532d95002/Fig/Action1-DetailII.png)   
-
-Fig3. Detail2 of GitHub Action2
+After adding the new GitHub Action, the `push` action is triggered by pushing to the master branch. See below link for more details.
 
 
 
-By viewing the log given by GitHub, the failure is caused by failing to build with mvn. The error indicates a problem with compiling the `kafka-ui-contract` module using Maven. The message "release version 17 not supported" suggests that the Java version set for the project is not compatible with the compiler's expected version. This can happen if the project is set to use a newer Java version than what the compiler plugin supports or recognizes.
--->
 
 # Reference
 
