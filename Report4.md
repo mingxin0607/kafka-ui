@@ -56,7 +56,7 @@ In the workflow file, define the conditions that trigger the CI process, such as
 
 In the workflow file, define the jobs that need to be executed, including environment setup, dependency installation, build, testing, etc.
 
-### 2.4 Configuration in the Project
+#### Configuration in the Project
 The following directory contains YML files executed by the project.  
 ```
 ├── aws_publisher.yaml
@@ -317,9 +317,11 @@ jobs:
 
 ```
 
-After adding the new GitHub Action, the `push` action is triggered by pushing to the master branch. See below link for more details.
-
+After adding the new GitHub Action, the `push` action is triggered by pushing to the master branch, showing the following result. See the below link for more details. 
 https://github.com/mingxin0607/kafka-ui/actions/runs/8028560204
+![CI Action Success](https://github.com/mingxin0607/kafka-ui/blob/63035729a2b9ad616c69adf311442eadf6b4c560/Fig/report4-action-success.png)  
+
+
 
 
 # Reference
