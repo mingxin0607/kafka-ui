@@ -15,10 +15,10 @@ jobs:
     - name: Set up JDK 11  # Setting up JDK 11
       uses: actions/setup-java@v3
       with:
-        java-version: '11'
-        distribution: 'temurin'  # Using the Temurin distribution
-        cache: 'maven'  # Cache Maven dependencies to speed up builds
+        java-version: '17'
+        distribution: 'zulu'
+        cache: 'maven'
 
     - name: Build with Maven and Run Tests  # Build the project using Maven
-      run: mvn clean install
+      run: ./mvnw clean install -Pprod
 
