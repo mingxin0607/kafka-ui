@@ -56,7 +56,7 @@ In the workflow file, define the conditions that trigger the CI process, such as
 
 In the workflow file, define the jobs that need to be executed, including environment setup, dependency installation, build, testing, etc.
 
-### 2. Configuration in the Project
+### 2.4 Configuration in the Project
 The following directory contains YML files executed by the project.  
 ```
 ├── aws_publisher.yaml
