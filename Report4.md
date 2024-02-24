@@ -234,6 +234,8 @@ After adding the new GitHub Action, the `push` action is triggered by pushing th
 
 Fig1. Overview of GitHub Action1
 
+<!--
+
 ![Fig2. GitHub Action1-Detail1](https://github.com/mingxin0607/kafka-ui/blob/d1af371d10c6749609e75d2ed9686a362feee3bd/Fig/Action1-Details.png)  
 
 Fig2. Detail1 of GitHub Action1
@@ -245,7 +247,7 @@ Fig3. Detail2 of GitHub Action2
 
 
 By viewing the log given by GitHub, the failure is caused by failing to build with mvn. The error indicates a problem with compiling the `kafka-ui-contract` module using Maven. The message "release version 17 not supported" suggests that the Java version set for the project is not compatible with the compiler's expected version. This can happen if the project is set to use a newer Java version than what the compiler plugin supports or recognizes.
-
+-->
 
 # Reference
 [1]_ CircleCI._ (2024, February 16). CircleCI. https://circleci.com/continuous-integration/
