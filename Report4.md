@@ -2,12 +2,48 @@
 
 ## 1. Continuous Integration 
 ### 1.1 Definition
+> Continuous Integration (CI) is the practice of merging all developers' working copies to a shared mainline several times a day. Nowadays it is typically implemented in such a way that it triggers an automated build with testing. [1](https://en.wikipedia.org/wiki/Continuous_integration)
 
 
 ### 1.2 Purpose of Continuous Integration
 
+__Early Detection of Integration Issues__
 
-## 2. Setting up CI
+CI involves regularly integrating code changes from multiple developers into a shared repository. This helps identify integration issues early in the development process, preventing the accumulation of bugs that might arise when integrating changes later
+
+__Automated Build and Testing__
+
+CI systems automate the process of building the software and running tests on the integrated code. Automated builds ensure that the code can be compiled successfully, and automated tests help verify that new changes do not introduce regressions or break existing functionality.
+
+__Enhanced Code Quality__
+
+By automating testing and integration processes, CI helps maintain and enhance code quality. The early detection of issues and the automated validation of code changes contribute to a more stable and reliable codebase.
+
+__Streamlined Deployment__
+
+Continuous Integration sets the stage for Continuous Deployment (CD). Automated builds and tests create a reliable foundation for deploying software to production environments, ensuring that only validated and functional code is released.
+
+
+### 1.3 CI Tools & Features
+__GitHub Actions__
+
+- Native GitHub Integration: GitHub Actions is tightly integrated into GitHub repositories, allowing developers to define CI/CD workflows using YAML files within the repository.
+- Workflow Automation: It supports automating build, test, and deployment processes triggered by events like pushes, pull requests, or manual triggers through the GitHub Actions UI.
+- Matrix Builds: GitHub Actions supports matrix builds, allowing users to define multiple jobs with different parameters for parallel execution.
+
+__Jenkins__
+
+- Extensibility: Jenkins is known for its extensive plugin ecosystem, enabling users to customize and extend its capabilities.
+- Customizable Workflows: Users can define complex build and deployment workflows through a web-based interface or by scripting in Groovy.
+- Community Support: With a large and active community, Jenkins benefits from continuous development and a wealth of shared knowledge.
+
+__Travis CI__
+
+- GitHub Integration: Travis CI seamlessly integrates with GitHub repositories, automatically triggering builds for every push or pull request.
+- YAML Configuration: Build configurations are specified in a .travis.yml file within the repository, making it easy to understand and version-controlled.
+- Parallel Builds: Travis CI supports parallel builds, enabling faster test execution by dividing tasks across multiple instances.
+
+## 2. Setting up CI with Github Actions
 ### 2.1 Create Workflow File
 
 Create a directory named `.github/workflows` in the GitHub repository, and add a YAML formatted workflow file (for example, `ci.yml`) within it. The workflow file specifies the conditions that trigger the CI process and the steps that need to be executed.
@@ -191,6 +227,63 @@ jobs:
 ## 3. Adding Code & CI Result
 In an effort to enhance our project's reliability and enforce coding standards, we have integrated a Continuous Integration (CI) process using GitHub Actions. This addition automates the testing of code submissions, ensuring that all changes meet our predefined quality benchmarks before being merged into the main codebase.  
 
+#### 3. `release_drafter.yml` file (under the path of `.github/workflows/release_drafter.yml`) 
+
+This workflow is using the Release Drafter action to automatically draft release notes.
+```yml
+# Name of the GitHub Actions workflow
+name: "Infra: Release Drafter run"
+
+# Events that trigger the workflow
+on:
+  push:
+    branches:
+      - master
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version'
+        required: false
+      branch:
+        description: 'Target branch'
+        required: false
+        default: 'master'
+
+# Permissions set for the workflow
+permissions:
+  contents: read
+
+# Jobs defined in the workflow
+jobs:
+  # Job to update the release draft
+  update_release_draft:
+    runs-on: ubuntu-latest
+
+    # Permissions for this job
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      # Step to use the Release Drafter action
+      - uses: release-drafter/release-drafter@v5
+        with:
+          # Configuration file for Release Drafter
+          config-name: release_drafter.yaml
+
+          # Disable autolabeler for this run
+          disable-autolabeler: true
+
+          # Retrieve version and target branch from workflow inputs
+          version: ${{ github.event.inputs.version }}
+          commitish: ${{ github.event.inputs.branch }}
+
+        # Environment variable for GitHub token authentication
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+```
+
 ### New GitHub Action 1  
 The newly added GitHub Actions workflow, the`kafkaUI-java-build-test.yml` file, automates our Java build and testing processes.
 - The file below is used to test whether the code pushed is aligned with the test set. So each push will trigger `mvn test` automatically, which ensures that only code that passes all tests can be merged, maintaining the high quality and stability of the project.
@@ -250,8 +343,5 @@ By viewing the log given by GitHub, the failure is caused by failing to build wi
 -->
 
 # Reference
-[1]_ CircleCI._ (2024, February 16). CircleCI. https://circleci.com/continuous-integration/
 
-[2] _What is CI/CD?_ (n.d.). Red Hat - We make open source technologies for the enterprise. https://www.redhat.com/en/topics/devops/what-is-ci-cd
-
-[3] _What is Continuous Integration?_ (n.d.). AWS. https://aws.amazon.com/devops/continuous-integration/#:~:text=Continuous%20integration%20is%20a%20DevOps,builds%20and%20tests%20are%20run
+[1]: [Continuous integration - Wikipedia](https://en.wikipedia.org/wiki/Continuous_integration)
