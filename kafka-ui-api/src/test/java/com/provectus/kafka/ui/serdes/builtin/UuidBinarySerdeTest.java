@@ -8,11 +8,12 @@ import com.provectus.kafka.ui.serdes.PropertyResolverImpl;
 import com.provectus.kafka.ui.serdes.RecordHeadersImpl;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.EnumSource;
 import java.nio.ByteBuffer;
-import org.mockito.MockedStatic;
+import org.junit.jupiter.params.provider.EnumSource;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
+import org.mockito.MockedStatic;
+
 import org.junit.jupiter.api.Nested;
 import org.mockito.Mockito;
 import org.springframework.mock.env.MockEnvironment;
