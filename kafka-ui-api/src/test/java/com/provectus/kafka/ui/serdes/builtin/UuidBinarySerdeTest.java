@@ -10,12 +10,13 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.mockito.MockedStatic;
 import org.mockito.Mockito;
-import org.springframework.mock.env.MockEnvironment;
 import java.nio.ByteBuffer;
 import java.util.UUID;
-import static org.assertj.core.api.Assertions.assertThat;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Nested;
+import org.springframework.mock.env.MockEnvironment;
+import static org.assertj.core.api.Assertions.assertThat;
+
 
 class UuidBinarySerdeTest {
   @Test
