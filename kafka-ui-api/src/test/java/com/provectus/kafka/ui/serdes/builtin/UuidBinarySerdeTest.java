@@ -1,44 +1,22 @@
 package com.provectus.kafka.ui.serdes.builtin;
 
-//import static org.assertj.core.api.Assertions.assertThat;
-//
-//import com.provectus.kafka.ui.serde.api.DeserializeResult;
-//import com.provectus.kafka.ui.serde.api.Serde;
-//import com.provectus.kafka.ui.serdes.PropertyResolverImpl;
-//import com.provectus.kafka.ui.serdes.RecordHeadersImpl;
-//import org.junit.jupiter.api.BeforeEach;
-//import org.junit.jupiter.params.ParameterizedTest;
-//import java.nio.ByteBuffer;
-//import org.junit.jupiter.params.provider.EnumSource;
-//import java.util.UUID;
-//import org.junit.jupiter.api.Test;
-//import org.mockito.MockedStatic;
-//
-//import org.junit.jupiter.api.Nested;
-//import org.mockito.Mockito;
-//import org.springframework.mock.env.MockEnvironment;
-// Static imports first (if there are any, and sorted alphabetically)
 import static org.assertj.core.api.Assertions.assertThat;
 
-// Then, standard Java imports (sorted alphabetically)
-import java.nio.ByteBuffer;
-import java.util.UUID;
-
-// Followed by third-party imports (e.g., JUnit, Mockito, Spring, etc.), sorted alphabetically and grouped by top-level package
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Nested;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.EnumSource;
-import org.mockito.MockedStatic;
-import org.mockito.Mockito;
-import org.springframework.mock.env.MockEnvironment;
-
-// Finally, imports from your own project, sorted alphabetically
 import com.provectus.kafka.ui.serde.api.DeserializeResult;
 import com.provectus.kafka.ui.serde.api.Serde;
 import com.provectus.kafka.ui.serdes.PropertyResolverImpl;
 import com.provectus.kafka.ui.serdes.RecordHeadersImpl;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.params.ParameterizedTest;
+import java.nio.ByteBuffer;
+import java.util.UUID;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.api.Nested;
+import org.mockito.MockedStatic;
+import org.mockito.Mockito;
+import org.springframework.mock.env.MockEnvironment;
+
 
 
 
