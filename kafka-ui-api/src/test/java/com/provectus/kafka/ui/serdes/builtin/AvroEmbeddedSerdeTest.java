@@ -1,16 +1,14 @@
 package com.provectus.kafka.ui.serdes.builtin;
 
-
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-
-import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.when;
+
 import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.provectus.kafka.ui.serde.api.DeserializeResult;
 import com.provectus.kafka.ui.serde.api.Serde;
-import com.provectus.kafka.ui.serdes.BuiltInSerde;
 import com.provectus.kafka.ui.serdes.PropertyResolverImpl;
 import io.confluent.kafka.schemaregistry.avro.AvroSchemaUtils;
 import java.io.ByteArrayOutputStream;
@@ -206,4 +204,5 @@ class AvroEmbeddedSerdeTest {
       writer.flush();
       return baos.toByteArray();
     }
-  }}
+  }
+}
