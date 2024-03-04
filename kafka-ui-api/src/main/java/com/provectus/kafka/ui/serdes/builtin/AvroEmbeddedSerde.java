@@ -46,11 +46,7 @@ public class AvroEmbeddedSerde implements BuiltInSerde {
 
   @Override
   public Deserializer deserializer(String topic, Target type) {
-    //This code snippet implements a Deserializer for Avro data. It overrides the deserializer method to return an anonymous Deserializer class.
-    // This class's deserialize method attempts to read Avro data from a byte array using DataFileReader and GenericDatumReader.
-    // If no data is found (indicating only headers are present), it returns a DeserializeResult with null data.
-    // Otherwise, it converts the Avro object to a JSON string using AvroSchemaUtils.toJson and returns a DeserializeResult containing the JSON string.
-    // This process is used for converting Avro-encoded Kafka record data into a human-readable JSON format.
+
     return new Deserializer() {
       @SneakyThrows
       @Override
