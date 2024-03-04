@@ -32,86 +32,52 @@ import org.mockito.MockitoAnnotations;
 
 class AvroEmbeddedSerdeTest {
 
-  @Mock
-  private DataFileReader<GenericRecord> dataFileReader;
-
-  private AvroEmbeddedSerde serde;
-
-  @BeforeEach
-  void setUp() {
-    MockitoAnnotations.initMocks(this);
-    serde = new AvroEmbeddedSerde();
-  }
-
-  @Test
-  void deserializeShouldReturnJsonValue() throws IOException {
-    // Arrange: Create a simple Avro schema
-    String schemaString = """
-            {
-              "type": "record",
-              "name": "TestAvroRecord",
-              "fields": [
-                { "name": "field1", "type": "string" },
-                { "name": "field2", "type": "int" }
-              ]
-            }
-            """;
-    Schema schema = new Schema.Parser().parse(schemaString);
-
-    // Create a GenericRecord with the schema
-    GenericRecord user1 = new GenericData.Record(schema);
-    user1.put("field1", "this is test msg");
-    user1.put("field2", 256);
-
-    // Serialize the GenericRecord to a byte array
-    ByteArrayOutputStream out = new ByteArrayOutputStream();
-    BinaryEncoder encoder = EncoderFactory.get().binaryEncoder(out, null);
-    SpecificDatumWriter<GenericRecord> writer = new SpecificDatumWriter<>(schema);
-    writer.write(user1, encoder);
-    encoder.flush();
-    out.close();
-    byte[] serializedBytes = out.toByteArray();
-
-    // Mock the DataFileReader to return the GenericRecord
-    when(dataFileReader.hasNext()).thenReturn(true).thenReturn(false); // End after one record
-    when(dataFileReader.next()).thenReturn(user1);
-
-    // Act: Deserialize the bytes
-//    Deserializer deserializer = (Deserializer) serde.deserializer("anyTopic", BuiltInSerde.Target.VALUE);
-//    DeserializeResult result = (DeserializeResult) deserializer.deserialize(null, serializedBytes);
-    var deserializer = avroEmbeddedSerde.deserializer("anyTopic", Serde.Target.VALUE);
-    DeserializeResult result = deserializer.deserialize(null, serializedBytes);
-
-    // Assert: Deserialize and verify the result
-    assertEquals("{ \"field1\": \"this is test msg\", \"field2\": 256 }", result.getResult());
-
-    // Verify that DataFileReader methods were called as expected
-    verify(dataFileReader, times(2)).hasNext();
-    verify(dataFileReader).next();
-  }
+//  @Mock
+//  private DataFileReader<GenericRecord> dataFileReader;
 //
+//  private AvroEmbeddedSerde serde;
+////创建待测类变量
+//
+//  @BeforeEach
+//  void setUp() {
+//    MockitoAnnotations.initMocks(this);
+//    serde = new AvroEmbeddedSerde();
+//  }
 //
 //  @Test
 //  void deserializeShouldReturnJsonValue() throws IOException {
-//    // Arrange: Create a simple Avro schema
+//    // Arrange: Create a simple Avro schema，将来要作为参照物
 //    String schemaString = """
-//        {
-//          "type": "record",
-//          "name": "TestAvroRecord",
-//          "fields": [
-//            { "name": "field1", "type": "string" },
-//            { "name": "field2", "type": "int" }
-//          ]
-//        }
-//        """;
+//            {
+//              "type": "record",
+//              "name": "TestAvroRecord",
+//              "fields": [
+//                { "name": "field1", "type": "string" },
+//                { "name": "field2", "type": "int" }
+//              ]
+//            }
+//            """;
 //    Schema schema = new Schema.Parser().parse(schemaString);
+////    record.put("field1", "this is test msg");
+////    record.put("field2", 100500);
+//
+//    String jsonRecord = new String(AvroSchemaUtils.toJson(schema));
+//    byte[] serializedRecordBytes = serializeAvroWithEmbeddedSchema((GenericRecord) schema);
+//
+//    var deserializer = avroEmbeddedSerde.deserializer("anyTopic", Serde.Target.KEY);
+//    DeserializeResult result = deserializer.deserialize(null, serializedRecordBytes);
+//
+//
+//
+//    assertThat(result.getType()).isEqualTo(DeserializeResult.Type.JSON);
+//    assertThat(result.getAdditionalProperties()).isEmpty();
+//    assertJsonEquals(jsonRecord, result.getResult());
+
 //
 //    // Create a GenericRecord with the schema
 //    GenericRecord user1 = new GenericData.Record(schema);
 //    user1.put("field1", "this is test msg");
 //    user1.put("field2", 256);
-////    user1.put("name", "John Doe");
-////    user1.put("favorite_number", 256);
 //
 //    // Serialize the GenericRecord to a byte array
 //    ByteArrayOutputStream out = new ByteArrayOutputStream();
@@ -123,20 +89,20 @@ class AvroEmbeddedSerdeTest {
 //    byte[] serializedBytes = out.toByteArray();
 //
 //    // Mock the DataFileReader to return the GenericRecord
-//    DataFileReader<GenericRecord> dataFileReader = mock(DataFileReader.class);
 //    when(dataFileReader.hasNext()).thenReturn(true).thenReturn(false); // End after one record
 //    when(dataFileReader.next()).thenReturn(user1);
 //
-//    // Act: Create a serde instance and deserialize the bytes
-//    AvroEmbeddedSerde serde = new AvroEmbeddedSerde();
-//    Deserializer deserializer = (Deserializer) serde.deserializer("anyTopic", BuiltInSerde.Target.VALUE);
+//    // Act: Deserialize the bytes
+//    var deserializer = avroEmbeddedSerde.deserializer("anyTopic", Serde.Target.VALUE);
+//    DeserializeResult result = deserializer.deserialize(null, serializedBytes);
 //
 //    // Assert: Deserialize and verify the result
-//    DeserializeResult result = (DeserializeResult) deserializer.deserialize(null, serializedBytes);
 //    assertEquals("{ \"field1\": \"this is test msg\", \"field2\": 256 }", result.getResult());
-//  }
 //
-
+//    // Verify that DataFileReader methods were called as expected
+//    verify(dataFileReader, times(2)).hasNext();
+//    verify(dataFileReader).next();
+//  }
 
   private AvroEmbeddedSerde avroEmbeddedSerde;
 
@@ -186,6 +152,8 @@ class AvroEmbeddedSerdeTest {
 
     var deserializer = avroEmbeddedSerde.deserializer("anyTopic", Serde.Target.KEY);
     DeserializeResult result = deserializer.deserialize(null, serializedRecordBytes);
+
+
     assertThat(result.getType()).isEqualTo(DeserializeResult.Type.JSON);
     assertThat(result.getAdditionalProperties()).isEmpty();
     assertJsonEquals(jsonRecord, result.getResult());
