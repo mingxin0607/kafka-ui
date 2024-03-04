@@ -34,6 +34,7 @@ In the Kafka-UI project, we try to improve the testability of the code, which ma
 We found one example in this class that might make the code not good for being tested. The original method directly uses the `Ints.toByteArray` method to convert an Integer into a byte array as follows:
 
 ```java
+//original code
 @Override
 public Serializer serializer(String topic, Target type) {
     return input -> Ints.toByteArray(Integer.parseUnsignedInt(input));
@@ -51,7 +52,7 @@ To solve the above issues, we can make the following modifications:
 We can create an interface containing the `toByteArray(String input)` method, so we can isolate the code implementation and the library. 
 
 ```java
-//original code
+//interface
 public interface UInt32Converter {
     byte[] toByteArray(String input);
 }
