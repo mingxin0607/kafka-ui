@@ -137,19 +137,31 @@ class AvroEmbeddedSerdeTest {
   @Test
   void deserializeShouldReturnJsonValue() throws IOException {
     // Arrange: Create a simple Avro schema
-    String schemaString = "{\"namespace\": \"example.avro\", " +
-        "\"type\": \"record\", " +
-        "\"name\": \"User\", " +
-        "\"fields\": [" +
-        "{\"name\": \"name\", \"type\": \"string\"}," +
-        "{\"name\": \"favorite_number\",  \"type\": [\"int\", \"null\"]}" +
-        "]}";
+    String schemaString = """
+        {
+          "type": "record",
+          "name": "TestAvroRecord",
+          "fields": [
+            { "name": "field1", "type": "string" },
+            { "name": "field2", "type": "int" }
+          ]
+        }
+        """;
+//    String schemaString = "{\"namespace\": \"example.avro\", " +
+//        "\"type\": \"record\", " +
+//        "\"name\": \"User\", " +
+//        "\"fields\": [" +
+//        "{\"name\": \"name\", \"type\": \"string\"}," +
+//        "{\"name\": \"favorite_number\",  \"type\": [\"int\", \"null\"]}" +
+//        "]}";
     Schema schema = new Schema.Parser().parse(schemaString);
 
     // Create a GenericRecord with the schema
     GenericRecord user1 = new GenericData.Record(schema);
-    user1.put("name", "John Doe");
-    user1.put("favorite_number", 256);
+    user1.put("field1", "this is test msg");
+    user1.put("field2", "this is another test msg");
+//    user1.put("name", "John Doe");
+//    user1.put("favorite_number", 256);
 
     // Serialize the GenericRecord to a byte array
     ByteArrayOutputStream out = new ByteArrayOutputStream();
@@ -169,11 +181,11 @@ class AvroEmbeddedSerdeTest {
     AvroEmbeddedSerde serde = new AvroEmbeddedSerde();
 //    var deserializer = avroEmbeddedSerde.deserializer("anyTopic", Serde.Target.KEY);
 //    DeserializeResult result = deserializer.deserialize(null, serializedBytes);
-    Deserializer deserializer = (Deserializer) serde.deserializer("topic", BuiltInSerde.Target.VALUE);
+    Deserializer deserializer = (Deserializer) serde.deserializer("anyTopic", BuiltInSerde.Target.VALUE);
 
     // Assert: Deserialize and verify the result
     DeserializeResult result = (DeserializeResult) deserializer.deserialize(null, serializedBytes);
-    assertEquals("{\"name\": \"John Doe\", \"favorite_number\": 256}", result.getResult());
+    assertEquals("{ \"field1\": \"this is test msg\", \"field2\": \"this is another test msg\" }", result.getResult());
   }
 
 

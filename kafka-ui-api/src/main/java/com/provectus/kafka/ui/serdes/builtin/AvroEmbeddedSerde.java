@@ -46,6 +46,11 @@ public class AvroEmbeddedSerde implements BuiltInSerde {
 
   @Override
   public Deserializer deserializer(String topic, Target type) {
+    //This code snippet implements a Deserializer for Avro data. It overrides the deserializer method to return an anonymous Deserializer class.
+    // This class's deserialize method attempts to read Avro data from a byte array using DataFileReader and GenericDatumReader.
+    // If no data is found (indicating only headers are present), it returns a DeserializeResult with null data.
+    // Otherwise, it converts the Avro object to a JSON string using AvroSchemaUtils.toJson and returns a DeserializeResult containing the JSON string.
+    // This process is used for converting Avro-encoded Kafka record data into a human-readable JSON format.
     return new Deserializer() {
       @SneakyThrows
       @Override
@@ -58,6 +63,8 @@ public class AvroEmbeddedSerde implements BuiltInSerde {
           }
           Object avroObj = reader.next();
           String jsonValue = new String(AvroSchemaUtils.toJson(avroObj));
+          //AvroSchemaUtils是 Confluence 的 Kafka Avro Serializer 库的一部分，外部依赖项。
+          // 提供了使用 Avro 架构和数据的方法，例如将 Avro 对象转换为 JSON，
           return new DeserializeResult(jsonValue, DeserializeResult.Type.JSON, Map.of());
         }
       }
