@@ -6,11 +6,11 @@
 
 #### 1.1.1The Concept of Testable Design
 
-A good testable design executes the automated testing in an efficient and economic way, which is an important attribute of a software design (Kexugit, 2008). According to the article provided by the Microsoft  (Kexugit, 2008) , testability primarily involves establishing quick and efficient feedback loops within your developemnt procedure to identify issues iin your code effectively.
+A good testable design executes automated testing efficiently and economically, which is an important attribute of a software design (Kexugit, 2008). According to the article provided by Microsoft  (Kexugit, 2008), testability primarily involves establishing quick and efficient feedback loops within your development procedure to identify issues in your code effectively.
 
 #### 1.1.2 The Importance of Testable Design
 
-The earlier problems are detected, the less costly they are to fix (Kexugit, 2008). Therefore, an appropriate testable design can help developers to fix the errors in a quick manner.
+The earlier problems are detected, the less costly they are to fix (Kexugit, 2008). Therefore, an appropriate testable design can help developers to fix the errors quickly.
 
 #### 1.1.3 Goals & Aspects of Testable Design
 
@@ -29,7 +29,7 @@ More specifically, tests including unit tests, integration tests, and functional
 4. Explicitly declaring dependencies enhances testability compared to implicit dependency handling, allowing for easier testing scenarios such as testing with clean databases, multiple threads, or other specific conditions.
 ### 1.2 Identify & Improve the Testability in Code
 
-In the Kafka-UI project, we try to improve the testability of the code, which makes the code tested more easily. There is a class called `UInt32Serde` (path: `kafka-ui-api/src/main/java/com/provectus/kafka/ui/serdes/builtin/UInt32Serde.java`). This class is serialization and deserialization for the unsigned integer. The Serialization Method takes a string input representing a 32-bit integer and converts it into a 4-byte array. The deserialization method takes a byte array and converts it back to a string representing an unsigned 32-bit integer.   
+In the Kafka-UI project, we try to improve the testability of the code, which makes the code tested more easily. There is a class called `UInt32Serde` (path: `kafka-ui-api/src/main/java/com/provectus/kafka/ui/serdes/builtin/UInt32Serde.java`). This class is about doing the serialization and deserialization for the unsigned integer. The Serialization Method takes a string input representing a 32-bit integer and converts it into a 4-byte array. The deserialization method takes a byte array and converts it back to a string representing an unsigned 32-bit integer.   
 
 We found one example in this class that might make the code not good for being tested. The original method directly uses the `Ints.toByteArray` method to convert an Integer into a byte array as follows:
 
