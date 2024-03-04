@@ -112,13 +112,50 @@ Mocking does not require any modification of the codebase.
 
 ### 2.2 Mocking Example
 
+We mocked the `UUID.randomUUID()` method in the `UuidBinarySerde` class using the `Mockito` framework in a unit test and validates the serialization logic of the `UuidBinarySerde` class. This process involves controlling the behavior of `UUID.randomUUID()`, ensuring the serialization logic correctly processes a UUID, and verifying that the method call occurs. Here is a detailed explanation of our code:
 
+Firstly, we need to know that in the `UuidBinarySerde` class, the `serializer` method is designed to convert a UUID, represented as a string, into a binary format encapsulated in a byte array. The serialization process takes into account the mostSignificantBitsFirst boolean flag to determine the order in which the UUID's most significant bits (MSB) and least significant bits (LSB) are placed in the resulting byte array.
 
+As for testing, we need to initializz and Configure the Mock Environment first.
 
+```java
+    try (MockedStatic<UUID> mockedUuid = Mockito.mockStatic(UUID.class)) {
+            // Create a fake UUID instance
+            UUID fakeUuid = new UUID(0L, 0L);
+            // When UUID.randomUUID() is called, return the fake UUID
+            mockedUuid.when(UUID::randomUUID).thenReturn(fakeUuid);
 
+```
+`MockedStatic<UUID>`: We uses Mockito to create a mock environment for the static method `randomUUID()` of the UUID class. This means that within this mock environment, the behavior of `UUID.randomUUID()` will no longer be generating a new, random UUID, but will execute according to the logic we specify.
 
+`UUID fakeUuid = new UUID(0L, 0L);`: Creates a UUID with all zeros. This UUID, being a fixed value, is used to verify whether the serialization logic correctly processes this specific UUID.
 
+`mockedUuid.when(UUID::randomUUID).thenReturn(fakeUuid);`: This line specifies that when `UUID.randomUUID()` is called, it should return your fixed UUID fakeUuid instead of a genuinely random UUID. This allows you to control the behavior and output of the test.
 
+Then we initializes an instance of `UuidBinarySerde` and configures it by calling the `configure` method. As for `serde.serializer("anyTopic", Serde.Target.VALUE);` it retrieves an instance of the Serializer for value (VALUE) serialization.
+
+```java
+      UuidBinarySerde serde = new UuidBinarySerde();
+        serde.configure(PropertyResolverImpl.empty(), PropertyResolverImpl.empty(), PropertyResolverImpl.empty());
+        var serializer = serde.serializer("anyTopic", Serde.Target.VALUE);
+
+```
+Here we serializes our fixed UUID using the serializer and wraps the result into a `ByteBuffer`. Then we verified that the serialized binary data correctly represents the UUID's most significant bits (MSB) and least significant bits (LSB).
+
+```java
+     byte[] bytes = serializer.serialize(fakeUuid.toString());
+        var bb = ByteBuffer.wrap(bytes);
+        // Verify the serialization result
+        assertThat(bb.getLong()).isEqualTo(fakeUuid.getMostSignificantBits());
+        assertThat(bb.getLong()).isEqualTo(fakeUuid.getLeastSignificantBits());
+```
+At last, we uses `Mockito` to verify whether `UUID.randomUUID()` was called at least once. This is a key step to check if the `UuidBinarySerde` serialization logic truly relies on `UUID.randomUUID()` to generate a UUID.
+
+```java
+    // Confirm that UUID.randomUUID() was called at least once
+    mockedUuid.verify(UUID::randomUUID, Mockito.times(1));
+
+```
 
 ## References
 
