@@ -72,7 +72,7 @@ public class DefaultUInt32Converter implements UInt32Converter {
 
 ```
 ```java
-// use the interface rather than directly use the library
+// use the interface rather than directly using the library
 public class UInt32Serde {
     private final UInt32Converter converter;
 
