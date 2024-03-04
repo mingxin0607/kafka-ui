@@ -46,6 +46,7 @@ class UuidBinarySerdeTest {
       mockedUuid.verify(UUID::randomUUID, Mockito.times(1));
     }
   }
+
   @Nested
   class MsbFirst {
 
