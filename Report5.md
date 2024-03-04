@@ -110,7 +110,9 @@ Mocking does not require any modification of the codebase.
 6. Unlike traditional unit testing, assertion is done by mock objects which are initialized in advance with respect to what method calls are expected and how they should respond.
 7. Mocking is used for protocol testing in which it tests how to use API and how it will react to API implemented accordingly.
 
-### 2.2 Mocking 
+### 2.2 Mocking Example
+
+
 
 
 

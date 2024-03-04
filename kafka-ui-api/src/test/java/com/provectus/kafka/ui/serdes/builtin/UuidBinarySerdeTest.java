@@ -2,21 +2,26 @@ package com.provectus.kafka.ui.serdes.builtin;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import org.junit.jupiter.api.Test;
-import org.mockito.MockedStatic;
-import org.mockito.Mockito;
+import java.nio.ByteBuffer;
 import java.util.UUID;
 import com.provectus.kafka.ui.serde.api.DeserializeResult;
 import com.provectus.kafka.ui.serde.api.Serde;
 import com.provectus.kafka.ui.serdes.PropertyResolverImpl;
+import org.junit.jupiter.api.Test;
+import org.mockito.MockedStatic;
+
+
+
+
+
 import com.provectus.kafka.ui.serdes.RecordHeadersImpl;
-import java.nio.ByteBuffer;
-import java.util.UUID;
+
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
-import org.mockito.MockedStatic;
+
 import org.mockito.Mockito;
 import org.springframework.mock.env.MockEnvironment;
 
