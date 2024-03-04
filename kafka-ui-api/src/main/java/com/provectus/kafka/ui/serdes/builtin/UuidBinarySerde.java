@@ -18,7 +18,7 @@ public class UuidBinarySerde implements BuiltInSerde {
     return "UUIDBinary";
   }
 
-  private boolean mostSignificantBitsFirst = true;
+  boolean mostSignificantBitsFirst = true;
 
   @Override
   public void configure(PropertyResolver serdeProperties,
