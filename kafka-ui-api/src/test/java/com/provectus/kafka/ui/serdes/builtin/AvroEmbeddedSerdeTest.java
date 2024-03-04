@@ -1,10 +1,6 @@
 package com.provectus.kafka.ui.serdes.builtin;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.when;
 
 import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.provectus.kafka.ui.serde.api.DeserializeResult;
@@ -14,95 +10,16 @@ import io.confluent.kafka.schemaregistry.avro.AvroSchemaUtils;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import org.apache.avro.Schema;
-import org.apache.avro.file.DataFileReader;
 import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericDatumWriter;
 import org.apache.avro.generic.GenericRecord;
-import org.apache.avro.io.BinaryEncoder;
-import org.apache.avro.io.EncoderFactory;
-import org.apache.avro.specific.SpecificDatumWriter;
-import org.apache.kafka.common.serialization.Deserializer;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
-import org.mockito.Mock;
-import org.mockito.MockitoAnnotations;
 
 class AvroEmbeddedSerdeTest {
-
-//  @Mock
-//  private DataFileReader<GenericRecord> dataFileReader;
-//
-//  private AvroEmbeddedSerde serde;
-////创建待测类变量
-//
-//  @BeforeEach
-//  void setUp() {
-//    MockitoAnnotations.initMocks(this);
-//    serde = new AvroEmbeddedSerde();
-//  }
-//
-//  @Test
-//  void deserializeShouldReturnJsonValue() throws IOException {
-//    // Arrange: Create a simple Avro schema，将来要作为参照物
-//    String schemaString = """
-//            {
-//              "type": "record",
-//              "name": "TestAvroRecord",
-//              "fields": [
-//                { "name": "field1", "type": "string" },
-//                { "name": "field2", "type": "int" }
-//              ]
-//            }
-//            """;
-//    Schema schema = new Schema.Parser().parse(schemaString);
-////    record.put("field1", "this is test msg");
-////    record.put("field2", 100500);
-//
-//    String jsonRecord = new String(AvroSchemaUtils.toJson(schema));
-//    byte[] serializedRecordBytes = serializeAvroWithEmbeddedSchema((GenericRecord) schema);
-//
-//    var deserializer = avroEmbeddedSerde.deserializer("anyTopic", Serde.Target.KEY);
-//    DeserializeResult result = deserializer.deserialize(null, serializedRecordBytes);
-//
-//
-//
-//    assertThat(result.getType()).isEqualTo(DeserializeResult.Type.JSON);
-//    assertThat(result.getAdditionalProperties()).isEmpty();
-//    assertJsonEquals(jsonRecord, result.getResult());
-
-//
-//    // Create a GenericRecord with the schema
-//    GenericRecord user1 = new GenericData.Record(schema);
-//    user1.put("field1", "this is test msg");
-//    user1.put("field2", 256);
-//
-//    // Serialize the GenericRecord to a byte array
-//    ByteArrayOutputStream out = new ByteArrayOutputStream();
-//    BinaryEncoder encoder = EncoderFactory.get().binaryEncoder(out, null);
-//    SpecificDatumWriter<GenericRecord> writer = new SpecificDatumWriter<>(schema);
-//    writer.write(user1, encoder);
-//    encoder.flush();
-//    out.close();
-//    byte[] serializedBytes = out.toByteArray();
-//
-//    // Mock the DataFileReader to return the GenericRecord
-//    when(dataFileReader.hasNext()).thenReturn(true).thenReturn(false); // End after one record
-//    when(dataFileReader.next()).thenReturn(user1);
-//
-//    // Act: Deserialize the bytes
-//    var deserializer = avroEmbeddedSerde.deserializer("anyTopic", Serde.Target.VALUE);
-//    DeserializeResult result = deserializer.deserialize(null, serializedBytes);
-//
-//    // Assert: Deserialize and verify the result
-//    assertEquals("{ \"field1\": \"this is test msg\", \"field2\": 256 }", result.getResult());
-//
-//    // Verify that DataFileReader methods were called as expected
-//    verify(dataFileReader, times(2)).hasNext();
-//    verify(dataFileReader).next();
-//  }
 
   private AvroEmbeddedSerde avroEmbeddedSerde;
 
@@ -152,8 +69,6 @@ class AvroEmbeddedSerdeTest {
 
     var deserializer = avroEmbeddedSerde.deserializer("anyTopic", Serde.Target.KEY);
     DeserializeResult result = deserializer.deserialize(null, serializedRecordBytes);
-
-
     assertThat(result.getType()).isEqualTo(DeserializeResult.Type.JSON);
     assertThat(result.getAdditionalProperties()).isEmpty();
     assertJsonEquals(jsonRecord, result.getResult());
@@ -173,4 +88,5 @@ class AvroEmbeddedSerdeTest {
       return baos.toByteArray();
     }
   }
+
 }
