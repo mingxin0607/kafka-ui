@@ -81,6 +81,74 @@ public class UInt32Serde {
     }
 ```
 
+### 1.3 New Test Cases for New Implementation
+Below are test cases that tests the new, more testable implemetation for the `UInt32Serde` class. The test cases use the Mockito framework for mocking and verifying interactions.
+
+First, the test sets up the behavior of the mock to return a specific result when the `toByteArray` method is called with a given input. Then, it creates an instance of `UInt32Serde` with this mock and tests whether the serializer method produces the expected result.
+
+Similarly, it tests the deserializer method by mocking the `toString` method of the `UInt32Converter` interface.
+
+This approach allows you to isolate the code implementation from the external library, making it easier to test the `UInt32Serde` functionality.
+
+```Java
+class UInt32SerdeTest {
+
+    @Test
+    void testSerializer() {
+        // Mock the UInt32Converter interface
+        UInt32Converter converterMock = Mockito.mock(UInt32Converter.class);
+
+        // Create an instance of the UInt32Serde with the mocked converter
+        UInt32Serde serde = new UInt32Serde(converterMock);
+
+        // Set up test input
+        String testInput = "123";
+
+        // Set up the expected result
+        byte[] expectedResult = new byte[]{0, 0, 0, 123};
+
+        // Set up the behavior of the mocked converter
+        Mockito.when(converterMock.toByteArray(testInput)).thenReturn(expectedResult);
+
+        // Call the serializer method
+        byte[] result = serde.serializer("test-topic", Target.VALUE).serialize(testInput);
+
+        // Verify that the converter method was called with the correct input
+        Mockito.verify(converterMock).toByteArray(testInput);
+
+        // Verify the result matches the expected result
+        assertArrayEquals(expectedResult, result);
+    }
+
+    @Test
+    void testDeserializer() {
+        // Mock the UInt32Converter interface
+        UInt32Converter converterMock = Mockito.mock(UInt32Converter.class);
+
+        // Create an instance of the UInt32Serde with the mocked converter
+        UInt32Serde serde = new UInt32Serde(converterMock);
+
+        // Set up test input
+        byte[] testInput = new byte[]{0, 0, 0, 123};
+
+        // Set up the expected result
+        String expectedResult = "123";
+
+        // Set up the behavior of the mocked converter
+        Mockito.when(converterMock.toString(testInput)).thenReturn(expectedResult);
+
+        // Call the deserializer method
+        String result = serde.deserializer("test-topic", Target.VALUE).deserialize(testInput);
+
+        // Verify that the converter method was called with the correct input
+        Mockito.verify(converterMock).toString(testInput);
+
+        // Verify the result matches the expected result
+        assertEquals(expectedResult, result);
+    }
+}
+```
+
 ## 2. **Mocking** 
 
 ### 2.1 Mocking Concept
