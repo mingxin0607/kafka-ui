@@ -196,9 +196,9 @@ As for testing, we need to initializz and Configure the Mock Environment first.
 ```
 `MockedStatic<UUID>`: We uses Mockito to create a mock environment for the static method `randomUUID()` of the UUID class. This means that within this mock environment, the behavior of `UUID.randomUUID()` will no longer be generating a new, random UUID, but will execute according to the logic we specify.
 
-`UUID fakeUuid = new UUID(0L, 0L);`: Creates a UUID. This UUID, being a fixed value, is used to verify whether the serialization logic correctly processes this specific UUID.
+`UUID specificUuid = UUID.fromString("123e4567-e89b-12d3-a456-426614174000");`: Creates a UUID. This UUID, being a fixed value, is used to verify whether the serialization logic correctly processes this specific UUID.
 
-`mockedUuid.when(UUID::randomUUID).thenReturn(fakeUuid);`: This line specifies that when `UUID.randomUUID()` is called, it should return your fixed UUID specificUuid instead of a genuinely random UUID. This allows you to control the behavior and output of the test.
+`mockedUuid.when(UUID::randomUUID).thenReturn(specificUuid);`: This line specifies that when `UUID.randomUUID()` is called, it should return your fixed UUID specificUuid instead of a genuinely random UUID. This allows you to control the behavior and output of the test.
 
 Then we initializes an instance of `UuidBinarySerde` and configures it by calling the `configure` method. As for `serde.serializer("anyTopic", Serde.Target.VALUE);` it retrieves an instance of the Serializer for value (VALUE) serialization.
 
