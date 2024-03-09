@@ -207,6 +207,8 @@
                             <rulesets>
                                 <ruleset>rulesets/java/basic.xml</ruleset>
                                 <ruleset>rulesets/java/unusedcode.xml</ruleset>
+                                <ruleset>category/java/errorprone.xml</ruleset>
+                                <ruleset>category/java/codestyle.xml</ruleset>
                             </rulesets>
                         </configuration>
                     </plugin>

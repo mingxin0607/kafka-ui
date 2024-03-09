@@ -4,15 +4,25 @@
 ### 1.1 Definition
 
 ## 2. PMD
-### 2.1 Set up
-#### 2.1.1 Download PMD
+### 2.1 About PMD
+PMD is a static source code analysis tool that identifies various issues in source code by applying a set of rules. It helps developers improve code quality by detecting potential bugs, code smells, and other issues. PMD supports multiple programming languages, including Java, JavaScript, XML, and more. 
+
+__Features__
+
+- Rule-Based Analysis: PMD analyzes source code based on a predefined set of rules. Each rule corresponds to a specific pattern or coding practice.
+
+- Multiple Language Support: While originally designed for Java, PMD has expanded to support several languages, including JavaScript, XML, Apex, and others.
+- Customizable Rulesets: Users can customize rulesets to include or exclude specific rules based on their project's requirements.
+- Command-Line and IDE Integration: PMD can be run from the command line or integrated into popular Integrated Development Environments (IDEs) such as Eclipse, IntelliJ IDEA, and others.
+### 2.2 Set up
+#### 2.2.1 Download PMD
 We followed the instrucitons on [PMD Document](https://pmd.github.io/), and set up pmd on Linux.
 ```shell
 $ cd $HOME
 $ wget https://github.com/pmd/pmd/releases/download/pmd_releases%2F7.0.0-rc4/pmd-dist-7.0.0-rc4-bin.zip
 $ unzip pmd-dist-7.0.0-rc4-bin.zip
 ```
-#### 2.1.2 Set up PMD maven plugin
+#### 2.2.2 PMD maven plugin
 In every "pom.xml" file, we added the following configuration.
 ```xml
 <plugin>
@@ -33,6 +43,8 @@ In every "pom.xml" file, we added the following configuration.
         <rulesets>
             <ruleset>rulesets/java/basic.xml</ruleset>
             <ruleset>rulesets/java/unusedcode.xml</ruleset>
+            <ruleset>category/java/errorprone.xml</ruleset>
+            <ruleset>category/java/codestyle.xml</ruleset>
         </rulesets>
     </configuration>
 </plugin>
@@ -47,13 +59,21 @@ About this configuration:
 ```
 __basic.xml__
 
-This ruleset (basic.xml) typically includes fundamental rules that cover basic coding conventions, potential pitfalls, and general best practices. It may include rules related to naming conventions, code complexity, and other essential coding standards.
+Fundamental rules that cover basic coding conventions, potential pitfalls, and general best practices. 
 
 __unusedcode.xml__
 
-The unusedcode.xml ruleset focuses on identifying and flagging unused code, which may include unused methods, fields, or other code elements. Removing unused code can help reduce code complexity and improve maintainability.
+Focuses on identifying and flagging unused code, which may include unused methods, fields, or other code elements. Removing unused code can help reduce code complexity and improve maintainability.
 
-### 2.2 Run PMD Check
+__errorprone.xml__
+
+Targets potential bugs and error-prone constructs in the code.
+
+__codestyle.xml__
+
+Enforces coding style conventions to maintain consistent code formatting.
+
+### 2.3 Run PMD Check
 
 Under project path, run:
 ```shell
@@ -61,4 +81,4 @@ mvn pmd:check
 ```
 `pmd.html` could be found at "kafka-ui-api/target/site/pmd.html". We saved the report to "pmd-reports/site/pmd.html".
 
-### 2.3
+### 2.4 PMD Report
