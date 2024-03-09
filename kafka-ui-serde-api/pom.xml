@@ -137,6 +137,27 @@
                             </execution>
                         </executions>
                     </plugin>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-pmd-plugin</artifactId>
+                        <version>3.21.2</version> 
+                        <executions>
+                            <execution>
+                                <id>pmd-check</id>
+                                <phase>validate</phase>
+                                <goals>
+                                    <goal>check</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                        <configuration>
+                            <failOnViolation>false</failOnViolation>
+                            <rulesets>
+                                <ruleset>rulesets/java/basic.xml</ruleset>
+                                <ruleset>rulesets/java/unusedcode.xml</ruleset>
+                            </rulesets>
+                        </configuration>
+                    </plugin>
 			</plugins>
 		</pluginManagement>
 	</build>
