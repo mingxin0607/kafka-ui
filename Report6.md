@@ -82,3 +82,41 @@ mvn pmd:check
 `pmd.html` could be found at "kafka-ui-api/target/site/pmd.html". We saved the report to "pmd-reports/site/pmd.html".
 
 ### 2.4 PMD Report
+#### 2.4.1 Priority 1 Warnings
+
+`FinalParameterInAbstractMethod` in `LogoutSuccessHandler.java`
+
+This warning suggests that the parameters in abstract methods should not be declared as final. In Java, abstract methods cannot have implementation details in their declaration, and marking parameters as final is redundant. Therefore, removing the final modifier from these parameters is recommended, though it would not cause real problem.
+
+`ReturnEmptyCollectionRatherThanNull` in `MessagesController.java`
+
+This warning advises returning an empty collection (Collections.emptyList()) instead of null. It helps to avoid potential NullPointerExceptions and is a good practice for enhancing code robustness.
+
+`VariableNamingConventions`, `FieldNamingConventions` in `MessageFilters.java`
+
+The variable GROOVY_ENGINE violates naming conventions. It should either be final or start with a lowercase character. To address this, consider making the variable final (static final GROOVY_ENGINE).
+
+`FieldNamingConventions`, `VariableNamingConventions` in `Provider.java`
+
+Similar to the previous case, the static fields violate naming conventions. They should either be final or follow the appropriate naming conventions for readability and maintainability.
+
+`ConstructorCallsOverridableMethod` in `WebClientConfigurator.java`
+
+This warning indicates that a potentially overridable method is called during object construction. It can lead to unexpected behavior, as subclass methods may not be fully initialized at the time of the call. Consider refactoring the code to avoid calling overridable methods during object construction.
+
+### 2.4.2 Priority 3 Warnings
+These are some example priority 3 warnings. They are mostly about code style and could help with code readability and maintainability.
+
+`MethodArgumentCouldBeFinal` in `KafkaUiApplication.java` and `RetryingKafkaConnectClient.java`
+
+PMD suggests that the method argument args could be declared as final. This is actually not a real problem to the project.
+
+`CommentDefaultAccessModifier`, `DefaultPackage`, `LongVariable` in `ClustersProperties.java`
+
+These warnings suggest code quality improvements. Adding comments for default access modifiers, avoiding default package usage, and considering shorter variable names contribute to better code readability and maintainability.
+
+
+`AtLeastOneConstructor`, `CompareObjectsWithEquals` in `CorsGlobalConfiguration.java`
+
+Ensuring at least one constructor is a good practice. Comparing objects with equals instead of direct reference comparison is more appropriate for object equality.
+
