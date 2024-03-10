@@ -303,8 +303,6 @@ The following data is generated from the module `kafka-ui-api`.
 
 | Metrics                  | Total |
 | ------------------------ | ----- |
-| Lines of code analyzed   | 0     |
-| Classes analyzed         | 0     |
 | Packages analyzed        | 25    |
 | High Priority Warnings   | 17    |
 | Medium Priority Warnings | 277   |
