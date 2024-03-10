@@ -4,13 +4,34 @@
 
 ### 1.1 Definition
 
-### 1.2 Goals
+Static analysis tools, also known as static code analyzers, are designed to evaluate computer programs by inspecting their code without actually executing the program. These tools serve multiple goals, purposes, and have various uses in the software development lifecycle, focusing on enhancing the reliability, security, and maintainability of applications.
 
-### 1.3 purposes
+### 1.2 Goals of Static Analysis Tools
 
-### 1.4 How to Use
+1. **Error Detection**: To identify programming errors, syntax violations, and other coding issues that could lead to software failures. This includes uncovering undefined values and potential buffer overflows, which are common vulnerabilities.
+
+2. **Code Quality Improvement**: By enforcing coding standards and identifying code smells, static analysis tools aim to elevate the overall quality of the code. This ensures that the codebase is maintainable, readable, and adheres to industry or project-specific standards.
+
+3. **Security Vulnerability Identification**: These tools are instrumental in detecting security flaws early in the development process, helping prevent potential exploits that could compromise application security.
+
+4. **Compliance Verification**: Ensuring that the code complies with predefined rules and standards, whether they are industry-wide or custom-defined within a project, is a crucial goal. This helps maintain consistency and best practices across the codebase
+
+### 1.3 Purposes of Static Analysis Tools
+
+1. **Automated Code Review**: Static analysis tools automate the process of code review, saving time and reducing human error. They provide an objective assessment of the code against established rules and standards.
+
+2. **Early Bug Detection**: By identifying issues early in the software development lifecycle (SDLC), particularly before testing and execution, these tools help reduce the cost and effort of fixing bugs at later stages.
+
+3. **Ensuring software security**: Prevent the introduction of security vulnerabilities to protect the application from attacks.
 
 
+### 1.4 Uses of Static Analysis Tools
+
+1. **Integration in Development and CI/CD Pipelines**: Static analysis is often integrated into the development phase and Continuous Integration/Continuous Deployment (CI/CD) pipelines. This ensures that code is automatically scanned for issues as it is written and before it is merged or deployed, facilitating a shift-left approach in the SDLC.
+
+2. **Code Review Process**: They are used during the code review process to automate the detection of potential issues, allowing human reviewers to focus on more complex and architectural aspects of the code.
+
+3. **Quality Assurance**: Quality assurance (QA) teams use static analysis tools to verify that the codebase meets the necessary quality and security standards before it is released.
 
 ## 2. PMD (Tool 1)
 
@@ -21,7 +42,6 @@ PMD is a static source code analysis tool that identifies various issues in sour
 __Features__
 
 - Rule-Based Analysis: PMD analyzes source code based on a predefined set of rules. Each rule corresponds to a specific pattern or coding practice.
-
 - Multiple Language Support: While originally designed for Java, PMD has expanded to support several languages, including JavaScript, XML, Apex, and others.
 - Customizable Rulesets: Users can customize rulesets to include or exclude specific rules based on their project's requirements.
 - Command-Line and IDE Integration: PMD can be run from the command line or integrated into popular Integrated Development Environments (IDEs) such as Eclipse, IntelliJ IDEA, and others.
@@ -397,11 +417,77 @@ This method accesses the value of a Map entry using a key that was retrieved fro
 
 ## 4. Contrast between PMD and SpotBugs
 
+### 4.1 Comparative Analysis of Results
+
+When we choose the `ClusterSerdes.java` in the `serdes` folder from the `kafka-ui-api` for static analysis, the comparison of the results indicates that `PMD` is focused on coding standards and potential poor coding practices. It highlights:
+
+1. `DefaultPackage` suggests using explicit access modifiers to improve the encapsulation of the code.
+2. `CommentDefaultAccessModifier`, which might be a documentation practice to signify that when the intent is to use the default access modifier, it should be documented.
+3. `MethodArgumentCouldBeFinal`, which is a coding practice to prevent accidental modification of parameter values within the code.
+4. `LocalVariableCouldBeFinal`, which helps to avoid unintentional changes to variables within a method.
+
+![report6_1.png](Fig%2Freport6_1.png)
+
+Based on the specific code, the `CommentDefaultAccessModifier` issue for line 19 indicates that in the `ClusterSerdes` class, the `serdes` field does not have an explicit access modifier (such as private, protected, or public). `PMD` suggests adding a comment to indicate that this is intentional, or to explicitly specify an access modifier. The relevant line of code is:
+
+```java
+//original code
+public class ClusterSerdes implements Closeable {
+
+    final Map<String, SerdeInstance> serdes;
+
+```
+
+Here is one way to solve this problem:
+
+```java
+//original code
+public class ClusterSerdes implements Closeable {
+
+    private final Map<String, SerdeInstance> serdes;
+
+```
+
+For `MethodArgumentCouldBeFinal` case, in the method `findSerdeByPatternsOrDefault`, the parameters topic, type, and additionalCheck could be made final to prevent them from being modified:
+
+```java
+//original code
+private Optional<SerdeInstance> findSerdeByPatternsOrDefault(final String topic, final Serde.Target type, final Predicate<SerdeInstance> additionalCheck) {
+        // method implementation
+        }
 
 
+```
+For `LocalVariableCouldBeFinal`, inside the same method `findSerdeByPatternsOrDefault`, if there's a local variable that is not reassigned, it can be marked as final. This rule suggests that local variables within a method could be declared as final. This makes it clear that their values are not intended to be changed after initial assignment.
+
+```java
+//original code
+final var pattern = type == Serde.Target.KEY ? serdeInstance.topicKeyPattern : serdeInstance.topicValuePattern;
+
+
+```
+
+`SpotBugs`, only giving one warning about the `ClusterSerdes` class, is concerned with a potential security vulnerability. It points out the issue that there could be exposure of internal state by storing a mutable object in the internal representation, which is a security risk because it could potentially be exploited by malicious code to alter the state of the object.
+
+In `ClusterSerdes` class, the constructor takes a `Map<String, SerdeInstance>` as a parameter and assigns it directly to the internal `serdes` field. If the `serdes` Map passed into the `ClusterSerdes` object is modified externally, those modifications would also impact the internal state of the `ClusterSerdes` object, thus violating the principle of encapsulation.
+
+![report6_2.png](Fig%2Freport6_2.png)
+
+### 4.2 Summary and Recommendations：
+
+When we compare both tools' analyses for the same class example involving the same line of code, we can see that they each focus on different areas of concern:
+
+1. `PMD`: Emphasizes code style and coding standards, aiming to maintain code quality, readability, and consistency.
+2. `SpotBugs`: Focuses on potential runtime issues, such as errors and security vulnerabilities, with the goal of preventing faults that could occur during software execution.
+
+There is no significant overlap in the information provided by the two. `PMD` primarily offers suggestions on coding practices, whereas `SpotBugs` points out potential bugs that may affect program behavior. Both sets of warnings have their value, but the types of value are different: `PMD`'s value lies in enhancing code clarity and maintainability, and its warnings are usually not directly related to runtime errors but can help prevent potential future faults.
+`SpotBugs`' value lies in its ability to identify issues that could directly lead to program failure, which is crucial for improving an application's robustness and security. In practice, we can combine the use of both tools, based on the specific goals of the practice and by defining analysis rules, to achieve the best analytical outcomes.
 
 
 ## References
-_Introduction — spotbugs 4.8.3 documentation._ (n.d.). SpotBugs manual — spotbugs 4.8.3 documentation. https://spotbugs.readthedocs.io/en/latest/introduction.html
+[1]_Introduction — spotbugs 4.8.3 documentation._ (n.d.). SpotBugs manual — spotbugs 4.8.3 documentation. https://spotbugs.readthedocs.io/en/latest/introduction.html
 
+[2]*"What Is Static Analysis? Source Code Analysis Tools + Static Code Analyzers Overview"*. (2023, June 7). PERFORCE. Retrieved March 8, 2024, from https://www.perforce.com/blog/sca/what-static-analysis
+
+[3]*static analysis (static code analysis)*. (2020, July). TechTarge. Retrieved March 8, 2024, from https://www.techtarget.com/whatis/definition/static-analysis-static-code-analysis
 
