@@ -297,7 +297,7 @@ mvn com.github.spotbugs:spotbugs-maven-plugin:4.2.3:spotbugs
 
 #### 3.3.1 Result Table
 
-After using the spot bugs plugin, two types of report is gotten. One is in `HTML` format, and another one is in `XML` format. The report is under the `spot-bugs-report`folder under the `kafka-ui`directory.
+After using the spot bugs plugin, two types of reports is gotten. One is in `HTML` format and another one is in `XML` format. The report is under the `spot-bugs-report`folder under the `kafka-ui`directory.
 
 The following data is generated from the module `kafka-ui-api`.
 
@@ -335,27 +335,66 @@ The following data is generated from the module `kafka-ui-api`.
 
 
 #### 3.3.2 Warning Details
+In addition to providing warnings, detailed information is available for each warning, often indicated by abbreviations. Here are explanations for some of these abbreviations:  
 
-#### 3.1 Priority 1 Warning
+`EI (May expose internal representation by returning reference to mutable object)`: Indicates that there's a possibility of exposing the internal structure of an object by returning a reference to a mutable (changeable) object.
 
-`CT_CONSTRUCTOR_THROW` in `com.provectus.kafka.ui.serdes.builtin.ProtobufFileSerde$ProtoSchemaLoader`
+`EI2 (May expose internal representation by incorporating reference to a mutable object)`: Suggests that the internal representation of an object might be exposed by including a reference to a mutable object within it.
 
-This warning alerts about potential issues with the constructor in `ProtobufFileSerde$ProtoSchemaLoader`, indicating that throwing exceptions within constructors can leave objects partially initialized. While this warning highlights a potential vulnerability to Finalizer attacks, resolving it by ensuring proper initialization or using a private constructor can mitigate the risk.
+`SIC (Could be refactored into a named static inner class)`: Suggests that the class could potentially be refactored into a named static inner class.
 
-`DP_CREATE_CLASSLOADER_INSIDE_DO_PRIVILEGED` in `com.provectus.kafka.ui.serdes.SerdesInitializerTest`
+`SS (Unread field: should this field be static?)`: Indicates that a field is unread and raises a question of whether it should be static.
 
-SpotBugs flags the creation of a classloader inside `SerdesInitializerTest`, suggesting that it should occur within a `doPrivileged` block to handle potential security concerns. Addressing this warning by encapsulating the classloader creation within a privileged block can enhance security measures.
+#### Bad Practice Warnings
 
-#### 3.2 Priority 3 Warnings
+`Boxed Value Reboxing (BX_UNBOXING_IMMEDIATELY_REBOXED):`
+A boxed value is unboxed and then immediately reboxed.
 
-`DM_CONVERT_CASE` in Various Classes
+`Constructor Exception (CT_CONSTRUCTOR_THROW):`
+Be wary of letting constructors throw exceptions. Classes that throw exceptions in their constructors are vulnerable to Finalizer attacks.
 
-The warning indicates potential issues with string conversion using the default platform encoding, which may lead to improper conversions with international characters. Recommending the usage of `String.toUpperCase(Locale l)` or `String.toLowerCase(Locale l)` methods can ensure proper handling of internationalization, improving code robustness and compatibility across different platforms.
+`Duplicate Switch Clauses (DB_DUPLICATE_SWITCH_CLAUSES):`
+Method uses the same code for two switch clauses. This could indicate a case of duplicate code or a coding mistake.
 
-`NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE` in Various Classes
+#### Correctness Warnings
 
-This warning highlights potential null pointer dereference issues due to unchecked return values from called methods. By adding appropriate null checks, developers can prevent potential `NullPointerException` errors, enhancing code reliability and stability.
+`Dead Local Store (DLS_DEAD_LOCAL_STORE):`
+This instruction assigns a value to a local variable, but the value is not read or used in any subsequent instruction. Often, this indicates an error because the value computed is never used.
 
+`Redundant Nullcheck (RCN_REDUNDANT_NULLCHECK_OF_NONNULL_VALUE):`
+This method contains a redundant check of a known non-null value against the constant null.
+
+`Uncalled Private Method (UPM_UNCALLED_PRIVATE_METHOD):`
+This private method is never called. Consider removing it if it's not intended for reflection usage.
+
+#### Experimental Warnings
+
+`Should Be Static (SS_SHOULD_BE_STATIC):`
+Unread field: should this field be static? Consider making the field static since it's initialized to a compile-time static value.
+
+#### Internationalization Warnings
+
+`Reliance on Default Encoding (DM_DEFAULT_ENCODING):`
+Found a call to a method that will perform a byte to String (or String to byte) conversion, assuming that the default platform encoding is suitable. This may cause application behavior to vary between platforms.
+
+`Consider Using Locale Parameterized Version (DM_CONVERT_CASE):`
+A String is being converted to upper or lowercase using the platform's default encoding. Consider using String.toUpperCase(Locale l) or String.toLowerCase(Locale l) versions instead.
+
+#### Malicious Code Vulnerability Warnings
+
+`Classloader Creation Inside doPrivileged (DP_CREATE_CLASSLOADER_INSIDE_DO_PRIVILEGED):`
+Classloaders should only be created inside a doPrivileged block for security reasons.
+
+`System.exit Invocation (DM_EXIT):`
+Invoking System.exit shuts down the entire Java virtual machine. Consider throwing a RuntimeException instead to avoid abrupt shutdowns.
+
+#### Performance Warnings
+
+`Unread Public/Protected Field (URF_UNREAD_PUBLIC_OR_PROTECTED_FIELD):`
+This field is never read. Consider removing it if not intended for external usage.
+
+`Inefficient Map Iterator Usage (WMI_WRONG_MAP_ITERATOR):`
+This method accesses the value of a Map entry using a key that was retrieved from a keySet iterator. It's more efficient to use an iterator on the entrySet of the map.
 
 
 ## 4. Contrast between PMD and SpotBugs
