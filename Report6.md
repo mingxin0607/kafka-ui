@@ -469,9 +469,17 @@ final var pattern = type == Serde.Target.KEY ? serdeInstance.topicKeyPattern : s
 
 `SpotBugs`, only giving one warning about the `ClusterSerdes` class, is concerned with a potential security vulnerability. It points out the issue that there could be exposure of internal state by storing a mutable object in the internal representation, which is a security risk because it could potentially be exploited by malicious code to alter the state of the object.
 
+![report6_2.png](Fig%2Freport6_2.png)
+
 In `ClusterSerdes` class, the constructor takes a `Map<String, SerdeInstance>` as a parameter and assigns it directly to the internal `serdes` field. If the `serdes` Map passed into the `ClusterSerdes` object is modified externally, those modifications would also impact the internal state of the `ClusterSerdes` object, thus violating the principle of encapsulation.
 
-![report6_2.png](Fig%2Freport6_2.png)
+```java
+//original code
+public class ClusterSerdes implements Closeable {
+
+    final Map<String, SerdeInstance> serdes;
+
+```
 
 ### 4.2 Summary and Recommendations：
 
