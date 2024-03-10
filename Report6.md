@@ -404,6 +404,6 @@ This method accesses the value of a Map entry using a key that was retrieved fro
 
 
 ## References
-_Introduction — spotbugs 4.8.3 documentation. _(n.d.). SpotBugs manual — spotbugs 4.8.3 documentation. https://spotbugs.readthedocs.io/en/latest/introduction.html
+_Introduction — spotbugs 4.8.3 documentation._ (n.d.). SpotBugs manual — spotbugs 4.8.3 documentation. https://spotbugs.readthedocs.io/en/latest/introduction.html
 
 
