@@ -175,13 +175,13 @@ SpotBugs is a powerful static analysis tool used to identify potential bugs in J
 
    - Extract the downloaded distribution into a directory of your choice.
 
-   - For gzipped tar format:
+     For gzipped tar format:
 
      ```
      $ gunzip -c spotbugs-4.8.3.tgz | tar xvf -
      ```
 
-   - For zip format:
+     For zip format:
 
      ```
      $ unzip spotbugs-4.8.3.zip
@@ -207,7 +207,7 @@ SpotBugs is a powerful static analysis tool used to identify potential bugs in J
 
 **Step 1: Configure SpotBugs Maven Plugin**
 
-Add the following configuration to the `pom.xml` file of t he project:
+Add the following configuration to the `pom.xml` file of the project:
 
 ```xml
 <plugin>
